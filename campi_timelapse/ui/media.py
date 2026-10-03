@@ -8,15 +8,14 @@ expire). So:
 - every read opens with FILE_SHARE_READ | FILE_SHARE_WRITE | FILE_SHARE_DELETE, and no handle is held between
   requests or even between chunks: open -> seek -> read -> close (a few ms). A delete succeeds even mid-read; a
   replace can only collide with one of those few-ms reads (render.replace_retry retries);
-- Range responses are capped at RANGE_CAP bytes; the player simply asks for the next range. A file that disappears
-  mid-response ends the response early, which closes the connection.
+- a response is exactly the range requested (or the whole file), streamed in CHUNK reads when it's large. A file that
+  disappears mid-response ends the response early, which closes the connection.
 """
 from __future__ import annotations
 
 import logging
 import os
 import re
-import time
 from email.utils import formatdate
 from pathlib import Path, PurePosixPath
 
@@ -25,7 +24,7 @@ from .contract import ApiError
 
 log = logging.getLogger("ui.media")
 
-RANGE_CAP = 4 * 1024 * 1024
+ONE_READ_MAX = 4 * 1024 * 1024  # larger responses are streamed in CHUNK reads
 CHUNK = 1024 * 1024
 DAILY_RE = re.compile(r"^campi_daily_(\d{4}-\d{2}-\d{2})\.mp4$")
 ARCHIVE_RE = re.compile(r"^campi_archive_(\d{3})\.mp4$")
@@ -166,47 +165,40 @@ def serve(request, path: Path, name: str, cache_control: str):
         return Response(body, status_code=416, media_type="application/json",
                         headers={**headers, "Content-Range": f"bytes */{size}"})
 
+    # Exactly the bytes asked for (AVPlayer doesn't accept a 206 shorter than the range it requested)
     if rng is not None:
         start, end = rng
-        end = min(end, start + RANGE_CAP - 1)
-        length = end - start + 1
-        rh = {**headers, "Content-Range": f"bytes {start}-{end}/{size}", "Content-Length": str(length)}
-        if request.method == "HEAD":
-            return Response(status_code=206, headers=rh, media_type=ctype)
-        t0 = time.perf_counter()
+        status = 206
+        headers["Content-Range"] = f"bytes {start}-{end}/{size}"
+    else:
+        start, end, status = 0, size - 1, 200
+    length = end - start + 1
+    headers["Content-Length"] = str(length)
+    if request.method == "HEAD":
+        return Response(status_code=status, headers=headers, media_type=ctype)
+
+    if length <= ONE_READ_MAX:  # images, and the small ranges players probe with: one read
         try:
             data = read_at(path, start, length)
         except OSError:
             raise ApiError(404, "not_found", f"{name} no longer exists") from None
         if len(data) != length:  # shrank or was replaced between stat and read: let the client retry
             raise ApiError(404, "not_found", f"{name} changed while reading")
-        log.debug("206 %s bytes %d-%d/%d (file open %.0f ms)", name, start, end, size, (time.perf_counter() - t0) * 1000)
-        return Response(data, status_code=206, media_type=ctype, headers=rh)
+        return Response(data, status_code=status, media_type=ctype, headers=headers)
 
-    headers["Content-Length"] = str(size)
-    if request.method == "HEAD":
-        return Response(status_code=200, headers=headers, media_type=ctype)
-    if size <= RANGE_CAP:  # images and small files: one read
-        try:
-            data = read_at(path, 0, size)
-        except OSError:
-            raise ApiError(404, "not_found", f"{name} no longer exists") from None
-        if len(data) != size:
-            raise ApiError(404, "not_found", f"{name} changed while reading")
-        return Response(data, media_type=ctype, headers=headers)
-
-    def chunks():  # no Range header on a big file: stream it, reopening per chunk; stop if it disappears
-        pos = 0
-        while pos < size:
+    def chunks():  # reopen per chunk (nothing stays open between them); stop if the file disappears
+        pos = start
+        while pos <= end:
             try:
-                b = read_at(path, pos, min(CHUNK, size - pos))
+                b = read_at(path, pos, min(CHUNK, end + 1 - pos))
             except OSError:
                 log.info("%s went away at byte %d; response ended", name, pos)
                 return
             if not b:
+                log.info("%s shrank at byte %d; response ended", name, pos)
                 return
             pos += len(b)
             yield b
 
-    log.info("200 %s streamed in %d KB chunks (%d bytes)", name, CHUNK // 1024, size)
-    return StreamingResponse(chunks(), media_type=ctype, headers=headers)
+    log.info("%d %s bytes %d-%d/%d streamed in %d KB chunks", status, name, start, end, size, CHUNK // 1024)
+    return StreamingResponse(chunks(), status_code=status, media_type=ctype, headers=headers)

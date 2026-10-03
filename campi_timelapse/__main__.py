@@ -3,25 +3,21 @@ from __future__ import annotations
 
 import argparse
 import json
-import shutil
 import sys
 import time
 from datetime import date
 
-from .config import load_config, read_json, setup_logging, side_log, write_json
+from .config import load_config, setup_logging, side_log, write_json
 
 
 def cmd_status(cfg) -> int:
-    st = read_json(cfg.paths.state / "status.json", {}) or {}
-    cap = read_json(cfg.paths.state / "capture.json", {}) or {}
-    clip = read_json(cfg.paths.state / "last_clip.json", {}) or {}
-    daily = read_json(cfg.paths.state / "last_daily.json", {}) or {}
-    now = time.time()
+    from .status import gather
+    g = gather(cfg)
+    st, cap, clip, daily, now, alive = g["service"], g["capture"], g["last_clip"], g["last_daily"], g["now"], g["alive"]
 
     def ago(ts):
         return f"{now - ts:.0f}s ago" if ts else "never"
 
-    alive = st.get("supervisor_pid") and now - st.get("updated", 0) < 30
     print(f"service      : {'RUNNING' if alive else 'STOPPED'}"
           + (f" (pid {st['supervisor_pid']}, heartbeat {ago(st.get('updated'))})" if alive else ""))
     if alive:
@@ -40,70 +36,17 @@ def cmd_status(cfg) -> int:
     if daily:
         print(f"last daily   : {daily.get('status')} {daily.get('day', '')}: "
               f"{daily.get('out') or daily.get('reason') or daily.get('error')}")
-    print(f"sightings    : {sightings_status(cfg, st if alive else {}, now)}")
+    print(f"sightings    : {g['sightings']['line']}")
     if alive:
-        print(f"gaming       : {gaming_status(cfg, st)}")
-        q = st.get("render_queue") or 0
-        print(f"render queue : {q} window(s)" + (f", oldest ending {st.get('render_queue_oldest')}" if q else "")
-              + ("; DEFERRED (gaming)" if st.get("renders_deferred") else ""))
-    print(f"disk free    : {shutil.disk_usage(cfg.paths.frames).free / 1e9:.1f} GB ({cfg.paths.frames.drive})")
+        print(f"gaming       : {g['gaming']['line']}")
+        q = g["render_queue"]["windows"]
+        print(f"render queue : {q} window(s)" + (f", oldest ending {g['render_queue']['oldest']}" if q else "")
+              + ("; DEFERRED (gaming)" if g["render_queue"]["deferred"] else ""))
+    print(f"disk free    : {g['disk']['free_gb']:.1f} GB ({g['disk']['drive']})")
     print(f"frames       : {cfg.paths.frames}")
     print(f"clips        : {cfg.paths.out}")
     print(f"logs         : {cfg.paths.logs}")
     return 0 if alive else 3
-
-
-def sightings_status(cfg, st: dict, now: float) -> str:
-    """One-line state of the optional sightings worker (stdlib only: no torch import here)."""
-    if not cfg.sightings.enabled:
-        return "disabled"
-    if not cfg.paths.sightings_python.exists():
-        return "NOT INSTALLED (run install.ps1 -Sightings)"
-    from . import sightings_db
-    ws = read_json(cfg.paths.state / "sightings.json", {}) or {}
-    pid = st.get("sightings_pid")
-    if st.get("sightings_crash_looping"):
-        nxt = st.get("sightings_next_start") or now
-        line = (f"CRASH-LOOPING ({st.get('sightings_recent_exits')} exits in 15 min; "
-                f"next try in {max(0, nxt - now):.0f}s; last error: {ws.get('last_error') or 'see campi logs sightings'})")
-    elif st.get("sightings_paused"):
-        line = "paused: gaming"
-    elif pid and pid in (ws.get("pid"), ws.get("ppid")):
-        dev = ("CPU FALLBACK" if ws.get("cpu_fallback") else
-               f"{ws.get('device')} {ws.get('device_name') or ''}".strip() if ws.get("device") else "(loading models)")
-        line = (f"running (pid {pid}, {ws.get('phase')}, restarts {st.get('sightings_restarts', 0)}); "
-                f"{ws.get('backend', cfg.sightings.backend)} on {dev}; classify queue {ws.get('classify_queue', 0)}")
-        if cfg.sightings.cloud.enabled:
-            line += (f"; cloud {ws.get('cloud_today', '?')}/{cfg.sightings.cloud.cloud_max_per_day} today, "
-                     f"{ws.get('cloud_pending', 0)} queued")
-    elif pid:
-        line = f"starting (pid {pid})"
-    else:
-        line = "not running" if st else "service stopped"
-    summ = sightings_db.summary(cfg.paths.sightings)
-    if summ:
-        last = summ["last"]
-        line += (f"; last sighting {sightings_db.local_str(last) if last else 'never'}, "
-                 f"today {summ['today']}, total {summ['total']}")
-    return line
-
-
-def gaming_status(cfg, st: dict) -> str:
-    g = st.get("gaming") or {}
-    if not g:
-        return "not polled yet"
-    if g.get("error"):
-        return f"detection error: {g['error']}"
-    mode = g.get("mode", "auto")
-    if g.get("active"):
-        since = g.get("since")
-        line = f"ACTIVE: {g.get('exe')}" + (f" for {(time.time() - since) / 60:.0f} min" if since else "")
-    else:
-        line = {"off": "off (campi game off)", "on": "on"}.get(mode, "auto, no game running" if cfg.gaming.auto
-                                                                   else "auto detection disabled")
-    if g.get("counters") and g["counters"] != "ok":
-        line += f"; GPU counters {g['counters']}"
-    return line + f" [mode {mode}]"
 
 
 def cmd_game(cfg, mode: str) -> int:
@@ -160,6 +103,20 @@ def cmd_sightings(cfg, n: int) -> int:
     print(sightings_db.format_rows(rows))
     print(f"media: {cfg.paths.sightings}")
     return 0
+
+
+def cmd_ui(cfg, args) -> int:
+    """Desktop UI (own venv). Never imported by the service or any other command."""
+    try:
+        from .ui import desktop
+    except ImportError as e:
+        if sys.stdout is not None:
+            print(f"the UI needs its own env: run install.ps1 -UI ({e})")
+        return 1
+    rc = desktop.run(cfg, browser=args.browser, port=args.port, host=args.host)
+    if not args.browser:
+        desktop.main_exit(rc)  # WebView2 / pythonnet threads must not keep the process alive
+    return rc
 
 
 def cmd_samples(cfg) -> int:
@@ -223,6 +180,10 @@ def main(argv=None) -> int:
     sub.add_parser("rife-bench", help="render one recent window with RIFE on the NVIDIA and the Intel GPU")
     gm = sub.add_parser("game", help="gaming mode override")
     gm.add_argument("mode", choices=["on", "off", "auto"])
+    ui = sub.add_parser("ui", help="desktop app: sightings, clips, daily videos, highlights (venv-ui; install.ps1 -UI)")
+    ui.add_argument("--browser", action="store_true", help="open in the default browser instead of a window")
+    ui.add_argument("--port", type=int, default=8765)
+    ui.add_argument("--host", default="127.0.0.1", help="bind address (default: this PC only)")
     args = ap.parse_args(argv)
 
     cfg = load_config(args.config)
@@ -234,6 +195,8 @@ def main(argv=None) -> int:
         return cmd_sightings(cfg, args.n)
     if args.cmd == "game":
         return cmd_game(cfg, args.mode)
+    if args.cmd == "ui":
+        return cmd_ui(cfg, args)
 
     log_name = {"run": "supervisor", "render-clip": "render", "render-daily": "daily",
                 "sightings-worker": "sightings"}.get(args.cmd, args.cmd)

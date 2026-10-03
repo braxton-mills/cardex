@@ -27,6 +27,7 @@ campi archive       # append any clips not yet in the archive (runs automaticall
 campi sightings [N] # optional vehicle sightings (see Sightings below)
 campi game on|off|auto   # gaming mode override (see Gaming below)
 campi rife-bench    # render one recent window with RIFE on the NVIDIA and the Intel GPU (work folder only)
+campi ui [--browser] [--port N]   # desktop app for sightings, clips, daily videos (see UI below)
 ```
 
 ## Gaming and the render queue
@@ -165,3 +166,81 @@ How it behaves:
   `keep_clips_days` (and clears `clip_path`); crops, frames and rows are kept forever.
 - Labels: `sightings_labels.txt` (`Make | Model` or a generic type per line). `car_id.py` is the original
   standalone script, kept for reference.
+
+## UI (optional)
+`campi ui` opens a desktop window for browsing everything the service makes: sightings, 10-minute clips, daily
+videos, the archive, highlights and the live camera. The service runs in the background session (session 0) and
+can't show windows, so the UI is a separate, on-demand process in your desktop session. It only reads what the
+service writes; closing the window ends it.
+
+Install: `powershell -ExecutionPolicy Bypass -File install.ps1 -UI` creates its own env
+(`%USERPROFILE%\CampiTimelapse\venv-ui`: fastapi, uvicorn, pywebview), checks for the Edge WebView2 runtime
+(preinstalled on Windows 11; otherwise `winget install Microsoft.EdgeWebView2Runtime`) and adds a Start Menu
+shortcut **Campi**. The service env is untouched.
+
+Launch: the **Campi** Start Menu shortcut (no console window), or
+```
+campi ui                 # window (Edge WebView2); the console returns immediately
+campi ui --browser       # in your default browser instead; Ctrl+C stops it
+campi ui --port 8800     # default 8765; it listens on 127.0.0.1 only (--host to change, not recommended)
+```
+Launching it again brings the open window to the front.
+
+What it never does: write to `state\`, `frames\`, the clips folder or the sightings media folder; open
+`sightings.db` read-write (it uses `sightings_db.connect_ro`); keep a file open between requests. Video is served
+in HTTP ranges, each read opening and closing the file within a few ms (delete access shared), so renders, the
+archive append and housekeeping never wait on it. `latest.mp4` is never served (it resolves to the dated clip in
+`state\latest.json`), nor is the archive part still being appended to (`part` in `state\archive.json`). Never
+launching it changes nothing: only `campi ui` imports it, from its own env.
+
+Its own data, in `%USERPROFILE%\CampiTimelapse\ui\`: `ui.db` (your stars, hidden sightings and label
+corrections), `ui.log`, and `webview\` (the window's browser profile).
+
+Views (sidebar; dark theme). Keys: `J`/`K` next/previous, `Space` play/pause, `S` star, `Enter` open, `Esc` close.
+- **Today**: status strip (the same data as `campi status`, refreshed every 30 s: service, stream, last/next
+  clip, sightings backend and device, Gemini calls, gaming, render queue, disk), the newest 10-minute clip playing,
+  today's counts, the latest sightings and today's highlights.
+- **Highlights**, newest first, filterable: *new catches* (first-ever sighting of a label), *rare* (labels seen 3
+  times or fewer), *busiest windows* (the 3 ten-minute windows per day with the most moving vehicles), each day's
+  *daily video*, and anything you *starred*.
+- **Sightings**: card grid (crop, label, confidence, time, direction, years, color, and who decided the label:
+  SigLIP, Gemini or You), filters for dates, make, class, source, unsure, parked, starred and hidden. A card opens
+  the detail panel: crop, full frame, clip, runner-up guesses, **View in timelapse**, star, hide, and **correct
+  label** (stored in `ui.db`; the API applies it everywhere, including counts and the collection).
+- **View in timelapse** opens the 10-minute clip covering the car, paused on the frame captured during the pass:
+  offset = usable frames in that window before the car / `output.base_fps`, the same layout `render_frames` uses
+  (exact while the clip exists; its raw frames outlive it). Once the clip has expired it opens that day's daily
+  video at the proportional position, marked *approximate*.
+- **Collection**: every label in `sightings_labels.txt` as a tile, caught or not, with count, first and last seen,
+  and a rarity tier computed from the counts (legendary 1, rare 2-3, uncommon 4-15, common more), plus cars Gemini
+  named that aren't in the list (*discovered*). Progress bar: X of Y caught. A caught tile opens its sightings.
+- **Timelapse**: the last 24 h of 10-minute clips grouped by hour, the daily videos and the archive parts (all
+  playable except the part still being written), each with **Show in folder**.
+- **Live**: the camera through `/live.mjpg`, leveled like the renders. Connected only while this view is showing
+  and the window isn't minimized: every viewer is another full stream over the Pi's Wi-Fi.
+
+With sightings off, the sightings views say so (and still show any history already recorded).
+
+### API
+The window uses a plain JSON API, meant to stay stable for other clients (an iPhone app later). Interactive docs:
+`http://127.0.0.1:8765/api/docs`. Times are ISO 8601: `*_at` in UTC as stored, `*_local` with the PC's offset.
+Lists are `{"items": [...], "next_cursor": ...}`; pass `cursor` (or `before` for highlights) to get the next page.
+
+| Endpoint | Returns |
+|---|---|
+| `GET /api/status` | everything `campi status` shows, structured (`sightings.line` / `gaming.line` are the CLI's text), plus `sightings_enabled` and a few config values |
+| `GET /api/sightings?from&to&make&class&source&label&hide_unsure&hide_stationary&starred&include_hidden&cursor&limit` | sightings, newest first (`from`/`to` are local dates; `source` = `siglip`, `cloud` or `user`) |
+| `GET /api/sightings/{id}` | one sighting with `frame_url`, `clip_url` (null once expired), `runner_ups`, SigLIP's answer, cloud state, `seek_ts` |
+| `POST /api/sightings/{id}/star`, `/hide` | body `{"value": true}`; returns the sighting |
+| `POST /api/sightings/{id}/label` | body `{"label": "Honda Civic"}` (or `null` to undo); returns the sighting |
+| `GET /api/today` | today's counts (total, by class, by label source, different labels, new catches) |
+| `GET /api/collection` | `{caught, total, discovered, items: [{label, make, model, generic, discovered, count, tier, first_seen, last_seen}]}` |
+| `GET /api/highlights?type=new_catch,rare,busy_window,daily,starred&before&limit` | highlight items `{type, types, at, title, sighting / window / daily / clip}` |
+| `GET /api/clips?hours=24`, `GET /api/clips/newest` | 10-minute clips (start, end, size, sighting count, starred, `url`) |
+| `GET /api/daily` | daily videos |
+| `GET /api/archive` | archive parts; the current one has `current: true` and `url: null` |
+| `GET /api/seek?ts=` | `{kind: clip/daily, name, url, offset_s, duration_s, fraction, frame_at, approximate}` for a time (epoch or ISO), or 404 |
+| `POST /api/videos/{clips,daily}/{name}/star` | body `{"value": true}` |
+| `POST /api/desktop/reveal` | body `{"root", "path"}`: Show in folder (this PC only) |
+| `GET /media/{clips,daily,archive,sightings}/{path}` | the files, with HTTP Range; nothing outside those folders, never `latest.mp4` or the current archive part |
+| `GET /live.mjpg` | the camera stream (at most 2 viewers; one Pi connection each, closed when the viewer leaves) |

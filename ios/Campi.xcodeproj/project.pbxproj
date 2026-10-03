@@ -15,6 +15,7 @@
 		40EE5FD23A1E386620E7D4DE /* Badges.swift in Sources */ = {isa = PBXBuildFile; fileRef = 57FA544A415D300B8E119BF3 /* Badges.swift */; };
 		45FD47A0EC2628DE07F6D9D1 /* LabelPickerView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 303A36E5C88D9218DF1F93B0 /* LabelPickerView.swift */; };
 		52CC54D15295CA97856B04B1 /* CampiKit in Frameworks */ = {isa = PBXBuildFile; productRef = C38C3DA85464FB33EAAA3DE9 /* CampiKit */; };
+		561B6344763343687C16DA99 /* MediaSaver.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9BB631B9487AA0A678C2C25C /* MediaSaver.swift */; };
 		786C29246F9ECCE07F1BE32C /* SettingsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = DD247E2EB2267C55A4F08A5F /* SettingsView.swift */; };
 		7DAFE2353591790E0671832E /* TodayModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = D57E5E87171B8F4122942817 /* TodayModel.swift */; };
 		82DF684D58ACC85F085E158C /* SightingsModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = C5F7F80899FD8B7A14D1796C /* SightingsModel.swift */; };
@@ -27,6 +28,7 @@
 		C54A645D46F5E46FEEFE5353 /* SightingStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = F6713C58CB0D8B470730FB61 /* SightingStore.swift */; };
 		D90FC23952D39993941BC901 /* CampiApp.swift in Sources */ = {isa = PBXBuildFile; fileRef = 79182482FD527B71C6977FA5 /* CampiApp.swift */; };
 		ED13FCFD10572138D5995061 /* Formatting.swift in Sources */ = {isa = PBXBuildFile; fileRef = 251F3A9F83732407FE7E1EE8 /* Formatting.swift */; };
+		F3EA889E5D2371B75BE836A2 /* TimelapseView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 84AC9EE4BA7FE9F8F54B2BBD /* TimelapseView.swift */; };
 		F5C8C766CA78D63B516F86BE /* PlayerView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 70F09E70F330808A90E5E281 /* PlayerView.swift */; };
 		F9AD438088856016D7AC0C1D /* RemoteImage.swift in Sources */ = {isa = PBXBuildFile; fileRef = 11198FCA1C6DF015D1E32A14 /* RemoteImage.swift */; };
 		FDA4717F4D00BE6C21050A75 /* SightingFilterView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3796895C830058CD2D5A3B22 /* SightingFilterView.swift */; };
@@ -58,6 +60,8 @@
 		5A2AF8456A878CD732AB84DA /* Assets.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; path = Assets.xcassets; sourceTree = "<group>"; };
 		70F09E70F330808A90E5E281 /* PlayerView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PlayerView.swift; sourceTree = "<group>"; };
 		79182482FD527B71C6977FA5 /* CampiApp.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CampiApp.swift; sourceTree = "<group>"; };
+		84AC9EE4BA7FE9F8F54B2BBD /* TimelapseView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TimelapseView.swift; sourceTree = "<group>"; };
+		9BB631B9487AA0A678C2C25C /* MediaSaver.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MediaSaver.swift; sourceTree = "<group>"; };
 		AE8C003F6CBE22F6E0AF2C61 /* SightingDetailView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SightingDetailView.swift; sourceTree = "<group>"; };
 		C5658DCF12B1BFDCC7CAFC16 /* Campi.entitlements */ = {isa = PBXFileReference; lastKnownFileType = text.plist.entitlements; path = Campi.entitlements; sourceTree = "<group>"; };
 		C5F7F80899FD8B7A14D1796C /* SightingsModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SightingsModel.swift; sourceTree = "<group>"; };
@@ -130,6 +134,7 @@
 			children = (
 				57FA544A415D300B8E119BF3 /* Badges.swift */,
 				251F3A9F83732407FE7E1EE8 /* Formatting.swift */,
+				9BB631B9487AA0A678C2C25C /* MediaSaver.swift */,
 				11198FCA1C6DF015D1E32A14 /* RemoteImage.swift */,
 				F6713C58CB0D8B470730FB61 /* SightingStore.swift */,
 			);
@@ -158,6 +163,7 @@
 				83AEC35FBF972A2C313B7124 /* Settings */,
 				3A47446909D8DC9DF82FD8C7 /* Shared */,
 				F3CF86D706D6CE927DDB490C /* Sightings */,
+				8E74463AF65BCDDF6758C98F /* Timelapse */,
 				AF442BE55E548748EB4DD857 /* Today */,
 				C5658DCF12B1BFDCC7CAFC16 /* Campi.entitlements */,
 				F7F3A236A03C0059E6C0CB95 /* Info.plist */,
@@ -181,6 +187,14 @@
 				DD247E2EB2267C55A4F08A5F /* SettingsView.swift */,
 			);
 			path = Settings;
+			sourceTree = "<group>";
+		};
+		8E74463AF65BCDDF6758C98F /* Timelapse */ = {
+			isa = PBXGroup;
+			children = (
+				84AC9EE4BA7FE9F8F54B2BBD /* TimelapseView.swift */,
+			);
+			path = Timelapse;
 			sourceTree = "<group>";
 		};
 		A17638718EB11E9F7649892B /* Pairing */ = {
@@ -336,6 +350,7 @@
 				ED13FCFD10572138D5995061 /* Formatting.swift in Sources */,
 				B8A8BAAFCB29DFD038E2C4D0 /* HighlightsView.swift in Sources */,
 				45FD47A0EC2628DE07F6D9D1 /* LabelPickerView.swift in Sources */,
+				561B6344763343687C16DA99 /* MediaSaver.swift in Sources */,
 				0CE19E9A06368C38AFE93124 /* PairingView.swift in Sources */,
 				F5C8C766CA78D63B516F86BE /* PlayerView.swift in Sources */,
 				F9AD438088856016D7AC0C1D /* RemoteImage.swift in Sources */,
@@ -347,6 +362,7 @@
 				82DF684D58ACC85F085E158C /* SightingsModel.swift in Sources */,
 				0B1EF2E03E121E0E3C5803A0 /* SightingsView.swift in Sources */,
 				04828B348F05CECD58F81D59 /* StatusDetailView.swift in Sources */,
+				F3EA889E5D2371B75BE836A2 /* TimelapseView.swift in Sources */,
 				7DAFE2353591790E0671832E /* TodayModel.swift in Sources */,
 				AA9C17E25599BE6A53C0FF4E /* TodayView.swift in Sources */,
 			);

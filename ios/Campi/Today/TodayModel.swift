@@ -7,6 +7,7 @@ final class TodayModel {
     private(set) var status: Status?
     private(set) var latest: [Sighting] = []
     private(set) var highlights: [Highlight] = []
+    private(set) var newestClip: Clip?
     private(set) var error: APIError?
     private(set) var lastRefresh: Date?
     private(set) var isLoading = false
@@ -23,6 +24,12 @@ final class TodayModel {
             async let latest = status.sightings.hasHistory ? client.sightings(query).items : []
             async let highlights = client.highlights(HighlightQuery(from: status.today, to: status.today, limit: 10)).items
             let (l, h) = try await (latest, highlights)
+            // the newest clip can expire or be replaced between status and this call: not an error
+            if let id = status.latestClipId, id != newestClip?.id {
+                newestClip = try? await client.clip(id: id)
+            } else if status.latestClipId == nil {
+                newestClip = nil
+            }
             self.status = status
             self.latest = l
             self.highlights = h

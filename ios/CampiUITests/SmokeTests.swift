@@ -181,6 +181,71 @@ final class SmokeTests: XCTestCase {
     }
 
     @MainActor
+    func testTimelapseSaveAndShare() async throws {
+        // fallback if the simulator wasn't pre-granted (xcrun simctl privacy <sim> grant photos-add <bundle>)
+        addUIInterruptionMonitor(withDescription: "Photos permission") { alert in
+            for title in ["Allow Full Access", "Allow", "OK"] where alert.buttons[title].exists {
+                alert.buttons[title].tap()
+                return true
+            }
+            return false
+        }
+        let app = try await launchPaired()
+        XCTAssertTrue(app.buttons["today.newestClip"].waitForExistence(timeout: 10), "no newest clip on Today")
+        sleep(1)
+        attach(app, "16-today-newest-clip")
+
+        app.tabBars.buttons["Timelapse"].tap()
+        let clip = app.buttons.matching(identifier: "timelapse.clip").firstMatch
+        XCTAssertTrue(clip.waitForExistence(timeout: 10))
+        sleep(1)
+        attach(app, "17-clips")
+        clip.tap()
+        let done = app.buttons["player.done"]
+        XCTAssertTrue(done.waitForExistence(timeout: 10))
+        sleep(2)
+        attach(app, "18-clip-player")
+        done.tap()
+
+        // Save to Photos from the context menu
+        openMenu(on: clip, item: "Save to Photos", in: app).tap()
+        XCTAssertTrue(app.staticTexts["Saved to Photos"].waitForExistence(timeout: 30), "save didn't finish")
+        attach(app, "19-saved-to-photos")
+
+        // Share sheet (after the "Saved" banner goes away)
+        _ = app.staticTexts["Saved to Photos"].waitForNonExistence(timeout: 6)
+        openMenu(on: clip, item: "Share…", in: app).tap()
+        let sheet = app.otherElements["ActivityListView"]
+        XCTAssertTrue(waitForAny([sheet, app.buttons["Copy"], app.cells["Copy"]], timeout: 20), "share sheet didn't open")
+        sleep(1)
+        attach(app, "20-share-sheet")
+        if app.buttons["Close"].exists { app.buttons["Close"].tap() } else { app.swipeDown(velocity: .fast) }
+
+        // Daily and archive lists
+        XCTAssertTrue(app.buttons["Daily"].waitForExistence(timeout: 5))
+        app.buttons["Daily"].tap()
+        XCTAssertTrue(app.buttons.matching(identifier: "timelapse.daily").firstMatch.waitForExistence(timeout: 10))
+        sleep(1)
+        attach(app, "21-daily")
+        app.buttons["Archive"].tap()
+        XCTAssertTrue(app.buttons.matching(identifier: "timelapse.archive").firstMatch.waitForExistence(timeout: 10))
+        attach(app, "22-archive")
+    }
+
+    /// Long-presses for the context menu and returns `item`, retrying the press once (it can miss while
+    /// another animation is finishing).
+    @MainActor
+    private func openMenu(on el: XCUIElement, item: String, in app: XCUIApplication) -> XCUIElement {
+        for _ in 0..<2 {
+            el.press(forDuration: 1.2)
+            if app.buttons[item].waitForExistence(timeout: 3) { return app.buttons[item] }
+            app.navigationBars.firstMatch.tap()   // dismiss whatever came up, without hitting a row
+        }
+        XCTFail("context menu item \(item) never appeared")
+        return app.buttons[item]
+    }
+
+    @MainActor
     private func waitFor(_ el: XCUIElement, value: String, timeout: TimeInterval = 10) -> Bool {
         let exp = XCTNSPredicateExpectation(predicate: NSPredicate(format: "value == %@", value), object: el)
         return XCTWaiter.wait(for: [exp], timeout: timeout) == .completed

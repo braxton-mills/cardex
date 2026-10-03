@@ -18,6 +18,8 @@ final class AppModel {
 
     /// Latest known version of every sighting the user acted on, so all screens agree (M2).
     let sightings = SightingStore()
+    /// Save to Photos / Share downloads (M3).
+    let saver = MediaSaver()
     /// The label collection, shared by Collection, the label picker and the make filter.
     private(set) var collection: LabelCollection?
     /// Set when a label correction changed counts; Collection reloads on next appearance.

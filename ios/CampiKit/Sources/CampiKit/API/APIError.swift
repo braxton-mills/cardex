@@ -45,7 +45,7 @@ public enum APIError: Error, Hashable, Sendable, LocalizedError {
         }
     }
 
-    static func from(transport error: any Error) -> APIError {
+    public static func from(transport error: any Error) -> APIError {
         if let e = error as? APIError { return e }
         if let u = error as? URLError { return .unreachable(u.localizedDescription) }
         return .unreachable(error.localizedDescription)

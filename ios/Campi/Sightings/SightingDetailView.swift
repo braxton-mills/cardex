@@ -53,6 +53,20 @@ struct SightingDetailView: View {
                         }
                     }
                     Divider()
+                    if let crop = s.media.crop {
+                        Button("Save Crop to Photos", systemImage: "photo.badge.arrow.down") {
+                            app.saver.saveImage(crop, fileName: "campi_\(s.id.prefix(8))_crop.jpg", app: app)
+                        }
+                        Button("Share Crop…", systemImage: "square.and.arrow.up") {
+                            app.saver.share(crop, fileName: "\(slugged)_crop.jpg", app: app)
+                        }
+                    }
+                    if let clip = s.media.clip {
+                        Button("Save Clip to Photos", systemImage: "square.and.arrow.down") {
+                            app.saver.saveVideo(clip, fileName: "\(slugged).mp4", app: app)
+                        }
+                    }
+                    Divider()
                     if s.hidden {
                         Button("Unhide", systemImage: "eye") { run { try await actions.setHidden(false, s) } }
                     } else {
@@ -201,6 +215,12 @@ struct SightingDetailView: View {
     }
 
     // MARK: helpers
+
+    /// File-name stem for saved media: "campi_toyota-camry_5f0c2a9e".
+    private var slugged: String {
+        let label = s.displayLabel.lowercased().map { $0.isLetter || $0.isNumber ? $0 : "-" }
+        return "campi_\(String(label))_\(s.id.prefix(8))"
+    }
 
     private var durationText: String {
         let secs = s.endedAt.date.timeIntervalSince(s.startedAt.date)

@@ -23,7 +23,7 @@ xcodegen generate                       # after editing project.yml or adding fi
 (cd CampiKit && swift test)             # package tests on the Mac
 python3 tools/mock_server.py &          # for the UI tests and running the app in the simulator
 xcodebuild -project Campi.xcodeproj -scheme Campi \
-  -destination 'platform=iOS Simulator,name=iPhone 18 Pro Max' test
+  -destination 'platform=iOS Simulator,name=iPhone 18 Pro Max' -collect-test-diagnostics never test
 ```
 In the simulator, pair with the mock at `http://127.0.0.1:8765` using the code the mock prints (or
 `curl -X POST http://127.0.0.1:8765/mock/pair-code` for a new one).

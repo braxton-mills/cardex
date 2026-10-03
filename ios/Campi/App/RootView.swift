@@ -13,6 +13,10 @@ struct RootView: View {
                 PairingView()
             }
         }
+        .overlay(alignment: .bottom) { SaveStatusBanner(saver: model.saver) }
+        .sheet(item: Bindable(model.saver).shareItem) { item in
+            ShareSheet(url: item.url).presentationDetents([.medium, .large])
+        }
         .sheet(item: $model.pendingLink) { link in
             PairConfirmView(link: link)
                 .presentationDetents([.medium, .large])
@@ -39,7 +43,7 @@ struct MainTabs: View {
                 CollectionView()
             }
             SwiftUI.Tab("Timelapse", systemImage: "film.stack", value: .timelapse) {
-                ComingSoonView(title: "Timelapse", systemImage: "film.stack", milestone: "M3")
+                TimelapseView()
             }
         }
     }

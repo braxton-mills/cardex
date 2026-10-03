@@ -24,6 +24,13 @@ struct TodayView: View {
                         .buttonStyle(.plain)
                         .accessibilityIdentifier("today.status")
                         CountsRow(status: status)
+                        if let clip = model.newestClip {
+                            NewestClipCard(clip: clip) {
+                                if let url = app.client?.url(for: clip.media.video) {
+                                    video = VideoTarget(url: url, title: "\(clip.windowStart.timeText)–\(clip.windowEnd.timeText)")
+                                }
+                            }
+                        }
                         LatestSightings(status: status, sightings: model.latest.map(app.sightings.resolve))
                         if !model.highlights.isEmpty {
                             TodayHighlights(highlights: model.highlights, play: play)
@@ -222,5 +229,35 @@ struct TodayHighlights: View {
                 }
             }
         }
+    }
+}
+
+struct NewestClipCard: View {
+    let clip: Clip
+    let play: () -> Void
+
+    var body: some View {
+        Button(action: play) {
+            HStack(spacing: 14) {
+                RemoteImage(path: clip.media.poster, maxPixelSize: 480)
+                    .frame(width: 128, height: 96)
+                    .clipShape(.rect(cornerRadius: 12))
+                    .overlay {
+                        Image(systemName: "play.circle.fill").font(.largeTitle).foregroundStyle(.white).shadow(radius: 4)
+                    }
+                VStack(alignment: .leading, spacing: 4) {
+                    Text("Newest clip").font(.caption).foregroundStyle(.secondary)
+                    Text("\(clip.windowStart.timeText)–\(clip.windowEnd.timeText)").font(.headline)
+                    if let n = clip.sightingsCount {
+                        Text("\(n) sighting\(n == 1 ? "" : "s")").font(.subheadline).foregroundStyle(.secondary)
+                    }
+                }
+                Spacer(minLength: 0)
+            }
+            .padding(12)
+            .background(.background.secondary, in: .rect(cornerRadius: 16))
+        }
+        .buttonStyle(.plain)
+        .accessibilityIdentifier("today.newestClip")
     }
 }

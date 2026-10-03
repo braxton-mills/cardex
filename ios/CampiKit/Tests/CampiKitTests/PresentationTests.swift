@@ -70,4 +70,25 @@ import Testing
         let none = try Fixtures.decode(Seek.self, "seek_none.json")
         #expect(none.explanation?.contains("too dark") == true)
     }
+
+    @Test func clipsByHour() throws {
+        let list = try Fixtures.decode(ClipList.self, "clips.json")
+        let groups = list.byHour
+        #expect(groups.flatMap(\.clips).map(\.id) == list.items.map(\.id))
+        for g in groups {
+            #expect(g.clips.allSatisfy { $0.id.hasPrefix(g.day.rawValue) })
+            #expect(g.clips.allSatisfy { Int($0.id.suffix(4).prefix(2)) == g.hour })
+        }
+    }
+
+    @Test func clipExpiry() throws {
+        let clip = try #require(try Fixtures.decode(ClipList.self, "clips.json").items.first)
+        let exp = clip.expiresAfter.date
+        #expect(clip.expiryText(now: exp.addingTimeInterval(-5 * 3600)) == "expires in about 5 h")
+        #expect(clip.expiryText(now: exp.addingTimeInterval(-600)) == "expires within the hour")
+        #expect(clip.expiryText(now: exp.addingTimeInterval(60)) == "may be deleted any time now")
+        #expect(clip.isExpiringSoon(now: exp.addingTimeInterval(-3600)))
+        #expect(!clip.isExpiringSoon(now: exp.addingTimeInterval(-10 * 3600)))
+        #expect(clip.fileName == "campi_\(clip.id).mp4")
+    }
 }

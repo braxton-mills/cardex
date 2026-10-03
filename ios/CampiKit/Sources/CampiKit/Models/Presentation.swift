@@ -121,3 +121,54 @@ extension Seek {
         }
     }
 }
+
+/// Clips of one PC-local hour.
+public struct HourGroup: Identifiable, Sendable {
+    public let day: PCDay
+    public let hour: Int
+    public var clips: [Clip]
+    public var id: String { "\(day.rawValue)-\(hour)" }
+}
+
+extension ClipList {
+    /// Clips grouped by the PC-local hour of their window start, keeping list order (newest first).
+    public var byHour: [HourGroup] {
+        var out: [HourGroup] = []
+        for clip in items {
+            var cal = Calendar(identifier: .gregorian)
+            cal.timeZone = clip.windowStart.timeZone
+            let hour = cal.component(.hour, from: clip.windowStart.date)
+            if let last = out.last, last.day == clip.day, last.hour == hour {
+                out[out.count - 1].clips.append(clip)
+            } else {
+                out.append(HourGroup(day: clip.day, hour: hour, clips: [clip]))
+            }
+        }
+        return out
+    }
+}
+
+extension Clip {
+    /// "expires in about 5 h" / "expires within the hour" / "may be deleted any time now".
+    public func expiryText(now: Date = Date()) -> String {
+        let left = expiresAfter.date.timeIntervalSince(now)
+        if left <= 0 { return "may be deleted any time now" }
+        if left < 3600 { return "expires within the hour" }
+        return "expires in about \(Int((left / 3600).rounded())) h"
+    }
+
+    /// Less than this left: suggest saving it.
+    public func isExpiringSoon(now: Date = Date()) -> Bool { expiresAfter.date.timeIntervalSince(now) < 3 * 3600 }
+
+    /// File name to use when saving or sharing.
+    public var fileName: String { "campi_\(id).mp4" }
+}
+
+extension Daily {
+    public var fileName: String { "campi_daily_\(day.rawValue).mp4" }
+}
+
+/// "2.6 MB", "1.2 GB".
+public func byteText(_ bytes: Int) -> String {
+    ByteCountFormatter.string(fromByteCount: Int64(bytes), countStyle: .file)
+}

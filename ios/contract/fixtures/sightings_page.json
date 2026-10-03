@@ -1,0 +1,156 @@
+{
+  "items": [
+    {
+      "id": "59a54a7b-b1fe-408f-9712-42425051c1cc",
+      "kind": "vehicle",
+      "started_at": "2026-10-03T13:49:08.431-05:00",
+      "ended_at": "2026-10-03T13:49:13.120-05:00",
+      "day": "2026-10-03",
+      "yolo_class": "car",
+      "label": "Jeep Grand Cherokee",
+      "make": "Jeep",
+      "model": "Grand Cherokee",
+      "confidence": 0.9688,
+      "decided_by": "cloud",
+      "machine": {
+        "label": "Jeep Grand Cherokee",
+        "make": "Jeep",
+        "model": "Grand Cherokee",
+        "confidence": 0.9688,
+        "source": "cloud"
+      },
+      "siglip": {
+        "label": "Jeep Grand Cherokee",
+        "confidence": 0.5176
+      },
+      "runner_ups": [
+        {
+          "label": "Ford F-150",
+          "p": 0.2817
+        },
+        {
+          "label": "dump truck",
+          "p": 0.2068
+        }
+      ],
+      "year_range": "2019-2023",
+      "color": "green",
+      "unsure": false,
+      "stationary": false,
+      "direction": "RL",
+      "cloud_status": "pending",
+      "starred": false,
+      "hidden": false,
+      "correction": null,
+      "track_frames": 46,
+      "max_box_px": 681,
+      "media": {
+        "crop": "/media/sightings/2026-10-03/134908_59a54a7b_jeep-grand-cherokee_crop.jpg?d=dev_k3j9q2m8x4c7v1bz&exp=1791099000&sig=uYst6Kbb1VqkSgiAIbESVl0RZ-yfrrYJJH0GKIGwM3c",
+        "frame": "/media/sightings/2026-10-03/134908_59a54a7b_jeep-grand-cherokee_frame.jpg?d=dev_k3j9q2m8x4c7v1bz&exp=1791099000&sig=V9oSd-ng22oF27dSg-7OPWMWMp9vccqPgDeRnuwMeeA",
+        "clip": "/media/sightings/2026-10-03/134908_59a54a7b_jeep-grand-cherokee.mp4?d=dev_k3j9q2m8x4c7v1bz&exp=1791099000&sig=Ai2vemlGJVvleLCLJQsnGlKBZ8MREvax1NFa1OsTB7A"
+      }
+    },
+    {
+      "id": "72723b9c-ef44-40d5-bee4-da5a7989e9d0",
+      "kind": "vehicle",
+      "started_at": "2026-10-03T13:33:26.944-05:00",
+      "ended_at": "2026-10-03T13:33:32.948-05:00",
+      "day": "2026-10-03",
+      "yolo_class": "car",
+      "label": "Toyota GR86",
+      "make": "Toyota",
+      "model": "GR86",
+      "confidence": 0.4998,
+      "decided_by": "siglip",
+      "machine": {
+        "label": "Toyota GR86",
+        "make": "Toyota",
+        "model": "GR86",
+        "confidence": 0.4998,
+        "source": "siglip"
+      },
+      "siglip": {
+        "label": "Toyota GR86",
+        "confidence": 0.4998
+      },
+      "runner_ups": [
+        {
+          "label": "Jeep Wrangler",
+          "p": 0.337
+        },
+        {
+          "label": "Toyota Tacoma",
+          "p": 0.1693
+        }
+      ],
+      "year_range": null,
+      "color": null,
+      "unsure": false,
+      "stationary": false,
+      "direction": "LR",
+      "cloud_status": null,
+      "starred": false,
+      "hidden": false,
+      "correction": null,
+      "track_frames": 60,
+      "max_box_px": 325,
+      "media": {
+        "crop": "/media/sightings/2026-10-03/133326_72723b9c_toyota-gr86_crop.jpg?d=dev_k3j9q2m8x4c7v1bz&exp=1791099000&sig=AIFuYu8niR5stgbdp9yL381v1BRsikx8eAfyK6Cop8I",
+        "frame": "/media/sightings/2026-10-03/133326_72723b9c_toyota-gr86_frame.jpg?d=dev_k3j9q2m8x4c7v1bz&exp=1791099000&sig=ik45JmVa8BjgATh9vBgXdQDbeI55O_gWGYCBysp40o4",
+        "clip": "/media/sightings/2026-10-03/133326_72723b9c_toyota-gr86.mp4?d=dev_k3j9q2m8x4c7v1bz&exp=1791099000&sig=6VtbuRcohRD7yeozFiyfCdKjWm79LH6l6hD1nDvVElc"
+      }
+    },
+    {
+      "id": "74e69a5d-0dd2-4a65-bd62-8881ad1b72db",
+      "kind": "vehicle",
+      "started_at": "2026-10-03T13:08:03.652-05:00",
+      "ended_at": "2026-10-03T13:08:09.442-05:00",
+      "day": "2026-10-03",
+      "yolo_class": "truck",
+      "label": "Ford F-150",
+      "make": "Ford",
+      "model": "F-150",
+      "confidence": 0.8271,
+      "decided_by": "siglip",
+      "machine": {
+        "label": "Ford F-150",
+        "make": "Ford",
+        "model": "F-150",
+        "confidence": 0.8271,
+        "source": "siglip"
+      },
+      "siglip": {
+        "label": "Ford F-150",
+        "confidence": 0.8271
+      },
+      "runner_ups": [
+        {
+          "label": "Nissan Rogue",
+          "p": 0.2754
+        },
+        {
+          "label": "Toyota RAV4",
+          "p": 0.2729
+        }
+      ],
+      "year_range": null,
+      "color": null,
+      "unsure": false,
+      "stationary": false,
+      "direction": "RL",
+      "cloud_status": null,
+      "starred": false,
+      "hidden": false,
+      "correction": null,
+      "track_frames": 57,
+      "max_box_px": 153,
+      "media": {
+        "crop": "/media/sightings/2026-10-03/130803_74e69a5d_ford-f-150_crop.jpg?d=dev_k3j9q2m8x4c7v1bz&exp=1791099000&sig=TgMzS8tscki_bZmEsrHETwroQe79tGHqFfvVHlX4OXk",
+        "frame": "/media/sightings/2026-10-03/130803_74e69a5d_ford-f-150_frame.jpg?d=dev_k3j9q2m8x4c7v1bz&exp=1791099000&sig=zMff-MpaHuAPkQpX2JhNFdAM1Z4OBopUmx7Ap6sedLA",
+        "clip": "/media/sightings/2026-10-03/130803_74e69a5d_ford-f-150.mp4?d=dev_k3j9q2m8x4c7v1bz&exp=1791099000&sig=y8FT3zpO1kDXnJ_G_CtT3SBCNdk9dC_Rgyj3E-i2xoA"
+      }
+    }
+  ],
+  "next_cursor": "WzE3OTEwNTA4ODMuNjUyOTkyNywgIjc0ZTY5YTVkLTBkZDItNGE2NS1iZDYyLTg4ODFhZDFiNzJkYiJd",
+  "total": 397
+}

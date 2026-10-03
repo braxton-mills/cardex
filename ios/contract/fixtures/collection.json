@@ -1,0 +1,698 @@
+{
+  "total": 46,
+  "caught": 41,
+  "tiers": [
+    {
+      "tier": "rare",
+      "min": 1,
+      "max": 3
+    },
+    {
+      "tier": "uncommon",
+      "min": 4,
+      "max": 20
+    },
+    {
+      "tier": "common",
+      "min": 21,
+      "max": null
+    }
+  ],
+  "items": [
+    {
+      "label": "Toyota Camry",
+      "make": "Toyota",
+      "model": "Camry",
+      "generic": false,
+      "origin": "labels_file",
+      "count": 7,
+      "first_seen_at": "2026-09-24T08:35:46.546-05:00",
+      "last_seen_at": "2026-10-03T09:08:21.207-05:00",
+      "tier": "uncommon",
+      "cover": {
+        "sighting_id": "72658833-f24d-4bf1-98dc-0ddb6d0b0efe",
+        "crop": "/media/sightings/2026-09-29/100646_72658833_toyota-camry_crop.jpg?d=dev_k3j9q2m8x4c7v1bz&exp=1791099000&sig=pvfP_91HeGaEDEwlxRlHd0lyQ4ZoThFo9uR7jDiVV5w"
+      }
+    },
+    {
+      "label": "Toyota Corolla",
+      "make": "Toyota",
+      "model": "Corolla",
+      "generic": false,
+      "origin": "labels_file",
+      "count": 2,
+      "first_seen_at": "2026-10-03T10:17:43.127-05:00",
+      "last_seen_at": "2026-10-03T11:07:45.705-05:00",
+      "tier": "rare",
+      "cover": {
+        "sighting_id": "1df9fd78-9c65-4938-ab05-37e65affb229",
+        "crop": "/media/sightings/2026-10-03/110745_1df9fd78_toyota-corolla_crop.jpg?d=dev_k3j9q2m8x4c7v1bz&exp=1791099000&sig=MmX8QXCTrO-b2NUfpOelaxdBEOFhpJJv_lgXr7pOVaU"
+      }
+    },
+    {
+      "label": "Toyota RAV4",
+      "make": "Toyota",
+      "model": "RAV4",
+      "generic": false,
+      "origin": "labels_file",
+      "count": 1,
+      "first_seen_at": "2026-09-25T16:51:29.899-05:00",
+      "last_seen_at": "2026-09-25T16:51:29.899-05:00",
+      "tier": "rare",
+      "cover": {
+        "sighting_id": "7755d18a-beb5-4fc8-8d82-c6d1e79ff29f",
+        "crop": "/media/sightings/2026-09-25/165129_7755d18a_toyota-rav4_crop.jpg?d=dev_k3j9q2m8x4c7v1bz&exp=1791099000&sig=B8EydX4z4m48GPHeMF8J4-QYctBkhnr0fE-han0l48k"
+      }
+    },
+    {
+      "label": "Toyota Tacoma",
+      "make": "Toyota",
+      "model": "Tacoma",
+      "generic": false,
+      "origin": "labels_file",
+      "count": 3,
+      "first_seen_at": "2026-09-25T10:55:12.575-05:00",
+      "last_seen_at": "2026-09-30T15:10:50.422-05:00",
+      "tier": "rare",
+      "cover": {
+        "sighting_id": "ad7b4176-0ebc-4be5-9b5d-ae4e4f397397",
+        "crop": "/media/sightings/2026-09-29/153538_ad7b4176_toyota-tacoma_crop.jpg?d=dev_k3j9q2m8x4c7v1bz&exp=1791099000&sig=sL491PCJEVWX6v-9JTjXIT5rXaPi_OkiYeVyskbPmAg"
+      }
+    },
+    {
+      "label": "Toyota 4Runner",
+      "make": "Toyota",
+      "model": "4Runner",
+      "generic": false,
+      "origin": "labels_file",
+      "count": 1,
+      "first_seen_at": "2026-09-22T16:52:54.837-05:00",
+      "last_seen_at": "2026-09-22T16:52:54.837-05:00",
+      "tier": "rare",
+      "cover": {
+        "sighting_id": "e47386fb-bf0a-4f0d-9460-62d01c49df9e",
+        "crop": "/media/sightings/2026-09-22/165254_e47386fb_toyota-4runner_crop.jpg?d=dev_k3j9q2m8x4c7v1bz&exp=1791099000&sig=wxQytLo5GHRUDwuGp4ojR5eOA2ZQHYQfYQf9Po5tJTw"
+      }
+    },
+    {
+      "label": "Toyota GR86",
+      "make": "Toyota",
+      "model": "GR86",
+      "generic": false,
+      "origin": "labels_file",
+      "count": 105,
+      "first_seen_at": "2026-09-20T07:47:11.205-05:00",
+      "last_seen_at": "2026-10-03T13:33:26.944-05:00",
+      "tier": "common",
+      "cover": {
+        "sighting_id": "4f152945-b39d-4ec4-9c4f-f9ef32760110",
+        "crop": "/media/sightings/2026-09-27/074304_4f152945_toyota-gr86_crop.jpg?d=dev_k3j9q2m8x4c7v1bz&exp=1791099000&sig=5ek5-AapVhu4s_827ggMXhRBt9cSyqVZXJqfwnCjWhE"
+      }
+    },
+    {
+      "label": "Honda Civic",
+      "make": "Honda",
+      "model": "Civic",
+      "generic": false,
+      "origin": "labels_file",
+      "count": 1,
+      "first_seen_at": "2026-09-21T10:44:13.754-05:00",
+      "last_seen_at": "2026-09-21T10:44:13.754-05:00",
+      "tier": "rare",
+      "cover": {
+        "sighting_id": "5a2b4a03-2865-4449-b679-53ff2ef13476",
+        "crop": "/media/sightings/2026-09-21/104413_5a2b4a03_honda-civic_crop.jpg?d=dev_k3j9q2m8x4c7v1bz&exp=1791099000&sig=nDRkGrQTmEwVv_ZlBdVRDyHzxVoJafCBt9HvEsqSN3E"
+      }
+    },
+    {
+      "label": "Honda Accord",
+      "make": "Honda",
+      "model": "Accord",
+      "generic": false,
+      "origin": "labels_file",
+      "count": 2,
+      "first_seen_at": "2026-09-24T16:39:26.796-05:00",
+      "last_seen_at": "2026-10-03T10:14:09.072-05:00",
+      "tier": "rare",
+      "cover": {
+        "sighting_id": "bd8e9bf1-afd9-4741-b865-d1f3a4c092c0",
+        "crop": "/media/sightings/2026-09-24/163926_bd8e9bf1_honda-accord_crop.jpg?d=dev_k3j9q2m8x4c7v1bz&exp=1791099000&sig=9riXOccgMoI_kQX3cawTLBivLPeYzUeCWuKeWDPgVQg"
+      }
+    },
+    {
+      "label": "Honda CR-V",
+      "make": "Honda",
+      "model": "CR-V",
+      "generic": false,
+      "origin": "labels_file",
+      "count": 5,
+      "first_seen_at": "2026-09-20T13:34:19.131-05:00",
+      "last_seen_at": "2026-10-03T10:47:25.635-05:00",
+      "tier": "uncommon",
+      "cover": {
+        "sighting_id": "7cd774b3-2f9f-4abc-bcb3-296abcae5c53",
+        "crop": "/media/sightings/2026-09-21/123710_7cd774b3_honda-cr-v_crop.jpg?d=dev_k3j9q2m8x4c7v1bz&exp=1791099000&sig=Ea8iV6czfp2d6RASeW0wnG6rBtQu2uuGJpixVMni7_A"
+      }
+    },
+    {
+      "label": "Honda Odyssey",
+      "make": "Honda",
+      "model": "Odyssey",
+      "generic": false,
+      "origin": "labels_file",
+      "count": 2,
+      "first_seen_at": "2026-09-22T09:16:16.566-05:00",
+      "last_seen_at": "2026-09-22T18:01:38.591-05:00",
+      "tier": "rare",
+      "cover": {
+        "sighting_id": "c9c30bc4-aa06-4354-8ace-0ef83601685f",
+        "crop": "/media/sightings/2026-09-22/091616_c9c30bc4_honda-odyssey_crop.jpg?d=dev_k3j9q2m8x4c7v1bz&exp=1791099000&sig=Cb6U8T9JS_XLnjhYLlwmIb4uwXcpBzW1WRH-WW44HPw"
+      }
+    },
+    {
+      "label": "Ford F-150",
+      "make": "Ford",
+      "model": "F-150",
+      "generic": false,
+      "origin": "labels_file",
+      "count": 10,
+      "first_seen_at": "2026-09-20T09:17:53.488-05:00",
+      "last_seen_at": "2026-10-03T13:08:03.652-05:00",
+      "tier": "uncommon",
+      "cover": {
+        "sighting_id": "ce91bfd1-7add-4913-9ab3-b2065f245e20",
+        "crop": "/media/sightings/2026-09-20/134900_ce91bfd1_ford-f-150_crop.jpg?d=dev_k3j9q2m8x4c7v1bz&exp=1791099000&sig=wi7toJl-bLj0rpMcdKrqZy-ubqKkNgFpzXLwXrUjSh8"
+      }
+    },
+    {
+      "label": "Ford Explorer",
+      "make": "Ford",
+      "model": "Explorer",
+      "generic": false,
+      "origin": "labels_file",
+      "count": 13,
+      "first_seen_at": "2026-09-20T09:51:49.647-05:00",
+      "last_seen_at": "2026-10-02T13:17:50.480-05:00",
+      "tier": "uncommon",
+      "cover": {
+        "sighting_id": "21b1aed2-3196-4d44-9c0d-f645d0a32611",
+        "crop": "/media/sightings/2026-10-01/185113_21b1aed2_ford-explorer_crop.jpg?d=dev_k3j9q2m8x4c7v1bz&exp=1791099000&sig=EPfTQgDxD67G0UmP00rWg0fFueizAxMTSwzVH3zCcls"
+      }
+    },
+    {
+      "label": "Ford Mustang",
+      "make": "Ford",
+      "model": "Mustang",
+      "generic": false,
+      "origin": "labels_file",
+      "count": 36,
+      "first_seen_at": "2026-09-20T07:41:18.851-05:00",
+      "last_seen_at": "2026-10-03T12:32:42.988-05:00",
+      "tier": "common",
+      "cover": {
+        "sighting_id": "8a8dd460-39ff-47f9-b549-a4768dd45639",
+        "crop": "/media/sightings/2026-09-27/095936_8a8dd460_ford-mustang_crop.jpg?d=dev_k3j9q2m8x4c7v1bz&exp=1791099000&sig=iTWFkDLzxouaJRFeU_EsWw9DFhSYAu19foDv500X3i0"
+      }
+    },
+    {
+      "label": "Ford Bronco",
+      "make": "Ford",
+      "model": "Bronco",
+      "generic": false,
+      "origin": "labels_file",
+      "count": 3,
+      "first_seen_at": "2026-09-21T09:57:45.555-05:00",
+      "last_seen_at": "2026-10-02T17:54:25.206-05:00",
+      "tier": "rare",
+      "cover": {
+        "sighting_id": "6a671ecc-4a17-4e93-a3e0-8fb218fa029e",
+        "crop": "/media/sightings/2026-09-29/185237_6a671ecc_ford-bronco_crop.jpg?d=dev_k3j9q2m8x4c7v1bz&exp=1791099000&sig=3Wn17SNz5LMboFgQgPnoT-xdymQsrH7o9I7_986-Aug"
+      }
+    },
+    {
+      "label": "Chevrolet Silverado 1500",
+      "make": "Chevrolet",
+      "model": "Silverado 1500",
+      "generic": false,
+      "origin": "labels_file",
+      "count": 6,
+      "first_seen_at": "2026-09-26T17:29:31.154-05:00",
+      "last_seen_at": "2026-10-02T12:38:20.094-05:00",
+      "tier": "uncommon",
+      "cover": {
+        "sighting_id": "4d36a8ed-3284-4c6f-8e01-7551f78530bf",
+        "crop": "/media/sightings/2026-10-01/125013_4d36a8ed_chevrolet-silverado-1500_crop.jpg?d=dev_k3j9q2m8x4c7v1bz&exp=1791099000&sig=_y2BMAx4zNCoNLrCjl_916y7n8NMtx-bJBi55oUNQcI"
+      }
+    },
+    {
+      "label": "Chevrolet Equinox",
+      "make": "Chevrolet",
+      "model": "Equinox",
+      "generic": false,
+      "origin": "labels_file",
+      "count": 18,
+      "first_seen_at": "2026-09-20T09:56:43.235-05:00",
+      "last_seen_at": "2026-10-01T13:56:41.034-05:00",
+      "tier": "uncommon",
+      "cover": {
+        "sighting_id": "d416b8a9-9fb9-48f6-9dc1-8bce34456d5b",
+        "crop": "/media/sightings/2026-10-01/135641_d416b8a9_chevrolet-equinox_crop.jpg?d=dev_k3j9q2m8x4c7v1bz&exp=1791099000&sig=InrpIiy35UdAjezcwMtZCXsaGxjmDewf8w9efHT9twY"
+      }
+    },
+    {
+      "label": "Chevrolet Tahoe",
+      "make": "Chevrolet",
+      "model": "Tahoe",
+      "generic": false,
+      "origin": "labels_file",
+      "count": 2,
+      "first_seen_at": "2026-09-20T17:32:49.367-05:00",
+      "last_seen_at": "2026-09-25T16:19:57.382-05:00",
+      "tier": "rare",
+      "cover": {
+        "sighting_id": "2ccb4915-72c4-439d-8dac-2c86274eb2cb",
+        "crop": "/media/sightings/2026-09-20/173249_2ccb4915_chevrolet-tahoe_crop.jpg?d=dev_k3j9q2m8x4c7v1bz&exp=1791099000&sig=Qp_MataWIFjwg5W8MKDtH-toJN36jd6hjHBA30F6cc0"
+      }
+    },
+    {
+      "label": "Ram 1500",
+      "make": "Ram",
+      "model": "1500",
+      "generic": false,
+      "origin": "labels_file",
+      "count": 5,
+      "first_seen_at": "2026-09-20T11:50:06.397-05:00",
+      "last_seen_at": "2026-10-02T10:09:13.540-05:00",
+      "tier": "uncommon",
+      "cover": {
+        "sighting_id": "7eea6fe1-9fa4-4dd6-b3b1-7af01be7f3cf",
+        "crop": "/media/sightings/2026-10-02/100913_7eea6fe1_ram-1500_crop.jpg?d=dev_k3j9q2m8x4c7v1bz&exp=1791099000&sig=JUz74Cn0vmMi_USTCcRApYPHO1Vw57JhqoC0AtSo3kw"
+      }
+    },
+    {
+      "label": "Tesla Model 3",
+      "make": "Tesla",
+      "model": "Model 3",
+      "generic": false,
+      "origin": "labels_file",
+      "count": 3,
+      "first_seen_at": "2026-09-23T09:34:04.381-05:00",
+      "last_seen_at": "2026-09-29T07:01:22.382-05:00",
+      "tier": "rare",
+      "cover": {
+        "sighting_id": "488383be-24a6-4615-ace9-eb6682e3e9ae",
+        "crop": "/media/sightings/2026-09-27/141604_488383be_tesla-model-3_crop.jpg?d=dev_k3j9q2m8x4c7v1bz&exp=1791099000&sig=wmqgYdRM3dq_pJxQ_UHXgERJ28t3elEi8FbV-UgMRUo"
+      }
+    },
+    {
+      "label": "Tesla Model Y",
+      "make": "Tesla",
+      "model": "Model Y",
+      "generic": false,
+      "origin": "labels_file",
+      "count": 19,
+      "first_seen_at": "2026-09-20T14:55:55.578-05:00",
+      "last_seen_at": "2026-10-03T11:10:11.457-05:00",
+      "tier": "uncommon",
+      "cover": {
+        "sighting_id": "1bc6b08b-4ce7-4f14-a602-ec120cb91cbe",
+        "crop": "/media/sightings/2026-09-30/173219_1bc6b08b_tesla-model-y_crop.jpg?d=dev_k3j9q2m8x4c7v1bz&exp=1791099000&sig=bd4KhmgNKJ2EeEN8vLbdcSnt9z7Z8Z_YGSpL6DVrKe8"
+      }
+    },
+    {
+      "label": "Tesla Cybertruck",
+      "make": "Tesla",
+      "model": "Cybertruck",
+      "generic": false,
+      "origin": "labels_file",
+      "count": 0,
+      "first_seen_at": null,
+      "last_seen_at": null,
+      "tier": "uncaught",
+      "cover": null
+    },
+    {
+      "label": "Subaru Outback",
+      "make": "Subaru",
+      "model": "Outback",
+      "generic": false,
+      "origin": "labels_file",
+      "count": 8,
+      "first_seen_at": "2026-09-22T17:58:52.619-05:00",
+      "last_seen_at": "2026-09-30T14:04:10.744-05:00",
+      "tier": "uncommon",
+      "cover": {
+        "sighting_id": "ad3271a6-cf05-454c-85ad-ac8af014ba34",
+        "crop": "/media/sightings/2026-09-25/152625_ad3271a6_subaru-outback_crop.jpg?d=dev_k3j9q2m8x4c7v1bz&exp=1791099000&sig=UzlbsBeVNw6rX7xpQwSJP2_wmzuMtRcVAQ0KavnnWc8"
+      }
+    },
+    {
+      "label": "Subaru Forester",
+      "make": "Subaru",
+      "model": "Forester",
+      "generic": false,
+      "origin": "labels_file",
+      "count": 4,
+      "first_seen_at": "2026-09-21T13:08:26.618-05:00",
+      "last_seen_at": "2026-09-26T15:54:01.264-05:00",
+      "tier": "uncommon",
+      "cover": {
+        "sighting_id": "1f51c88c-75d0-4b16-8291-7fb3170ab3c0",
+        "crop": "/media/sightings/2026-09-21/130826_1f51c88c_subaru-forester_crop.jpg?d=dev_k3j9q2m8x4c7v1bz&exp=1791099000&sig=58yac_0xOCQvWZiRh0FJ26WuJRhpNrztDk4z1_rLTJg"
+      }
+    },
+    {
+      "label": "Jeep Wrangler",
+      "make": "Jeep",
+      "model": "Wrangler",
+      "generic": false,
+      "origin": "labels_file",
+      "count": 1,
+      "first_seen_at": "2026-09-26T10:45:20.997-05:00",
+      "last_seen_at": "2026-09-26T10:45:20.997-05:00",
+      "tier": "rare",
+      "cover": {
+        "sighting_id": "a5b74b73-bf07-42fe-b935-56ef003d1921",
+        "crop": "/media/sightings/2026-09-26/104520_a5b74b73_jeep-wrangler_crop.jpg?d=dev_k3j9q2m8x4c7v1bz&exp=1791099000&sig=B_hyS6KchgEbTL3XS_kRigX-MR40CHQrCEfpHm6RY3Y"
+      }
+    },
+    {
+      "label": "Jeep Grand Cherokee",
+      "make": "Jeep",
+      "model": "Grand Cherokee",
+      "generic": false,
+      "origin": "labels_file",
+      "count": 1,
+      "first_seen_at": "2026-10-03T13:49:08.431-05:00",
+      "last_seen_at": "2026-10-03T13:49:08.431-05:00",
+      "tier": "rare",
+      "cover": {
+        "sighting_id": "59a54a7b-b1fe-408f-9712-42425051c1cc",
+        "crop": "/media/sightings/2026-10-03/134908_59a54a7b_jeep-grand-cherokee_crop.jpg?d=dev_k3j9q2m8x4c7v1bz&exp=1791099000&sig=uYst6Kbb1VqkSgiAIbESVl0RZ-yfrrYJJH0GKIGwM3c"
+      }
+    },
+    {
+      "label": "Nissan Rogue",
+      "make": "Nissan",
+      "model": "Rogue",
+      "generic": false,
+      "origin": "labels_file",
+      "count": 1,
+      "first_seen_at": "2026-09-30T12:26:14.006-05:00",
+      "last_seen_at": "2026-09-30T12:26:14.006-05:00",
+      "tier": "rare",
+      "cover": {
+        "sighting_id": "c3406a1a-8387-40e4-a47a-6c082f0db088",
+        "crop": "/media/sightings/2026-09-30/122614_c3406a1a_nissan-rogue_crop.jpg?d=dev_k3j9q2m8x4c7v1bz&exp=1791099000&sig=TOsfX6nKUWzlhsN5rbi9S3f-4Z6xZui_lFGAcNhXdFE"
+      }
+    },
+    {
+      "label": "Hyundai Tucson",
+      "make": "Hyundai",
+      "model": "Tucson",
+      "generic": false,
+      "origin": "labels_file",
+      "count": 1,
+      "first_seen_at": "2026-09-20T12:17:15.674-05:00",
+      "last_seen_at": "2026-09-20T12:17:15.674-05:00",
+      "tier": "rare",
+      "cover": {
+        "sighting_id": "70996b13-960c-4ce7-a931-f2854d831fdd",
+        "crop": "/media/sightings/2026-09-20/121715_70996b13_hyundai-tucson_crop.jpg?d=dev_k3j9q2m8x4c7v1bz&exp=1791099000&sig=w6bAK7AzIU6DWzDkyMOl_TgyFlUWyF09z7k3qjtkmUk"
+      }
+    },
+    {
+      "label": "Kia Telluride",
+      "make": "Kia",
+      "model": "Telluride",
+      "generic": false,
+      "origin": "labels_file",
+      "count": 2,
+      "first_seen_at": "2026-09-23T10:42:25.694-05:00",
+      "last_seen_at": "2026-09-29T16:39:35.473-05:00",
+      "tier": "rare",
+      "cover": {
+        "sighting_id": "f9b1de86-461a-427f-a5a1-ba53926893ed",
+        "crop": "/media/sightings/2026-09-29/163935_f9b1de86_kia-telluride_crop.jpg?d=dev_k3j9q2m8x4c7v1bz&exp=1791099000&sig=udEDF2DNRs5akzNiHr5Y5xr67jdGKGj6USW9TszuP10"
+      }
+    },
+    {
+      "label": "Mazda3",
+      "make": "Mazda",
+      "model": "Mazda3",
+      "generic": false,
+      "origin": "labels_file",
+      "count": 6,
+      "first_seen_at": "2026-09-25T07:38:18.978-05:00",
+      "last_seen_at": "2026-10-01T11:41:29.944-05:00",
+      "tier": "uncommon",
+      "cover": {
+        "sighting_id": "b05f9e08-35ff-4d04-9206-7e9eb38f84ad",
+        "crop": "/media/sightings/2026-09-25/073818_b05f9e08_mazda3_crop.jpg?d=dev_k3j9q2m8x4c7v1bz&exp=1791099000&sig=GSOTrhRNaappAWnHQrsGXzboUkPYrcaVGmX8_Ou7vig"
+      }
+    },
+    {
+      "label": "Mazda CX-5",
+      "make": "Mazda",
+      "model": "CX-5",
+      "generic": false,
+      "origin": "labels_file",
+      "count": 2,
+      "first_seen_at": "2026-09-23T11:19:22.909-05:00",
+      "last_seen_at": "2026-09-28T14:10:13.350-05:00",
+      "tier": "rare",
+      "cover": {
+        "sighting_id": "a7a06a4d-1ff6-496f-9cfb-206fb226ce6b",
+        "crop": "/media/sightings/2026-09-23/111922_a7a06a4d_mazda-cx-5_crop.jpg?d=dev_k3j9q2m8x4c7v1bz&exp=1791099000&sig=bdkAchFAip3rdyYOFkWdcEOqEGpiiO2H7gfviHeyo3I"
+      }
+    },
+    {
+      "label": "BMW X5",
+      "make": "BMW",
+      "model": "X5",
+      "generic": false,
+      "origin": "labels_file",
+      "count": 13,
+      "first_seen_at": "2026-09-20T13:58:36.768-05:00",
+      "last_seen_at": "2026-10-01T17:01:32.057-05:00",
+      "tier": "uncommon",
+      "cover": {
+        "sighting_id": "91124d13-51db-4463-9484-bfacbe342ce0",
+        "crop": "/media/sightings/2026-09-20/165506_91124d13_bmw-x5_crop.jpg?d=dev_k3j9q2m8x4c7v1bz&exp=1791099000&sig=CnNw_6CMaLFU7DwfcUVwQlYa2zqMpOllJyspIBRl4vU"
+      }
+    },
+    {
+      "label": "Porsche 911",
+      "make": "Porsche",
+      "model": "911",
+      "generic": false,
+      "origin": "labels_file",
+      "count": 0,
+      "first_seen_at": null,
+      "last_seen_at": null,
+      "tier": "uncaught",
+      "cover": null
+    },
+    {
+      "label": "Lamborghini Urus",
+      "make": "Lamborghini",
+      "model": "Urus",
+      "generic": false,
+      "origin": "labels_file",
+      "count": 0,
+      "first_seen_at": null,
+      "last_seen_at": null,
+      "tier": "uncaught",
+      "cover": null
+    },
+    {
+      "label": "Ferrari Roma",
+      "make": "Ferrari",
+      "model": "Roma",
+      "generic": false,
+      "origin": "labels_file",
+      "count": 0,
+      "first_seen_at": null,
+      "last_seen_at": null,
+      "tier": "uncaught",
+      "cover": null
+    },
+    {
+      "label": "dump truck",
+      "make": null,
+      "model": null,
+      "generic": true,
+      "origin": "labels_file",
+      "count": 4,
+      "first_seen_at": "2026-09-25T07:09:17.500-05:00",
+      "last_seen_at": "2026-09-29T13:50:29.561-05:00",
+      "tier": "uncommon",
+      "cover": {
+        "sighting_id": "50f7b168-0f4d-4d88-9be4-078c7c8005c5",
+        "crop": "/media/sightings/2026-09-29/085831_50f7b168_dump-truck_crop.jpg?d=dev_k3j9q2m8x4c7v1bz&exp=1791099000&sig=BYf_vTLefDc4tTf74IfxI5DzeNqFUbGRlBG7f5RnTPw"
+      }
+    },
+    {
+      "label": "concrete mixer truck",
+      "make": null,
+      "model": null,
+      "generic": true,
+      "origin": "labels_file",
+      "count": 2,
+      "first_seen_at": "2026-09-20T11:54:20.420-05:00",
+      "last_seen_at": "2026-10-03T09:10:54.458-05:00",
+      "tier": "rare",
+      "cover": {
+        "sighting_id": "a26aa0ae-044f-4574-b037-afc644d82a53",
+        "crop": "/media/sightings/2026-10-03/091054_a26aa0ae_concrete-mixer-truck_crop.jpg?d=dev_k3j9q2m8x4c7v1bz&exp=1791099000&sig=FeuZPn24BMNtUcs1CA8B40bOZKu6IckehS8hBJ2mpok"
+      }
+    },
+    {
+      "label": "semi truck",
+      "make": null,
+      "model": null,
+      "generic": true,
+      "origin": "labels_file",
+      "count": 3,
+      "first_seen_at": "2026-09-24T08:24:29.275-05:00",
+      "last_seen_at": "2026-09-27T11:09:12.726-05:00",
+      "tier": "rare",
+      "cover": {
+        "sighting_id": "afd74c37-9d40-4482-b020-3f2e9c5065d2",
+        "crop": "/media/sightings/2026-09-24/082429_afd74c37_semi-truck_crop.jpg?d=dev_k3j9q2m8x4c7v1bz&exp=1791099000&sig=Io2cO97cSwadL5wXkA_mWfbtp2QYNvXHE5QOyUcopdY"
+      }
+    },
+    {
+      "label": "box truck",
+      "make": null,
+      "model": null,
+      "generic": true,
+      "origin": "labels_file",
+      "count": 43,
+      "first_seen_at": "2026-09-20T10:43:46.129-05:00",
+      "last_seen_at": "2026-10-02T15:28:23.568-05:00",
+      "tier": "common",
+      "cover": {
+        "sighting_id": "99ea4514-541c-48d5-a382-5046e1527ae4",
+        "crop": "/media/sightings/2026-10-01/155245_99ea4514_box-truck_crop.jpg?d=dev_k3j9q2m8x4c7v1bz&exp=1791099000&sig=1LQxVRsmra1Y5xvJQIGOUyCLy8rDuuv2VlVlW1gnmqI"
+      }
+    },
+    {
+      "label": "garbage truck",
+      "make": null,
+      "model": null,
+      "generic": true,
+      "origin": "labels_file",
+      "count": 1,
+      "first_seen_at": "2026-09-29T08:54:02.765-05:00",
+      "last_seen_at": "2026-09-29T08:54:02.765-05:00",
+      "tier": "rare",
+      "cover": {
+        "sighting_id": "2c10514f-38c2-439e-b880-8c83fde11576",
+        "crop": "/media/sightings/2026-09-29/085402_2c10514f_garbage-truck_crop.jpg?d=dev_k3j9q2m8x4c7v1bz&exp=1791099000&sig=Q6Eg0VdN9ROztMqxgHLEDe6mIRkXE8Jou5HYuVDkpLc"
+      }
+    },
+    {
+      "label": "school bus",
+      "make": null,
+      "model": null,
+      "generic": true,
+      "origin": "labels_file",
+      "count": 1,
+      "first_seen_at": "2026-09-24T17:32:48.366-05:00",
+      "last_seen_at": "2026-09-24T17:32:48.366-05:00",
+      "tier": "rare",
+      "cover": {
+        "sighting_id": "c560803c-c53a-4252-8071-6f2d542635b5",
+        "crop": "/media/sightings/2026-09-24/173248_c560803c_school-bus_crop.jpg?d=dev_k3j9q2m8x4c7v1bz&exp=1791099000&sig=KJ_-rJq9yseHlOjhyqsn1JU9hdGcXxMUykZcQZWftyc"
+      }
+    },
+    {
+      "label": "city bus",
+      "make": null,
+      "model": null,
+      "generic": true,
+      "origin": "labels_file",
+      "count": 3,
+      "first_seen_at": "2026-09-22T12:30:48.810-05:00",
+      "last_seen_at": "2026-09-29T11:02:36.135-05:00",
+      "tier": "rare",
+      "cover": {
+        "sighting_id": "63b76c86-6e18-4b31-af6b-1827ba243b69",
+        "crop": "/media/sightings/2026-09-28/121207_63b76c86_city-bus_crop.jpg?d=dev_k3j9q2m8x4c7v1bz&exp=1791099000&sig=eKKZP6FBzhSgMNVfz5L2xLEX1iC9PgXoJi2vMXHfeZ8"
+      }
+    },
+    {
+      "label": "motorcycle",
+      "make": null,
+      "model": null,
+      "generic": true,
+      "origin": "labels_file",
+      "count": 7,
+      "first_seen_at": "2026-09-22T13:35:34.847-05:00",
+      "last_seen_at": "2026-10-03T12:57:49.776-05:00",
+      "tier": "uncommon",
+      "cover": {
+        "sighting_id": "57c20faf-2981-4a6d-9418-16c796e19e32",
+        "crop": "/media/sightings/2026-09-22/133534_57c20faf_motorcycle_crop.jpg?d=dev_k3j9q2m8x4c7v1bz&exp=1791099000&sig=48vsSEeu8HktxZCxdtBRR17BuEEInfh2rRleSuUByWg"
+      }
+    },
+    {
+      "label": "excavator",
+      "make": null,
+      "model": null,
+      "generic": true,
+      "origin": "labels_file",
+      "count": 0,
+      "first_seen_at": null,
+      "last_seen_at": null,
+      "tier": "uncaught",
+      "cover": null
+    },
+    {
+      "label": "Polestar 2",
+      "make": "Polestar",
+      "model": "2",
+      "generic": false,
+      "origin": "discovered",
+      "count": 1,
+      "first_seen_at": "2026-09-25T13:30:00.000-05:00",
+      "last_seen_at": "2026-09-25T13:30:00.000-05:00",
+      "tier": "rare",
+      "cover": {
+        "sighting_id": "2ef71419-8af4-45e9-9ad7-6d7c406bf953",
+        "crop": "/media/sightings/2026-09-25/133000_2ef71419_tesla-model-3_crop.jpg?d=dev_k3j9q2m8x4c7v1bz&exp=1791099000&sig=0JbaMppPVRtHEMAHo5-UWgRV4hXg8eA1wHrl_oUkxs0"
+      }
+    },
+    {
+      "label": "Lucid Air",
+      "make": "Lucid",
+      "model": "Air",
+      "generic": false,
+      "origin": "discovered",
+      "count": 1,
+      "first_seen_at": "2026-09-28T12:30:00.000-05:00",
+      "last_seen_at": "2026-09-28T12:30:00.000-05:00",
+      "tier": "rare",
+      "cover": {
+        "sighting_id": "18fb936e-421f-49d7-9378-05a8e9a566a5",
+        "crop": "/media/sightings/2026-09-28/123000_18fb936e_ram-1500_crop.jpg?d=dev_k3j9q2m8x4c7v1bz&exp=1791099000&sig=vL24bLC1dsRoHqzLsrZpweMUXr0AXCYrLQwo177_w7o"
+      }
+    },
+    {
+      "label": "Rivian R1S",
+      "make": "Rivian",
+      "model": "R1S",
+      "generic": false,
+      "origin": "discovered",
+      "count": 1,
+      "first_seen_at": "2026-10-01T11:30:00.000-05:00",
+      "last_seen_at": "2026-10-01T11:30:00.000-05:00",
+      "tier": "rare",
+      "cover": {
+        "sighting_id": "224065ed-6136-4cbf-a7e2-0a3d123419d6",
+        "crop": "/media/sightings/2026-10-01/113000_224065ed_subaru-outback_crop.jpg?d=dev_k3j9q2m8x4c7v1bz&exp=1791099000&sig=S6o2Wgp1ewJ5diOwE_xTDlheyzApOt222wHiRrv95oY"
+      }
+    }
+  ]
+}

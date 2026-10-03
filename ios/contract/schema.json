@@ -1,0 +1,212 @@
+{
+  "$doc": [
+    "Shapes for docs/api-contract.md (which wins on any disagreement). Used by tools/contract_check.py and tools/mock_server.py.",
+    "Type strings: string | int | number | bool | datetime (RFC 3339 with offset, never Z) | date (YYYY-MM-DD) |",
+    "url (path-absolute, e.g. /api/..) | signed_url (path-absolute with d, exp, sig query params) | enum:a|b|c |",
+    "[T] (array of T) | a type name from 'types' | an inline object. A trailing ? means nullable.",
+    "Every key listed must be present. Extra keys are allowed (additive changes)."
+  ],
+  "types": {
+    "Error": {"error": {"code": "enum:invalid_param|unauthorized|invalid_code|expired|not_found|invalid_range|unknown_label|rate_limited|pi_unreachable|live_busy|internal", "message": "string"}},
+
+    "Status": {
+      "api_version": "int",
+      "server_name": "string",
+      "server_time": "datetime",
+      "service": "ServiceStatus",
+      "capture": "CaptureStatus",
+      "clips": "ClipsStatus",
+      "daily": "DailyStatus",
+      "sightings": "SightingsStatus",
+      "gaming": "GamingStatus?",
+      "disk": {"free_gb": "number", "drive": "string"},
+      "latest_clip_id": "string?",
+      "live": "LiveStatus"
+    },
+    "ServiceStatus": {"state": "enum:running|stopped", "pid": "int?", "started_at": "datetime?", "heartbeat_at": "datetime?", "disabled": "bool"},
+    "CaptureStatus": {"connected": "bool", "host": "string?", "last_frame_at": "datetime?", "saved": "int", "rejected": "int", "reconnects": "int", "restarts": "int?", "last_error": "string?"},
+    "ClipsStatus": {"last": "RenderResult?", "next_at": "datetime?", "running": "bool?", "queue": "RenderQueue?"},
+    "RenderQueue": {"length": "int", "oldest_window_start": "datetime?", "deferred": "bool", "deferred_reason": "enum:gaming?"},
+    "DailyStatus": {"last": "RenderResult?", "running": "bool?"},
+    "RenderResult": {"status": "enum:ok|skipped|error", "finished_at": "datetime?", "clip_id": "string?", "day": "date?", "detail": "string?"},
+    "SightingsStatus": {
+      "enabled": "bool",
+      "state": "enum:disabled|not_installed|service_stopped|not_running|starting|running|crash_looping|paused_gaming",
+      "phase": "enum:loading|disconnected|running|paused_dark|error?",
+      "restarts": "int?",
+      "last_error": "string?",
+      "next_retry_at": "datetime?",
+      "has_history": "bool",
+      "today": "int",
+      "total": "int",
+      "last_sighting_at": "datetime?",
+      "backend": "enum:openvino|cuda?",
+      "device": "string?",
+      "cpu_fallback": "bool?",
+      "classify_queue": "int?",
+      "cloud": "CloudUsage?"
+    },
+    "CloudUsage": {"enabled": "bool", "calls_today": "int", "cap": "int"},
+    "GamingStatus": {"mode": "enum:auto|on|off", "active": "bool", "exe": "string?", "since": "datetime?", "detection": "enum:counters|path_only", "renders_deferred": "bool"},
+    "LiveStatus": {"available": "bool", "mjpeg": "signed_url?", "snapshot": "signed_url?", "rotation": "int", "max_viewers": "int"},
+
+    "Sighting": {
+      "id": "string",
+      "kind": "string",
+      "started_at": "datetime",
+      "ended_at": "datetime",
+      "day": "date",
+      "yolo_class": "string?",
+      "label": "string?",
+      "make": "string?",
+      "model": "string?",
+      "confidence": "number?",
+      "decided_by": "enum:siglip|cloud|user",
+      "machine": "MachineVerdict",
+      "siglip": {"label": "string?", "confidence": "number?"},
+      "runner_ups": "[RunnerUp]",
+      "year_range": "string?",
+      "color": "string?",
+      "unsure": "bool",
+      "stationary": "bool",
+      "direction": "enum:LR|RL?",
+      "cloud_status": "enum:pending|done|failed|capped|skipped?",
+      "starred": "bool",
+      "hidden": "bool",
+      "correction": "Correction?",
+      "track_frames": "int?",
+      "max_box_px": "int?",
+      "media": {"crop": "signed_url?", "frame": "signed_url?", "clip": "signed_url?"}
+    },
+    "MachineVerdict": {"label": "string?", "make": "string?", "model": "string?", "confidence": "number?", "source": "enum:siglip|cloud"},
+    "RunnerUp": {"label": "string", "p": "number"},
+    "Correction": {"label": "string", "at": "datetime"},
+    "SightingPage": {"items": "[Sighting]", "next_cursor": "string?", "total": "int"},
+
+    "Clip": {
+      "id": "string",
+      "day": "date",
+      "window_start": "datetime",
+      "window_end": "datetime",
+      "exact_window": "bool",
+      "duration_s": "number?",
+      "size_bytes": "int",
+      "modified_at": "datetime",
+      "expires_after": "datetime",
+      "sightings_count": "int?",
+      "starred": "bool",
+      "media": {"video": "signed_url", "poster": "signed_url"}
+    },
+    "ClipList": {"latest_id": "string?", "retention_hours": "int", "window_min": "int", "items": "[Clip]"},
+
+    "Daily": {"day": "date", "duration_s": "number?", "size_bytes": "int", "modified_at": "datetime", "sightings_count": "int?", "starred": "bool", "media": {"video": "signed_url", "poster": "signed_url"}},
+    "DailyPage": {"items": "[Daily]", "next_cursor": "string?", "total": "int"},
+
+    "ArchivePart": {"part": "int", "size_bytes": "int", "modified_at": "datetime", "duration_s": "number?", "current": "bool", "media": {"video": "signed_url?"}},
+    "ArchiveList": {"enabled": "bool", "items": "[ArchivePart]"},
+
+    "Collection": {"total": "int", "caught": "int", "tiers": "[Tier]", "items": "[CollectionItem]"},
+    "Tier": {"tier": "enum:rare|uncommon|common", "min": "int", "max": "int?"},
+    "CollectionItem": {
+      "label": "string",
+      "make": "string?",
+      "model": "string?",
+      "generic": "bool",
+      "origin": "enum:labels_file|discovered|other",
+      "count": "int",
+      "first_seen_at": "datetime?",
+      "last_seen_at": "datetime?",
+      "tier": "enum:uncaught|rare|uncommon|common",
+      "cover": "Cover?"
+    },
+    "Cover": {"sighting_id": "string", "crop": "signed_url"},
+
+    "Highlight": {
+      "id": "string",
+      "types": "[enum:new_catch|rare|busiest|daily|starred]",
+      "at": "datetime",
+      "day": "date",
+      "sighting": "Sighting?",
+      "clip": "Clip?",
+      "daily": "Daily?",
+      "window": "Window?"
+    },
+    "Window": {"start": "datetime", "end": "datetime", "sightings_count": "int"},
+    "HighlightPage": {"items": "[Highlight]", "next_cursor": "string?", "total": "int"},
+
+    "Seek": {
+      "ts": "datetime",
+      "target": "enum:clip|daily|none",
+      "clip_id": "string?",
+      "day": "date?",
+      "video": "signed_url?",
+      "offset_s": "number?",
+      "approximate": "bool",
+      "reason": "enum:pending_render|not_rendered|no_frames|expired?"
+    },
+
+    "PushPrefs": {"new_catch": "bool", "rare": "bool", "discovered": "bool", "service_alerts": "bool"},
+    "Device": {
+      "id": "string",
+      "name": "string",
+      "platform": "enum:ios|desktop|other",
+      "created_at": "datetime",
+      "last_seen_at": "datetime?",
+      "push": {"enabled": "bool", "environment": "enum:sandbox|production?", "prefs": "PushPrefs"}
+    },
+    "PairResult": {"token": "string", "device": "Device", "server_name": "string", "api_version": "int"},
+
+    "PushPayload": {
+      "aps": {"alert": {"title": "string", "body": "string"}, "mutable-content": "int", "thread-id": "string", "category": "enum:SIGHTING|SERVICE"},
+      "campi": {
+        "type": "enum:new_catch|rare|discovered|service",
+        "sighting_id": "string?",
+        "label": "string?",
+        "day": "date?",
+        "crop": "url?",
+        "alert": "enum:capture_disconnected|sightings_crash_looping|disk_low|render_failing|recovered?"
+      }
+    }
+  },
+  "endpoints": {
+    "POST /api/pair": "PairResult",
+    "GET /api/devices/me": "Device",
+    "PUT /api/devices/me/push": "Device",
+    "GET /api/status": "Status",
+    "GET /api/sightings": "SightingPage",
+    "GET /api/sightings/{id}": "Sighting",
+    "POST /api/sightings/{id}/star": "Sighting",
+    "POST /api/sightings/{id}/hide": "Sighting",
+    "POST /api/sightings/{id}/label": "Sighting",
+    "GET /api/collection": "Collection",
+    "GET /api/highlights": "HighlightPage",
+    "GET /api/clips": "ClipList",
+    "GET /api/clips/{id}": "Clip",
+    "POST /api/clips/{id}/star": "Clip",
+    "GET /api/daily": "DailyPage",
+    "GET /api/daily/{day}": "Daily",
+    "POST /api/daily/{day}/star": "Daily",
+    "GET /api/archive": "ArchiveList",
+    "GET /api/seek": "Seek"
+  },
+  "fixtures": {
+    "status.json": "Status",
+    "status_v1_sightings_off.json": "Status",
+    "sightings_page.json": "SightingPage",
+    "sighting_cloud.json": "Sighting",
+    "sighting_corrected.json": "Sighting",
+    "collection.json": "Collection",
+    "highlights_page.json": "HighlightPage",
+    "clips.json": "ClipList",
+    "daily_page.json": "DailyPage",
+    "archive.json": "ArchiveList",
+    "seek_clip.json": "Seek",
+    "seek_daily.json": "Seek",
+    "seek_none.json": "Seek",
+    "pair_result.json": "PairResult",
+    "device.json": "Device",
+    "error.json": "Error",
+    "push_new_catch.json": "PushPayload",
+    "push_service.json": "PushPayload"
+  }
+}

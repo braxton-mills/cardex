@@ -1,0 +1,90 @@
+{
+  "api_version": 1,
+  "server_name": "CAMPI-PC",
+  "server_time": "2026-10-03T14:30:00.000-05:00",
+  "service": {
+    "state": "running",
+    "pid": 10432,
+    "started_at": "2026-09-30T14:09:26.000-05:00",
+    "heartbeat_at": "2026-10-03T14:29:58.000-05:00",
+    "disabled": false
+  },
+  "capture": {
+    "connected": true,
+    "host": "192.168.1.50",
+    "last_frame_at": "2026-10-03T14:29:58.600-05:00",
+    "saved": 128734,
+    "rejected": 12,
+    "reconnects": 3,
+    "restarts": 0,
+    "last_error": null
+  },
+  "clips": {
+    "last": {
+      "status": "ok",
+      "finished_at": "2026-10-03T14:21:15.000-05:00",
+      "clip_id": "2026-10-03_1410",
+      "day": null,
+      "detail": null
+    },
+    "next_at": "2026-10-03T14:40:00.000-05:00",
+    "running": false,
+    "queue": {
+      "length": 0,
+      "oldest_window_start": null,
+      "deferred": false,
+      "deferred_reason": null
+    }
+  },
+  "daily": {
+    "last": {
+      "status": "ok",
+      "finished_at": "2026-10-03T00:12:00.000-05:00",
+      "clip_id": null,
+      "day": "2026-10-02",
+      "detail": null
+    },
+    "running": false
+  },
+  "sightings": {
+    "enabled": true,
+    "state": "running",
+    "phase": "running",
+    "restarts": 1,
+    "last_error": null,
+    "next_retry_at": null,
+    "has_history": true,
+    "today": 23,
+    "total": 399,
+    "last_sighting_at": "2026-10-03T13:49:08.431-05:00",
+    "backend": "openvino",
+    "device": "Intel(R) UHD Graphics 770 (iGPU)",
+    "cpu_fallback": false,
+    "classify_queue": 0,
+    "cloud": {
+      "enabled": true,
+      "calls_today": 37,
+      "cap": 400
+    }
+  },
+  "gaming": {
+    "mode": "auto",
+    "active": false,
+    "exe": null,
+    "since": null,
+    "detection": "counters",
+    "renders_deferred": false
+  },
+  "disk": {
+    "free_gb": 412.7,
+    "drive": "C:"
+  },
+  "latest_clip_id": "2026-10-03_1410",
+  "live": {
+    "available": true,
+    "mjpeg": "/live.mjpg?d=dev_k3j9q2m8x4c7v1bz&exp=1791099000&sig=qMZALM2upvICtNObyiA8oah1jet8NqtxAc96ixK2KMs",
+    "snapshot": "/live.jpg?d=dev_k3j9q2m8x4c7v1bz&exp=1791099000&sig=jyrssFsDNqm7Ka5Bu_a93eoZEkJ76oDhCYsyJ7B-Vio",
+    "rotation": 0,
+    "max_viewers": 3
+  }
+}

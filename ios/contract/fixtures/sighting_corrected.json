@@ -1,0 +1,53 @@
+{
+  "id": "072235c2-8fcd-4f40-b3c1-cd2c81f98b52",
+  "kind": "vehicle",
+  "started_at": "2026-10-03T10:17:43.127-05:00",
+  "ended_at": "2026-10-03T10:17:49.645-05:00",
+  "day": "2026-10-03",
+  "yolo_class": "car",
+  "label": "Toyota Corolla",
+  "make": "Toyota",
+  "model": "Corolla",
+  "confidence": 0.508,
+  "decided_by": "user",
+  "machine": {
+    "label": "Toyota Camry",
+    "make": "Toyota",
+    "model": "Camry",
+    "confidence": 0.508,
+    "source": "siglip"
+  },
+  "siglip": {
+    "label": "Toyota Camry",
+    "confidence": 0.508
+  },
+  "runner_ups": [
+    {
+      "label": "Honda Civic",
+      "p": 0.2877
+    },
+    {
+      "label": "Chevrolet Silverado 1500",
+      "p": 0.1948
+    }
+  ],
+  "year_range": null,
+  "color": null,
+  "unsure": false,
+  "stationary": false,
+  "direction": "RL",
+  "cloud_status": null,
+  "starred": false,
+  "hidden": false,
+  "correction": {
+    "label": "Toyota Corolla",
+    "at": "2026-10-03T11:17:49.645-05:00"
+  },
+  "track_frames": 65,
+  "max_box_px": 609,
+  "media": {
+    "crop": "/media/sightings/2026-10-03/101743_072235c2_toyota-camry_crop.jpg?d=dev_k3j9q2m8x4c7v1bz&exp=1791099000&sig=gIkL6vh1Ybe9J_4iKtFRXeUpSD_Xvk5I0TeHHWQjReU",
+    "frame": "/media/sightings/2026-10-03/101743_072235c2_toyota-camry_frame.jpg?d=dev_k3j9q2m8x4c7v1bz&exp=1791099000&sig=Rmho0-Z8hmb8M_jl6DroYwO_s6Zvf7Ah2UVxO62orjo",
+    "clip": "/media/sightings/2026-10-03/101743_072235c2_toyota-camry.mp4?d=dev_k3j9q2m8x4c7v1bz&exp=1791099000&sig=Qzze8m6Ccu5cZAGhDuPvML4JjjVwRIXMwh9XqwBqh4A"
+  }
+}

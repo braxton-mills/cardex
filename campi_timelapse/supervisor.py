@@ -76,6 +76,13 @@ class Supervisor:
         self.sightings_exits: list[float] = []
         self.sightings_missing_logged = False
         self.sightings_paused = False      # stopped for gaming (not a crash)
+        # optional API for the iPhone app / desktop UI (only touched when [api] enabled)
+        self.api = None
+        self.api_restarts = 0
+        self.api_backoff = 10.0
+        self.api_next_start = 0.0
+        self.api_started = 0.0
+        self.api_missing_logged = False
         # render queue (window-end boundaries, oldest first) and game-aware deferral
         self.render_queue_path = cfg.paths.state / "render_queue.json"
         self.render_queue: list[float] = sorted(read_json(self.render_queue_path, []) or [])
@@ -163,6 +170,34 @@ class Supervisor:
         self.sightings = self.spawn("sightings-worker", low_priority=True, exe=str(exe), env=env)
         self.sightings_started = now
         log.info("sightings worker started (pid %d)", self.sightings.pid)
+
+    def check_api(self, now: float) -> None:
+        """Keep the optional API alive (venv-ui, below-normal priority, same Job Object). Restarts with backoff
+        (10 s doubling to 10 min, reset after 10 min up). It writes nothing under state\\; its log is ui\\api.log."""
+        p = self.api
+        if p and p.poll() is None:
+            if now - self.api_started > 600:
+                self.api_backoff = 10.0
+            return
+        if p:
+            rc = p.returncode
+            self.api = None
+            self.api_restarts += 1
+            self.api_next_start = now + self.api_backoff
+            log.error("api exited with %s; restarting in %.0fs (see ui\\api.log)", rc, self.api_backoff)
+            self.api_backoff = min(self.api_backoff * 2, 600)
+            return
+        if now < self.api_next_start:
+            return
+        exe = self.cfg.paths.ui_python
+        if not exe.exists():
+            if not self.api_missing_logged:
+                log.error("api enabled but %s is missing; run install.ps1 -UI", exe)
+                self.api_missing_logged = True
+            return
+        self.api = self.spawn("api", low_priority=True, exe=str(exe))
+        self.api_started = now
+        log.info("api started (pid %d, 127.0.0.1:%d)", self.api.pid, self.cfg.api.port)
 
     # -- gaming ------------------------------------------------------------
     def poll_game(self, now: float) -> None:
@@ -299,6 +334,8 @@ class Supervisor:
             "next_clip": datetime.fromtimestamp(next_clip).isoformat(timespec="seconds"),
             "free_gb": round(free, 1), "output_dir": str(self.cfg.paths.out),
             **(self.sightings_status(now) if self.cfg.sightings.enabled else {}),
+            **({"api_pid": self.api.pid if self.api and self.api.poll() is None else None,
+                "api_restarts": self.api_restarts} if self.cfg.api.enabled else {}),
             "render_queue": len(self.render_queue),
             "render_queue_oldest": (datetime.fromtimestamp(self.render_queue[0]).isoformat(timespec="minutes")
                                     if self.render_queue else None),
@@ -351,6 +388,8 @@ class Supervisor:
                 self.reset_backoff(now)
                 if cfg.sightings.enabled:
                     self.check_sightings(now)
+                if cfg.api.enabled:
+                    self.check_api(now)
 
                 self.poll_game(now)
                 self.reap("clip", cfg.render.timeout_min * 60, now)
@@ -385,9 +424,10 @@ class Supervisor:
         finally:
             if self.capture and self.capture.poll() is None:
                 self.capture.terminate()
-            if self.sightings and self.sightings.poll() is None:
-                subprocess.run(["taskkill", "/T", "/F", "/PID", str(self.sightings.pid)], capture_output=True,
-                               creationflags=NO_WINDOW)
+            for child in (self.sightings, self.api):
+                if child and child.poll() is None:
+                    subprocess.run(["taskkill", "/T", "/F", "/PID", str(child.pid)], capture_output=True,
+                                   creationflags=NO_WINDOW)
             for slot in ("clip", "daily", "housekeep"):
                 cur = getattr(self, slot)
                 if cur and cur[0].poll() is None:

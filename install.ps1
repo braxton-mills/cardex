@@ -8,8 +8,10 @@
    - with -Sightings: the optional vehicle sightings worker's own venv
      (%USERPROFILE%\CampiTimelapse\venv-sightings: CUDA torch, ultralytics, open_clip, transformers) and its
      model weights (several GB). Then set [sightings] enabled = true in config.toml and run `campi restart`.
-   - with -UI: the desktop app's own venv (%USERPROFILE%\CampiTimelapse\venv-ui: fastapi, uvicorn, pywebview),
-     a WebView2 runtime check, and a Start Menu shortcut "Campi" that runs `campi ui` without a console window.
+   - with -UI: the desktop app's and the API's own venv (%USERPROFILE%\CampiTimelapse\venv-ui: fastapi, uvicorn,
+     pywebview, pillow, httpx[http2], pyjwt[crypto], qrcode), a WebView2 runtime check, and a Start Menu shortcut
+     "Campi" that runs `campi ui` without a console window. Set [api] enabled = true to run the API for the iPhone
+     app under the service (see README "API").
 #>
 param([switch]$Sightings, [switch]$UI)
 $ErrorActionPreference = 'Stop'
@@ -50,11 +52,12 @@ if ($Sightings) {
 }
 
 if ($UI) {
-    # Separate env so the timelapse env never changes; only `campi ui` uses it
+    # Separate env so the timelapse env never changes; only `campi ui` and the API (`campi_timelapse api`) use it.
+    # pillow: /live.jpg; httpx[http2] + pyjwt[crypto]: APNs push; qrcode: `campi pair`
     $uv = Join-Path $env:USERPROFILE 'CampiTimelapse\venv-ui'
     $upy = Join-Path $uv 'Scripts\python.exe'
     if (-not (Test-Path $upy)) { uv venv $uv --python 3.12 }
-    uv pip install --python $upy fastapi uvicorn pywebview
+    uv pip install --python $upy fastapi uvicorn pywebview pillow 'httpx[http2]' 'pyjwt[crypto]' qrcode
     # The window is Edge WebView2 (preinstalled on Windows 11); `campi ui --browser` works without it
     $wv = 'Microsoft\EdgeUpdate\Clients\{F3017226-FE2A-4295-8BDF-00C3A9A7E4C5}'
     $ver = foreach ($k in "HKLM:\SOFTWARE\WOW6432Node\$wv", "HKLM:\SOFTWARE\$wv", "HKCU:\Software\$wv") {

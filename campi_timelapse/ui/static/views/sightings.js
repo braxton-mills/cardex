@@ -1,5 +1,6 @@
 import {
-  api, empty, h, icon, offBanner, openSighting, prefs, qs, selection, sightingCard, sightingsOff, stagger, viewHead,
+  api, empty, h, icon, noSightings, offBanner, openSighting, prefs, qs, selection, sightingCard, sightingsOff, stagger,
+  viewHead,
 } from '../lib.js';
 
 const CLASSES = ['car', 'truck', 'bus', 'motorcycle'];
@@ -9,7 +10,7 @@ export async function mount(el, params) {
   const st = await api('/api/status').catch(() => null);
   const head = viewHead();
   el.append(head);
-  if (st && !st.sightings_enabled && !st.sightings_db) {
+  if (noSightings(st)) {
     el.append(sightingsOff(st));
     return { unmount() {} };
   }
@@ -17,8 +18,10 @@ export async function mount(el, params) {
   if (banner) el.append(banner);
 
   // filters: URL params (from Collection) win over the remembered ones
-  const f = { from: '', to: '', make: '', class: '', source: '', label: '', hide_unsure: false, hide_stationary: false, starred: false, include_hidden: false, ...prefs.get('sightingFilters', {}) };
-  if (Object.keys(params).length) Object.assign(f, { make: '', label: '', class: '', source: '' }, params);
+  const saved = prefs.get('sightingFilters', {});
+  if (saved.source !== undefined) { saved.decided_by = saved.source; delete saved.source; } // filter name before the API contract
+  const f = { from: '', to: '', make: '', class: '', decided_by: '', label: '', hide_unsure: false, hide_stationary: false, starred: false, include_hidden: false, ...saved };
+  if (Object.keys(params).length) Object.assign(f, { make: '', label: '', class: '', decided_by: '' }, params);
   let makes = [];
   try {
     const c = await api('/api/collection');
@@ -37,7 +40,7 @@ export async function mount(el, params) {
     input('from'), h('span', { class: 'muted' }, '–'), input('to'),
     select('make', makes.map((m) => [m, m]), 'All makes'),
     select('class', CLASSES.map((c) => [c, c]), 'All classes'),
-    select('source', SOURCES, 'Any source'),
+    select('decided_by', SOURCES, 'Any source'),
     h('div', { class: 'tabs' }, toggle('hide_unsure', 'Hide unsure'), toggle('hide_stationary', 'Hide parked'), toggle('starred', 'Starred'), toggle('include_hidden', 'Show hidden')),
     f.label ? h('button', { class: 'tab on', title: 'Clear the label filter', onclick: () => set('label', '') }, icon('tag', 14), f.label, icon('x', 14)) : null);
   const grid = h('div', { class: 'grid' });
@@ -95,7 +98,7 @@ export async function mount(el, params) {
       cursor = page.next_cursor;
       done = !cursor;
       if (!ids.length) grid.append(empty('No sightings match', 'Try clearing some filters.'));
-      count.textContent = `${ids.length}${done ? '' : '+'} shown`;
+      count.textContent = done ? `${ids.length} shown` : `${ids.length} of ${page.total}`;
       refreshSelection();
     } catch (e) {
       grid.append(empty('Could not load sightings', e.message));

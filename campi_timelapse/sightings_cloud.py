@@ -98,7 +98,7 @@ class CloudWorker(threading.Thread):
                     continue
                 sid = job["sighting_id"]
                 if db.cloud_calls_today(con) >= self.c.cloud_max_per_day:
-                    db.finish_cloud_job(con, sid, None, error="cap")  # SigLIP's answer stays
+                    db.finish_cloud_job(con, sid, None, error="cap", status="capped")  # SigLIP's answer stays
                     self.capped += 1
                     log.info("cloud: daily cap %d reached; keeping SigLIP's answer for %s",
                              self.c.cloud_max_per_day, sid[:8])
@@ -107,7 +107,7 @@ class CloudWorker(threading.Thread):
                     result = self.ask(job)
                 except Permanent as e:
                     self.errors += 1
-                    db.finish_cloud_job(con, sid, None, error=self._clean(e))
+                    db.finish_cloud_job(con, sid, None, error=self._clean(e), status="failed")
                     log.error("cloud: %s gave up: %s", sid[:8], self._clean(e))
                     continue
                 except Exception as e:  # network, timeout, 429/5xx: retry later (survives restarts)
@@ -169,7 +169,7 @@ class CloudWorker(threading.Thread):
     def apply(self, con, job, r: dict):
         make, model = (r.get("make") or "").strip(), (r.get("model") or "").strip()
         if not make or not model:
-            db.finish_cloud_job(con, job["sighting_id"], r, error="empty answer")
+            db.finish_cloud_job(con, job["sighting_id"], r, error="empty answer", status="failed")
             return
         label = model if model.lower().startswith(make.lower()) else f"{make} {model}"
         update = {"label": label, "make": make, "model": model, "year_range": r.get("year_range") or None,

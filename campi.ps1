@@ -18,6 +18,9 @@
     campi rife-bench      render one recent window with RIFE on the NVIDIA and the Intel GPU (work folder only)
     campi game on|off|auto   gaming mode override (renders wait while a game runs)
     campi ui [--browser] [--port N]   desktop app: sightings, clips, daily videos, highlights (install.ps1 -UI)
+    campi pair            pair an iPhone: QR code + one-time code (needs the API: [api] enabled or campi api)
+    campi devices [revoke ID]   list paired devices / unpair one (its token and media links stop working at once)
+    campi api             run the API in this window with live logs (debugging; Ctrl+C stops)
 #>
 param([Parameter(Position = 0)][string]$Command = 'status',
       [Parameter(Position = 1, ValueFromRemainingArguments = $true)][string[]]$Rest)
@@ -107,6 +110,12 @@ switch ($Command) {
         if (-not (Test-Path $exe)) { Write-Host 'UI env not installed: run install.ps1 -UI'; exit 1 }
         if ($browser) { & $exe -m campi_timelapse ui @Rest }
         else { Start-Process $exe -ArgumentList (@('-m', 'campi_timelapse', 'ui') + @($Rest | Where-Object { $_ })) -WorkingDirectory $Project }
+    }
+    { $_ -in 'pair', 'devices', 'api' } {
+        $exe = Join-Path $UiScripts 'python.exe'
+        if (-not (Test-Path $exe)) { Write-Host 'UI env not installed: run install.ps1 -UI'; exit 1 }
+        & $exe -m campi_timelapse $Command @Rest
+        exit $LASTEXITCODE
     }
     { $_ -in 'sightings-record', 'sightings-test', 'sightings-bench' } {
         if (-not (Test-Path $PySightings)) { Write-Host 'sightings env not installed: run install.ps1 -Sightings'; exit 1 }

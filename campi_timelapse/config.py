@@ -99,7 +99,9 @@ def load_config(path: Path | None = None) -> SimpleNamespace:
         out=Path(_expand(cfg.output.dir)),
     )
     cfg.paths.daily = cfg.paths.out / "daily"
-    cfg.paths.archive = cfg.paths.out / "archive"
+    # [archive] dir: keep the long archive elsewhere (e.g. off a synced folder: each append rewrites the part)
+    adir = getattr(cfg.archive, "dir", "")
+    cfg.paths.archive = Path(_expand(adir)) if adir else cfg.paths.out / "archive"
     for p in vars(cfg.paths).values():
         p.mkdir(parents=True, exist_ok=True)
     # Optional sightings worker: not created here, so nothing new appears on disk while it is disabled.

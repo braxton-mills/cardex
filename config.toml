@@ -27,7 +27,7 @@ gap_factor = 3.0             # frames further apart than gap_factor * spacing = 
 timeout_min = 9              # kill a stuck render after this long
 
 [output]
-dir = "{downloads}\\campi-timelapse"
+dir = "{home}\\OneDrive\\Videos\\campi"   # 10-min clips, latest.mp4, daily\ (synced by OneDrive)
 width = 1440                 # must match the cropped aspect (4:3, or 3:4 when rotation is 90/270)
 height = 1080
 base_fps = 30                # source frames per second of video
@@ -61,8 +61,9 @@ target_seconds = 60
 min_frames = 300             # skip the daily video if fewer usable frames than this
 
 [archive]
-enabled = true               # append every finished clip onto one long video in <output>\archive\
+enabled = true               # append every finished clip onto one long video in [archive] dir
 max_gb = 2.0                 # start campi_archive_002.mp4 etc. when the next clip would pass this size
+dir = "{downloads}\\campi-timelapse\\archive"   # kept off OneDrive: every append rewrites the current part (1-2 GB)
 
 [retention]
 clips_hours = 24             # 10-minute clips in Downloads (latest.mp4 and daily\ are never deleted)

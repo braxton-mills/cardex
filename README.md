@@ -5,10 +5,10 @@ and one ~60 s video per day. All settings are in `config.toml`; after editing it
 
 | What | Where |
 |---|---|
-| 10-minute clips (kept 24 h) | `Downloads\campi-timelapse\campi_YYYY-MM-DD_HHMM.mp4` (HHMM = window start) |
-| Newest clip | `Downloads\campi-timelapse\latest.mp4` |
-| Daily videos (kept forever) | `Downloads\campi-timelapse\daily\campi_daily_YYYY-MM-DD.mp4` |
-| Long archive (every clip appended, new part at 2 GB) | `Downloads\campi-timelapse\archive\campi_archive_001.mp4`, `_002`, ... |
+| 10-minute clips (kept 24 h) | `OneDrive\Videos\campi\campi_YYYY-MM-DD_HHMM.mp4` (HHMM = window start) |
+| Newest clip | `OneDrive\Videos\campi\latest.mp4` |
+| Daily videos (kept forever) | `OneDrive\Videos\campi\daily\campi_daily_YYYY-MM-DD.mp4` |
+| Long archive (every clip appended, new part at 2 GB) | `Downloads\campi-timelapse\archive\campi_archive_001.mp4`, `_002`, ... (kept local: each append rewrites the part, too big to re-sync every 10 min; `[archive] dir`) |
 | Raw frames (all for 48 h, then 1/min) | `%USERPROFILE%\CampiTimelapse\frames\YYYY-MM-DD\HH\` + `index.csv` |
 | Logs | `%USERPROFILE%\CampiTimelapse\logs\` (`gaps.log` = capture gaps, `gpu.log` = RIFE GPU proof) |
 

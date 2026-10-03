@@ -9,6 +9,8 @@
     curl -X POST http://127.0.0.1:8765/mock/pair-code                   # mock-only: issue a fresh pairing code
     python3 tools/mock_server.py --live busy --rotation 90               # exercise Live's error states / rotation
     curl -X POST -d '{"state":"unreachable"}' http://127.0.0.1:8765/mock/live   # mock-only: change it at runtime
+    curl -X POST -d '{"type":"new_catch"}' http://127.0.0.1:8765/mock/push      # mock-only: simctl push to the simulator
+    curl -X POST -d '{"seconds":60}' http://127.0.0.1:8765/mock/offline         # mock-only: drop API connections
 
 Stdlib only (Python 3.11+). Sample media is generated once with ffmpeg into tools/mock_media/.
 Mock limitations: every clip/daily/archive/sighting file of a kind is the same sample file; /live.jpg ignores w
@@ -238,6 +240,7 @@ class Store:
         self.live_viewers = 0
         self.live_opened = self.live_closed = 0         # for /mock/live (UI tests check disconnects)
         self.live_state = "ok"                           # ok | busy | unreachable | unavailable
+        self.offline_until = 0.0                         # /mock/offline: drop /api/ connections until then
         self.rotation = 0
         self.live_jpg_times: list[float] = []
         self._seed_ui_state()
@@ -775,6 +778,7 @@ class Handler(BaseHTTPRequestHandler):
     views: Views
     latency = 0.0
     quiet = False
+    bundle_id = "com.braxtonmills.campi"
 
     def log_message(self, fmt, *args):
         if not self.quiet:
@@ -841,6 +845,9 @@ class Handler(BaseHTTPRequestHandler):
         u = urlsplit(self.path)
         path, q = u.path, parse_qs(u.query)
         try:
+            if path.startswith(("/api/", "/media/", "/live")) and time.time() < self.store.offline_until:
+                self.close_connection = True   # no answer at all, like the PC behind a Tailscale that's off
+                return
             if path.startswith("/media/"):
                 with self.store.lock:
                     self.auth(path, q, allow_sig=True)
@@ -853,6 +860,12 @@ class Handler(BaseHTTPRequestHandler):
                         return self.serve_live_jpg()
             if path == "/live.mjpg":
                 return self.serve_mjpeg(q)
+            if path == "/mock/push" and self.command == "POST":   # mock-only: simulated APNs push to the simulator
+                return self.send_json(200, self.simulator_push())
+            if path == "/mock/offline" and self.command == "POST":   # mock-only: act unreachable for N seconds
+                secs = float(self.body_json().get("seconds", 60))
+                self.store.offline_until = time.time() + secs
+                return self.send_json(200, {"offline_for_s": secs})
             with self.store.lock:
                 if path == "/mock/pair-code" and self.command == "POST":   # mock-only: fresh code for UI tests
                     self.store.pair_attempts.clear()   # each test pairs once; don't trip the 10-per-10-min limit
@@ -1185,6 +1198,22 @@ class Handler(BaseHTTPRequestHandler):
         if self.command != "HEAD":
             self.wfile.write(data)
 
+    def simulator_push(self) -> dict:
+        """`xcrun simctl push booted` with a contract payload (§9.3), like the PC's sender would send via APNs."""
+        kind = self.body_json().get("type", "new_catch")
+        if kind not in ("new_catch", "rare", "discovered", "service"):
+            raise ApiError(400, "invalid_param", "type: new_catch | rare | discovered | service")
+        with self.store.lock:
+            payload = push_payload(self.store, kind)
+        payload["Simulator Target Bundle"] = self.bundle_id
+        f = MEDIA / "push.apns"   # git-ignored
+        f.write_text(json.dumps(payload))
+        r = subprocess.run(["xcrun", "simctl", "push", "booted", self.bundle_id, str(f)],
+                           capture_output=True, text=True, timeout=30)
+        if r.returncode != 0:
+            raise ApiError(500, "internal", f"simctl push failed: {r.stderr.strip()}")
+        return {"sent": payload["campi"]}
+
     def serve_mjpeg(self, q: dict):
         st = self.store
         max_fps = int_param(q, "max_fps", 30, 1, 30)
@@ -1348,7 +1377,7 @@ def main(argv=None):
         return
     store.live_state, store.rotation = a.live, a.rotation
     Handler.store, Handler.views = store, Views(store)
-    Handler.latency, Handler.quiet = a.latency, a.quiet
+    Handler.latency, Handler.quiet, Handler.bundle_id = a.latency, a.quiet, a.bundle_id
     srv = ThreadingHTTPServer((a.host, a.port), Handler)
     srv.daemon_threads = True
     base = a.public_url or f"http://{'127.0.0.1' if a.host == '0.0.0.0' else a.host}:{a.port}"

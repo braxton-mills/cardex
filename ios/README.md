@@ -12,8 +12,8 @@ The iPhone companion to the Campi timelapse + vehicle-sightings service running 
 | M3 Timelapse tab, player, Save to Photos / Share | done |
 | M4 Live (MJPEG on Wi-Fi, snapshots on cellular) | done |
 | M4.5 Cardex cards (on-device card text per label) | done |
-| M5 Push notifications + Home Screen widget | next |
-| M6 Polish, accessibility, install on device | planned |
+| M5 Push notifications + Home Screen widget | done |
+| M6 Polish, accessibility, install on device | next |
 
 The PC side (`campi ui` API, see `docs/api-contract.md` Appendix A) isn't built yet; the app runs against
 `tools/mock_server.py` until it is.
@@ -32,6 +32,11 @@ The PC side (`campi ui` API, see `docs/api-contract.md` Appendix A) isn't built 
   Card" from the card's context menu or the detail's ⋯ menu. Without Apple Intelligence it shows a plain card
   and says why.
 - **Timelapse:** last 24 h of clips by hour (with expiry), daily videos, archive parts; save to Photos or share.
+- **Notifications** (sent by the PC over APNs): new catches, rare (2nd/3rd) sightings, Gemini discoveries and
+  service alerts, each toggled in Settings and stored on the PC. A notification extension attaches the crop,
+  fetched with the bearer token from the shared Keychain. Tapping opens the sighting (or the status).
+- **Widget** (small, medium): today's count, the latest catch with its crop, health. When the PC can't be
+  reached it keeps the last good data and says "PC unreachable · as of …". Tapping opens the sighting.
 - **Live** (from Today): MJPEG video at 10 fps on Wi-Fi, the newest saved frame every 2 s on cellular or Low Data
   Mode (or pick one). Disconnects as soon as it's off screen or the app leaves the foreground. Explains
   `live_busy`, an unreachable Pi and "no recent frame", and offers snapshots when video isn't possible.
@@ -73,6 +78,12 @@ In the simulator, pair with the mock at `http://127.0.0.1:8765` using the code t
 `curl -X POST http://127.0.0.1:8765/mock/pair-code` for a new one).
 
 Testing notes:
+- Pairing asks for notification permission; the UI tests tap Allow. `simctl push` (and `/mock/push`) shows the
+  banner and tests the tap, but doesn't run the notification extension: check the crop attachment with a real
+  APNs push (Apple's Push Notifications Console, sandbox, to the token from Settings → Copy device token).
+- The widget test adds the Campi widget to the simulator's home screen once; it stays there.
+- The push environment follows the signing (`aps-environment` in the embedded profile), not Debug/Release:
+  a Release build installed from Xcode is development-signed and gets sandbox tokens.
 - Cardex text is generated in the simulator only when this Mac has Apple Intelligence turned on; otherwise the
   test sees the fallback card. `-cardexFallback` forces the fallback (and an in-memory cache).
 - Keep `-collect-test-diagnostics never`: without it, a failing UI test makes xcodebuild run
@@ -90,6 +101,8 @@ python3 tools/mock_server.py --v1 --sightings-off   # today's service: schema v1
 python3 tools/mock_server.py --write-fixtures       # regenerate contract/fixtures (fixed clock + seed)
 python3 tools/mock_server.py --live busy --rotation 90   # Live: ok | busy | unreachable | unavailable
 curl -X POST -d '{"state":"unreachable"}' http://127.0.0.1:8765/mock/live   # change it while running
+curl -X POST -d '{"type":"new_catch"}' http://127.0.0.1:8765/mock/push      # simctl push a contract payload
+curl -X POST -d '{"seconds":60}' http://127.0.0.1:8765/mock/offline         # act unreachable (widget, Today)
 python3 tools/mock_server.py --print-push new_catch > /tmp/p.apns && xcrun simctl push booted com.braxtonmills.campi /tmp/p.apns
 ```
 The first run uses ffmpeg (`brew install ffmpeg`) to generate sample media into `tools/mock_media/`

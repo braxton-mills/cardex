@@ -26,10 +26,11 @@ struct RootView: View {
 
 struct MainTabs: View {
     enum Tab: Hashable { case today, highlights, sightings, collection, timelapse }
-    @State private var selection: Tab = .today
+    @Environment(AppModel.self) private var app
 
     var body: some View {
-        TabView(selection: $selection) {
+        @Bindable var app = app
+        TabView(selection: $app.tab) {
             SwiftUI.Tab("Today", systemImage: "sun.max", value: .today) {
                 TodayView()
             }
@@ -45,6 +46,85 @@ struct MainTabs: View {
             SwiftUI.Tab("Timelapse", systemImage: "film.stack", value: .timelapse) {
                 TimelapseView()
             }
+        }
+        .sheet(item: $app.route) { route in
+            switch route {
+            case .sighting(let id): SightingLoaderView(id: id)
+            case .status: StatusLoaderView()
+            }
+        }
+    }
+}
+
+/// A sighting opened by id (notification or widget tap).
+struct SightingLoaderView: View {
+    @Environment(AppModel.self) private var app
+    @Environment(\.dismiss) private var dismiss
+    let id: String
+    @State private var sighting: Sighting?
+    @State private var error: APIError?
+
+    var body: some View {
+        NavigationStack {
+            Group {
+                if let sighting {
+                    SightingDetailView(initial: sighting)
+                } else if let error {
+                    UnreachableView(error: error, serverName: app.connection?.serverName) { Task { await load() } }
+                } else {
+                    ProgressView()
+                }
+            }
+            .toolbar {
+                ToolbarItem(placement: .cancellationAction) { Button("Done") { dismiss() } }
+            }
+            .sightingDestinations()
+        }
+        .task { await load() }
+    }
+
+    private func load() async {
+        guard let client = app.client else { return }
+        error = nil
+        do {
+            sighting = app.sightings.resolve(try await client.sighting(id: id))
+        } catch {
+            app.report(error)
+            self.error = error as? APIError ?? .unreachable(error.localizedDescription)
+        }
+    }
+}
+
+/// The service status sheet, opened by a service-alert notification.
+struct StatusLoaderView: View {
+    @Environment(AppModel.self) private var app
+    @State private var status: Status?
+    @State private var error: APIError?
+
+    var body: some View {
+        if let status {
+            StatusDetailView(status: status)
+        } else {
+            NavigationStack {
+                Group {
+                    if let error {
+                        UnreachableView(error: error, serverName: app.connection?.serverName) { Task { await load() } }
+                    } else {
+                        ProgressView()
+                    }
+                }
+                .navigationTitle("Status")
+            }
+            .task { await load() }
+        }
+    }
+
+    private func load() async {
+        guard let client = app.client else { return }
+        error = nil
+        do { status = try await client.status() } catch {
+            app.report(error)
+            self.error = error as? APIError ?? .unreachable(error.localizedDescription)
         }
     }
 }

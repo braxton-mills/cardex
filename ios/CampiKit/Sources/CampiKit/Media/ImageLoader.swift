@@ -69,6 +69,15 @@ public actor ImageLoader {
                                      kCGImageSourceThumbnailMaxPixelSize: maxPixelSize]
         return CGImageSourceCreateThumbnailAtIndex(src, 0, opts as CFDictionary)
     }
+
+    /// JPEG-encodes `data` downsampled to `maxPixelSize` (notification attachments, widget crops).
+    public static func downsampledJPEG(_ data: Data, maxPixelSize: Int, quality: Double = 0.8) -> Data? {
+        guard let img = downsample(data, maxPixelSize: maxPixelSize) else { return nil }
+        let out = NSMutableData()
+        guard let dest = CGImageDestinationCreateWithData(out, "public.jpeg" as CFString, 1, nil) else { return nil }
+        CGImageDestinationAddImage(dest, img, [kCGImageDestinationLossyCompressionQuality: quality] as CFDictionary)
+        return CGImageDestinationFinalize(dest) ? out as Data : nil
+    }
 }
 
 final class CGImageBox: @unchecked Sendable {

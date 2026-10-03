@@ -2,6 +2,7 @@ import CampiKit
 import Foundation
 import Observation
 import UIKit
+import WidgetKit
 
 /// App-wide state: which PC we're paired with, and the client to talk to it.
 @MainActor @Observable
@@ -16,12 +17,25 @@ final class AppModel {
     /// Set when the PC rejected our token (revoked with `campi devices revoke`, or the PC's ui.db was reset).
     var unpairedReason: String?
 
+    /// The selected tab, so deep links can switch it.
+    var tab: MainTabs.Tab = .today
+    /// A screen opened by a notification or widget tap, shown as a sheet over the tabs.
+    var route: Route?
+
+    enum Route: Identifiable, Hashable {
+        case sighting(id: String)
+        case status
+        var id: Self { self }
+    }
+
     /// Latest known version of every sighting the user acted on, so all screens agree (M2).
     let sightings = SightingStore()
     /// Save to Photos / Share downloads (M3).
     let saver = MediaSaver()
     /// Cardex card text per label, generated on device and cached (M4.5).
     let cardex = CardexStore()
+    /// Notification permission, APNs token and push prefs (M5).
+    let push = PushManager()
     /// The label collection, shared by Collection, the label picker and the make filter.
     private(set) var collection: LabelCollection?
     /// Set when a label correction changed counts; Collection reloads on next appearance.
@@ -43,11 +57,44 @@ final class AppModel {
     var isPaired: Bool { client != nil }
 
     func handle(url: URL) {
-        if let link = PairingLink(url: url) {
+        if let link = DeepLink(url: url) { open(link) }
+    }
+
+    /// Pairing links, and taps on notifications and the widget.
+    func open(_ link: DeepLink) {
+        switch link {
+        case .pair(let p):
             pairingError = nil
-            pendingLink = link
+            pendingLink = p
+        case .sighting(let id):
+            guard isPaired else { return }
+            route = .sighting(id: id)
+        case .today:
+            tab = .today
+            route = nil
+        case .status:
+            guard isPaired else { return }
+            tab = .today
+            route = .status
         }
-        // campi://sighting/<id> deep links arrive with push (M5)
+    }
+
+    // MARK: Push
+
+    func pushTokenReceived(_ token: Data) {
+        push.didRegister(token)
+        Task { await syncPush() }
+    }
+
+    /// Sends the token, environment and prefs to the PC (each launch, on a new token, after a permission change).
+    func syncPush() async {
+        guard let client else { return }
+        do { try await push.sync(client: client) } catch { report(error) }
+    }
+
+    func enablePush() async {
+        await push.requestPermission()
+        if push.permission != .allowed { await syncPush() }   // denied: tell the PC to stop (apns_token null)
     }
 
     static var defaultDeviceName: String { UIDevice.current.name }
@@ -65,6 +112,8 @@ final class AppModel {
             client = APIClient(baseURL: link.baseURL, token: result.token)
             pendingLink = nil
             unpairedReason = nil
+            WidgetCenter.shared.reloadAllTimelines()
+            Task { await enablePush() }   // asks once; later from Settings
         } catch let e as APIError {
             pairingError = switch e.code {
             case .invalidCode: "That code is wrong, already used, or expired. Run campi pair again on the PC."
@@ -107,6 +156,11 @@ final class AppModel {
         client = nil
         collection = nil
         sightings.reset()
+        push.reset()
+        route = nil
+        tab = .today
+        WidgetStore().clear()
+        WidgetCenter.shared.reloadAllTimelines()
         unpairedReason = reason
         Task { await ImageLoader.shared.clear() }
     }

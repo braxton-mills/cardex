@@ -52,6 +52,7 @@ final class SmokeTests: XCTestCase {
         app.buttons["pair.submit"].tap()
 
         XCTAssertTrue(app.navigationBars["CAMPI-PC"].waitForExistence(timeout: 15), "Today didn't appear after pairing")
+        allowNotificationsIfAsked()
         XCTAssertTrue(app.buttons["today.status"].waitForExistence(timeout: 10))
         XCTAssertTrue(app.staticTexts["Latest sightings"].exists)
         sleep(2)   // let crops load for the screenshot
@@ -64,6 +65,12 @@ final class SmokeTests: XCTestCase {
 
         app.buttons["Settings"].tap()
         XCTAssertTrue(app.navigationBars["Settings"].waitForExistence(timeout: 5))
+        // Push prefs come from the PC and are written back to it.
+        let rare = app.switches["settings.push.rare"]
+        XCTAssertTrue(rare.waitForExistence(timeout: 10), "no notification toggles")
+        let before = rare.value as? String
+        rare.switches.firstMatch.tap()
+        XCTAssertTrue(waitFor(rare, value: before == "1" ? "0" : "1"), "rare toggle didn't change")
         attach(app, "4-settings")
         app.buttons["Unpair this iPhone"].tap()
         app.buttons["Unpair"].firstMatch.tap()
@@ -102,7 +109,62 @@ final class SmokeTests: XCTestCase {
         app.textFields["pair.code"].typeText(pairCode)
         app.buttons["pair.submit"].tap()
         XCTAssertTrue(app.navigationBars["CAMPI-PC"].waitForExistence(timeout: 15), "pairing failed")
+        allowNotificationsIfAsked()
         return app
+    }
+
+    /// Pairing asks for notification permission once per install; allow it.
+    @MainActor
+    private func allowNotificationsIfAsked() {
+        let allow = XCUIApplication(bundleIdentifier: "com.apple.springboard").alerts.buttons["Allow"]
+        if allow.waitForExistence(timeout: 4) { allow.tap() }
+    }
+
+    // MARK: Push (M5)
+
+    /// Mock-only `/mock/push`: the mock runs `xcrun simctl push booted` with a contract payload.
+    @discardableResult
+    static func mockPush(_ type: String) async throws -> [String: Any] {
+        var req = URLRequest(url: URL(string: mock + "/mock/push")!, timeoutInterval: 40)
+        req.httpMethod = "POST"
+        req.httpBody = try JSONSerialization.data(withJSONObject: ["type": type])
+        let (data, resp) = try await URLSession.shared.data(for: req)
+        XCTAssertEqual((resp as? HTTPURLResponse)?.statusCode, 200, String(decoding: data, as: UTF8.self))
+        return try JSONSerialization.jsonObject(with: data) as? [String: Any] ?? [:]
+    }
+
+    @MainActor
+    func testPushOpensSightingAndStatus() async throws {
+        let app = try await launchPaired()
+        XCTAssertTrue(app.buttons["today.status"].waitForExistence(timeout: 10))
+        let springboard = XCUIApplication(bundleIdentifier: "com.apple.springboard")
+
+        // In the background: a new-catch banner; tapping it opens that sighting.
+        XCUIDevice.shared.press(.home)
+        let sent = try await Self.mockPush("new_catch")
+        let label = try XCTUnwrap((sent["sent"] as? [String: Any])?["label"] as? String)
+        let banner = springboard.descendants(matching: .any)
+            .matching(NSPredicate(format: "label CONTAINS %@", "New catch: \(label)")).firstMatch
+        XCTAssertTrue(banner.waitForExistence(timeout: 20), "no banner for the push")
+        sleep(3)   // the notification extension attaches the crop
+        let shot = XCTAttachment(screenshot: XCUIScreen.main.screenshot())
+        shot.name = "30-push-banner"
+        shot.lifetime = .keepAlways
+        add(shot)
+        banner.tap()
+        XCTAssertTrue(app.buttons["detail.timelapse"].waitForExistence(timeout: 20), "the tap didn't open the sighting")
+        XCTAssertTrue(app.navigationBars[label].exists || app.staticTexts[label].exists)
+        attach(app, "31-push-opened-sighting")
+        app.buttons["Done"].firstMatch.tap()
+
+        // In the foreground: a service alert still shows; tapping it opens the status.
+        try await Self.mockPush("service")
+        let alert = springboard.descendants(matching: .any)
+            .matching(NSPredicate(format: "label CONTAINS 'stream lost'")).firstMatch
+        XCTAssertTrue(alert.waitForExistence(timeout: 20), "no banner while in the foreground")
+        alert.tap()
+        XCTAssertTrue(app.navigationBars["Status"].waitForExistence(timeout: 15), "the tap didn't open the status")
+        attach(app, "32-push-opened-status")
     }
 
     @MainActor
@@ -234,6 +296,71 @@ final class SmokeTests: XCTestCase {
 
     /// Long-presses for the context menu and returns `item`, retrying the press once (it can miss while
     /// another animation is finishing).
+    // MARK: Widget (M5)
+
+    static func mockOffline(seconds: Double) async throws {
+        var req = URLRequest(url: URL(string: mock + "/mock/offline")!, timeoutInterval: 5)
+        req.httpMethod = "POST"
+        req.httpBody = try JSONSerialization.data(withJSONObject: ["seconds": seconds])
+        _ = try await URLSession.shared.data(for: req)
+    }
+
+    /// Adds the medium Campi widget to the home screen unless one is there (it survives reinstalls over the top).
+    @MainActor
+    private func addWidgetIfNeeded(_ springboard: XCUIApplication) {
+        let widget = springboard.descendants(matching: .any).matching(NSPredicate(format: "label CONTAINS 'sightings today'")).firstMatch
+        if widget.waitForExistence(timeout: 3) { return }
+        springboard.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.6)).press(forDuration: 2.0)
+        XCTAssertTrue(springboard.buttons["Edit"].waitForExistence(timeout: 5), "home screen didn't enter edit mode")
+        springboard.buttons["Edit"].tap()
+        springboard.buttons["Add Widget"].tap()
+        let search = springboard.searchFields["Search Widgets"]
+        XCTAssertTrue(search.waitForExistence(timeout: 5))
+        search.tap()
+        search.typeText("Campi")
+        springboard.cells["Campi"].tap()
+        let add = springboard.buttons.matching(NSPredicate(format: "label CONTAINS 'Add Widget'")).firstMatch
+        XCTAssertTrue(add.waitForExistence(timeout: 5))
+        springboard.swipeLeft()   // the medium size
+        sleep(1)
+        add.tap()
+        sleep(2)
+        if springboard.buttons["Done"].exists { springboard.buttons["Done"].tap() }
+    }
+
+    @MainActor
+    func testWidgetShowsLatestCatchThenUnreachable() async throws {
+        try await Self.mockOffline(seconds: 0)
+        addTeardownBlock { try? await Self.mockOffline(seconds: 0) }
+        let app = try await launchPaired()
+        XCTAssertTrue(app.buttons["today.status"].waitForExistence(timeout: 10))
+        XCUIDevice.shared.press(.home)   // backgrounding reloads the widget
+        let springboard = XCUIApplication(bundleIdentifier: "com.apple.springboard")
+        addWidgetIfNeeded(springboard)
+
+        let fresh = springboard.descendants(matching: .any)
+            .matching(NSPredicate(format: "label CONTAINS 'sightings today' AND NOT (label CONTAINS 'unreachable')")).firstMatch
+        XCTAssertTrue(fresh.waitForExistence(timeout: 20), "widget never showed today's count")
+        sleep(3)
+        let shot1 = XCTAttachment(screenshot: XCUIScreen.main.screenshot())
+        shot1.name = "33-widget"
+        shot1.lifetime = .keepAlways
+        add(shot1)
+
+        // The PC stops answering: the widget keeps the last good data and says so.
+        try await Self.mockOffline(seconds: 120)
+        app.activate()
+        sleep(1)
+        XCUIDevice.shared.press(.home)
+        let stale = springboard.descendants(matching: .any).matching(NSPredicate(format: "label CONTAINS 'PC unreachable'")).firstMatch
+        XCTAssertTrue(stale.waitForExistence(timeout: 30), "widget never showed the unreachable state")
+        sleep(1)
+        let shot2 = XCTAttachment(screenshot: XCUIScreen.main.screenshot())
+        shot2.name = "34-widget-unreachable"
+        shot2.lifetime = .keepAlways
+        add(shot2)
+    }
+
     // MARK: Cardex (M4.5)
 
     /// Opens the first caught label's page and waits for its card to finish (generated or fallback).

@@ -13,7 +13,7 @@ The iPhone companion to the Campi timelapse + vehicle-sightings service running 
 | M4 Live (MJPEG on Wi-Fi, snapshots on cellular) | done |
 | M4.5 Cardex cards (on-device card text per label) | done |
 | M5 Push notifications + Home Screen widget | done |
-| M6 Polish, accessibility, install on device | polish done; device install next |
+| M6 Polish, accessibility, install on device | done |
 
 The PC side (`campi ui` API, see `docs/api-contract.md` Appendix A) isn't built yet; the app runs against
 `tools/mock_server.py` until it is.
@@ -129,7 +129,11 @@ xcrun devicectl list devices
 xcrun devicectl device install app --device <UDID> build/device/Build/Products/Release-iphoneos/Campi.app
 ```
 Automatic signing creates the App IDs and profiles for the app and both extensions (App Group, Keychain sharing,
-Push). The phone needs Developer Mode on. A beta iOS may need the matching Xcode beta.
+Push). The phone needs Developer Mode on. Xcode 27.0 installs fine on the iOS 27.2 beta.
+
+To try the phone against the mock: `python3 tools/mock_server.py --host 0.0.0.0 --public-url http://<mac-ip>:8765`
+(the Mac's Wi-Fi or Tailscale address). The mock prints each device's APNs token when it registers, for a test push
+from Apple's Push Notifications Console (sandbox).
 
 ## App icon
 `swift tools/make_icon.swift` draws the light, dark and tinted icons into `AppIcon.appiconset` (CoreGraphics; no

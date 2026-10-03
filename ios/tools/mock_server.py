@@ -922,6 +922,8 @@ class Handler(BaseHTTPRequestHandler):
                         not (b.get("apns_token") is None or isinstance(b.get("apns_token"), str)):
                     raise ApiError(400, "invalid_param", "need apns_token, environment and all four prefs")
                 d.update(apns_token=b["apns_token"], environment=b["environment"], prefs=prefs)
+                # mock-only: the token, for a test push from Apple's Push Notifications Console
+                print(f"push: {d['name']} ({d['id']}) {b['environment']} token {b['apns_token']}", file=sys.stderr)
                 return 200, self.device_json(d)
         if parts[0] == "sightings":
             if not st.has_db and len(parts) > 1:

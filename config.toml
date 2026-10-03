@@ -1,0 +1,79 @@
+# Campi timelapse service: every setting lives here.
+# Paths may use {home}, {downloads} (real Downloads folder, OneDrive-aware) and {project}.
+# After editing, run:  campi restart
+
+[stream]
+url = "http://campi.local:8000/stream.mjpg"
+snapshot_url = "http://campi.local:8000/snapshot.jpg"   # high-quality JPEG per request (added to the Pi server)
+pi_mac = "D8-3A-DD-A1-30-A1"       # Pi wlan0 MAC: if the host stops answering, capture finds the Pi on the LAN by this
+timeout_s = 10               # connect timeout, and no data for this long = stream dropped
+backoff_initial_s = 1
+backoff_max_s = 60
+
+[capture]
+source = "snapshot"          # snapshot (q90 software JPEG from the Pi) | stream (hardware MJPEG, capped at 25 Mbps)
+interval_s = 2.0             # seconds between saved frames
+data_dir = "{home}\\CampiTimelapse"   # frames\, logs\, state\, work\ live here (outside Downloads)
+expected_width = 0           # reject frames of any other size (0 = accept any; renders crop any size to 4:3)
+expected_height = 0
+stall_after_dupes = 5        # this many identical frames in a row = stalled stream -> reconnect
+
+[render]
+interval_min = 10            # render a clip every N minutes (wall-clock aligned)
+window_min = 10              # each clip covers the last N minutes
+delay_s = 15                 # wait after the window closes so the last frame is on disk
+min_usable_frac = 0.5        # skip the clip if fewer usable frames than this fraction of expected
+gap_factor = 3.0             # frames further apart than gap_factor * spacing = hard cut, no interpolation
+timeout_min = 9              # kill a stuck render after this long
+
+[output]
+dir = "{downloads}\\campi-timelapse"
+width = 1440                 # must match the cropped aspect (4:3, or 3:4 when rotation is 90/270)
+height = 1080
+base_fps = 30                # source frames per second of video
+interp_factor = 2            # RIFE multiplier (1 = off); final fps = base_fps * interp_factor
+encoder = "auto"             # auto (NVENC, fall back to libx264) | nvenc | x264
+cq = 19                      # NVENC constant quality (libx264 fallback uses crf = cq - 1)
+
+[image]
+rotation = 0                 # 0 / 90 / 180 / 270, clockwise
+level_deg = 9.0              # extra counter-clockwise leveling; output is cropped so there are no black corners
+
+[deflicker]
+mode = "luma"                # luma (match each frame to a rolling average) | ffmpeg (deflicker filter) | off
+window = 15                  # frames in the rolling average
+min_gain = 0.8
+max_gain = 1.25
+
+[night]
+luma_threshold = 35          # frames with mean brightness (0-255) below this are skipped
+
+[overlay]
+enabled = true
+corner = "bottom-right"      # top-left | top-right | bottom-left | bottom-right
+format = "%Y-%m-%d %H:%M:%S"
+scale = 0.8                  # font size at 1080 px output height
+
+[daily]
+enabled = true
+run_at = "00:05"             # render yesterday's full-day video at this time
+target_seconds = 60
+min_frames = 300             # skip the daily video if fewer usable frames than this
+
+[archive]
+enabled = true               # append every finished clip onto one long video in <output>\archive\
+max_gb = 2.0                 # start campi_archive_002.mp4 etc. when the next clip would pass this size
+
+[retention]
+clips_hours = 24             # 10-minute clips in Downloads (latest.mp4 and daily\ are never deleted)
+raw_hours = 48               # keep every raw frame this long ...
+thin_keep_per_minute = 1     # ... then keep this many frames per minute
+thinned_retention_days = 0   # delete thinned frames after N days (0 = keep forever)
+min_free_gb = 50             # below this, warn and delete the oldest thinned days first
+
+[tools]
+ffmpeg = "{localappdata}\\Microsoft\\WinGet\\Packages\\Gyan.FFmpeg_Microsoft.Winget.Source_8wekyb3d8bbwe\\ffmpeg-9.0.2-full_build\\bin\\ffmpeg.exe"   # full path or a name on PATH (falls back to PATH if missing)
+ffprobe = "{localappdata}\\Microsoft\\WinGet\\Packages\\Gyan.FFmpeg_Microsoft.Winget.Source_8wekyb3d8bbwe\\ffmpeg-9.0.2-full_build\\bin\\ffprobe.exe"
+rife = "{project}\\tools\\rife-ncnn-vulkan\\rife-ncnn-vulkan.exe"
+rife_model = "rife-v4.6"     # folder next to the rife exe
+rife_gpu = "NVIDIA"         # Vulkan device: name substring (preferred; index order differs with no one logged on) or index

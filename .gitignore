@@ -1,0 +1,11 @@
+# Python
+__pycache__/
+*.py[cod]
+.venv/
+.venv-service/
+
+# Downloaded by install.ps1 (rife-ncnn-vulkan binary + models)
+tools/
+
+# Model weights (ultralytics downloads yolo11n.pt on first run)
+*.pt

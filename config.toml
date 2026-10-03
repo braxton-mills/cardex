@@ -135,3 +135,20 @@ gpu_busy_pct = 20              # a matching process must use the 5070's 3D engin
 gpu_busy_s = 30                # ... for this long before it counts as a game
 defer_renders = true           # clip/daily renders wait while gaming (when rife_gpu is the NVIDIA card)
 pause_sightings = false        # stop the sightings worker while gaming (it no longer uses the 5070)
+
+[api]
+# The HTTP API for the Campi iPhone app (and the desktop UI): see README "API". Needs `install.ps1 -UI`.
+# enabled = true runs it headless under the service (127.0.0.1 only; publish it with `tailscale serve`).
+enabled = true
+port = 8765                    # always bound to 127.0.0.1
+public_url = ""                # base URL in pairing QR codes; "" = https://<this PC's Tailscale DNS name>
+max_live_viewers = 3
+media_url_ttl_h = 12           # signed /media and /live URLs expire after this long
+
+[api.push]
+# APNs push notifications to paired iPhones (sent only by the API running under the service).
+enabled = false
+key_file = "{home}\\CampiTimelapse\\secrets\\apns_AuthKey.p8"   # outside the repo; never logged
+key_id = ""
+team_id = ""
+bundle_id = "com.braxtonmills.campi"

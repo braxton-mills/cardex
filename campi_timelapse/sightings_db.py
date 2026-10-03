@@ -13,7 +13,7 @@ from pathlib import Path
 
 log = logging.getLogger("sightings")
 
-SCHEMA_VERSION = 2
+SCHEMA_VERSION = 3
 SCHEMA = """
 CREATE TABLE IF NOT EXISTS schema_version (version INTEGER NOT NULL);
 CREATE TABLE IF NOT EXISTS sightings (
@@ -42,7 +42,8 @@ CREATE INDEX IF NOT EXISTS sightings_started_at ON sightings (started_at);
 COLUMNS = ("id", "kind", "started_at", "ended_at", "yolo_class", "label", "make", "model", "confidence",
            "runner_ups", "unsure", "stationary", "direction", "track_frames", "max_box_px", "crop_path",
            "frame_path", "clip_path", "synced_at",
-           "year_range", "color", "source", "siglip_label", "siglip_confidence")  # v2
+           "year_range", "color", "source", "siglip_label", "siglip_confidence",  # v2
+           "cloud_status", "updated_at")  # v3
 V2_COLUMNS = (("year_range", "TEXT"), ("color", "TEXT"), ("source", "TEXT"), ("siglip_label", "TEXT"),
               ("siglip_confidence", "REAL"))
 V2_TABLES = """
@@ -64,6 +65,8 @@ CREATE TABLE IF NOT EXISTS discovered_labels (
     count INTEGER NOT NULL DEFAULT 1
 );
 """
+V3_COLUMNS = (("cloud_status", "TEXT"), ("updated_at", "TEXT"))
+CLOUD_STATUSES = ("pending", "done", "failed", "capped", "skipped")
 
 
 def db_path(root: Path) -> Path:
@@ -94,27 +97,43 @@ def connect(root: Path) -> sqlite3.Connection:
 
 
 def migrate(con: sqlite3.Connection) -> None:
-    """v1 -> v2 in one transaction (idempotent; safe on the live DB): SigLIP-vs-cloud columns, cloud queue,
-    discovered labels. Existing rows are backfilled as SigLIP answers."""
-    if con.execute("SELECT MAX(version) FROM schema_version").fetchone()[0] >= SCHEMA_VERSION:
+    """Schema upgrades in one transaction (idempotent; safe on the live DB).
+    v2: SigLIP-vs-cloud columns, cloud queue, discovered labels; existing rows are backfilled as SigLIP answers.
+    v3: per-row cloud_status (pending | done | failed | capped | skipped; NULL = never sent / cloud off) and
+    updated_at (insert, and every cloud update), backfilled from the cloud queue."""
+    version = con.execute("SELECT MAX(version) FROM schema_version").fetchone()[0]
+    if version >= SCHEMA_VERSION:
         return
     have = {r[1] for r in con.execute("PRAGMA table_info(sightings)")}
     con.execute("BEGIN IMMEDIATE")
     try:
-        for name, typ in V2_COLUMNS:
+        if version < 2:
+            for name, typ in V2_COLUMNS:
+                if name not in have:
+                    con.execute(f"ALTER TABLE sightings ADD COLUMN {name} {typ}")
+            con.execute("UPDATE sightings SET source = 'siglip', siglip_label = label, "
+                        "siglip_confidence = confidence WHERE source IS NULL")
+            for stmt in V2_TABLES.split(";"):
+                if stmt.strip():
+                    con.execute(stmt)
+        for name, typ in V3_COLUMNS:
             if name not in have:
                 con.execute(f"ALTER TABLE sightings ADD COLUMN {name} {typ}")
-        con.execute("UPDATE sightings SET source = 'siglip', siglip_label = label, siglip_confidence = confidence "
-                    "WHERE source IS NULL")
-        for stmt in V2_TABLES.split(";"):
-            if stmt.strip():
-                con.execute(stmt)
-        con.execute("UPDATE schema_version SET version = 2")
+        con.execute("""UPDATE sightings SET
+            updated_at = COALESCE(updated_at, (SELECT q.done_at FROM cloud_queue q WHERE q.sighting_id = sightings.id),
+                                  ended_at),
+            cloud_status = COALESCE(cloud_status, (SELECT CASE WHEN q.done_at IS NULL THEN 'pending'
+                                                              WHEN q.last_error = 'cap' THEN 'capped'
+                                                              WHEN q.last_error IS NOT NULL THEN 'failed'
+                                                              ELSE 'done' END
+                                                   FROM cloud_queue q WHERE q.sighting_id = sightings.id),
+                                    CASE WHEN source = 'cloud' THEN 'done' END)""")
+        con.execute("UPDATE schema_version SET version = ?", (SCHEMA_VERSION,))
         con.commit()
     except BaseException:
         con.rollback()
         raise
-    log.info("sightings database migrated to schema v2")
+    log.info("sightings database migrated to schema v%d", SCHEMA_VERSION)
 
 
 def connect_ro(root: Path) -> sqlite3.Connection | None:
@@ -169,6 +188,16 @@ def format_rows(rows) -> str:
     return "\n".join(out)
 
 
+def _unlink(p: Path) -> bool:
+    """A clip that is open elsewhere is skipped; the orphan sweep deletes it on a later run."""
+    try:
+        p.unlink(missing_ok=True)
+        return True
+    except OSError as e:
+        log.warning("could not delete %s (%s); will retry next run", p.name, type(e).__name__)
+        return False
+
+
 def expire_clips(root: Path, keep_days: float, now: float | None = None) -> int:
     """Delete clips older than keep_days. clip_path is cleared (committed) before the file is deleted,
     so a crash in between leaves an orphan file, never a row pointing at a missing clip."""
@@ -183,15 +212,18 @@ def expire_clips(root: Path, keep_days: float, now: float | None = None) -> int:
             con.executemany("UPDATE sightings SET clip_path = NULL WHERE id = ?", [(r[0],) for r in rows])
             con.commit()
         for _, rel in rows:
-            (root / rel).unlink(missing_ok=True)
+            _unlink(root / rel)
         live = {r[0] for r in con.execute("SELECT clip_path FROM sightings WHERE clip_path IS NOT NULL")}
     finally:
         con.close()
     orphans = 0  # clips no row points at (crash between the two steps above, or an aborted write)
     for p in root.glob("*/*.mp4"):
         rel = p.relative_to(root).as_posix()
-        if rel not in live and p.stat().st_mtime < now - keep_days * 86400:
-            p.unlink(missing_ok=True)
+        try:
+            old = p.stat().st_mtime < now - keep_days * 86400
+        except OSError:
+            continue
+        if rel not in live and old and _unlink(p):
             orphans += 1
     if rows or orphans:
         log.info("expired %d sighting clips older than %g days (%d orphans)", len(rows), keep_days, orphans)
@@ -237,16 +269,18 @@ def retry_cloud_job(con: sqlite3.Connection, sighting_id: str, error: str, delay
 
 
 def finish_cloud_job(con: sqlite3.Connection, sighting_id: str, result: dict | None, error: str | None = None,
-                     update: dict | None = None) -> None:
-    """Close a job; with `update`, overwrite the row's answer (label/make/model/...) in the same transaction."""
+                     update: dict | None = None, status: str = "done") -> None:
+    """Close a job; with `update`, overwrite the row's answer (label/make/model/...) in the same transaction.
+    `status` is the row's cloud_status (done | failed | capped)."""
+    now = utc_iso(time.time())
     con.execute("BEGIN IMMEDIATE")
     try:
         con.execute("UPDATE cloud_queue SET done_at = ?, last_error = ?, result = ?, attempts = attempts + 1 "
                     "WHERE sighting_id = ?",
-                    (utc_iso(time.time()), error, json.dumps(result) if result is not None else None, sighting_id))
-        if update:
-            cols = ", ".join(f"{k} = ?" for k in update)
-            con.execute(f"UPDATE sightings SET {cols} WHERE id = ?", [*update.values(), sighting_id])
+                    (now, error, json.dumps(result) if result is not None else None, sighting_id))
+        update = {**(update or {}), "cloud_status": status, "updated_at": now}
+        cols = ", ".join(f"{k} = ?" for k in update)
+        con.execute(f"UPDATE sightings SET {cols} WHERE id = ?", [*update.values(), sighting_id])
         con.commit()
     except BaseException:
         con.rollback()

@@ -1,310 +1,355 @@
-"""The UI's HTTP API (JSON) and static frontend. The same API is meant for other clients (an iPhone app later), so it
-returns data, not UI shapes: times are ISO 8601 (`*_at` UTC as stored, `*_local` with the local offset), lists are
-{items, next_cursor}. Interactive docs at /api/docs."""
+"""The Campi HTTP API (campi-ios docs/api-contract.md, v1) plus the desktop UI's static frontend.
+
+Every /api request needs `Authorization: Bearer <token>` (also from 127.0.0.1: `tailscale serve` traffic arrives
+from loopback), except POST /api/pair. /media and /live accept a bearer token or a signed URL. Endpoints outside the
+contract (/api/today, /api/activity, /api/clips/newest, /api/desktop/*) answer only the `desktop` device.
+"""
 from __future__ import annotations
 
-import bisect
-import copy
-import ipaddress
+import json
 import logging
+import os
+import re
+import socket
 import subprocess
-from datetime import date, datetime, timedelta
-from pathlib import Path
+from typing import Any
 
-from fastapi import FastAPI, HTTPException, Query, Request
-from fastapi.responses import FileResponse, JSONResponse
+from fastapi import Body, Depends, FastAPI, Request
+from fastapi.exceptions import RequestValidationError
+from fastapi.responses import FileResponse, JSONResponse, Response
 from fastapi.staticfiles import StaticFiles
-from pydantic import BaseModel
+from starlette.exceptions import HTTPException as StarletteHTTPException
 
-from ..archive import CLIP_RE, clip_start
 from ..config import NO_WINDOW
-from ..sightings_db import utc_iso
-from ..status import gather
-from . import live as live_mod
-from . import media
-from .library import DAILY_RE, Library
-from .sightings_data import Sightings, to_ts
+from . import media, status_api
+from .auth import Auth
+from .contract import ApiError, flag, int_param, invalid, iso, iso_from_utc, not_found, one, parse_instant
+from .highlights import Highlights
+from .library import Library
+from .live import LiveProbe, LiveStreams, Snapshot
+from .posters import Posters
+from .sightings_data import Sightings
 from .store import Store, ui_home
 
 log = logging.getLogger("ui")
-STATIC = Path(__file__).parent / "static"
-HIGHLIGHT_TYPES = ("new_catch", "rare", "busy_window", "daily", "starred")
+STATIC = os.path.join(os.path.dirname(__file__), "static")
+PUSH_KEYS = ("new_catch", "rare", "discovered", "service_alerts")
+APNS_TOKEN_RE = re.compile(r"^[0-9A-Fa-f]{8,400}$")
 
 
-class Flag(BaseModel):
-    value: bool
+class NoStoreJSON(JSONResponse):
+    def __init__(self, content: Any = None, status_code: int = 200, headers=None, **kw):
+        super().__init__(content, status_code, {"Cache-Control": "no-store", **(headers or {})}, **kw)
+
+    def render(self, content: Any) -> bytes:
+        return json.dumps(content, ensure_ascii=False, separators=(",", ":")).encode("utf-8")
 
 
-class LabelIn(BaseModel):
-    label: str | None = None
+class RevalidatedStatic(StaticFiles):
+    """Always revalidate the frontend (cheap 304s): after an update, a cached old lib.js next to a new view module
+    would break the module imports."""
+
+    def file_response(self, *a, **kw):
+        resp = super().file_response(*a, **kw)
+        resp.headers["Cache-Control"] = "no-cache"
+        return resp
 
 
-class RevealIn(BaseModel):
-    root: str
-    path: str
+def device_json(d: dict) -> dict:
+    return {"id": d["id"], "name": d["name"], "platform": d["platform"], "created_at": iso_from_utc(d["created_at"]),
+            "last_seen_at": iso_from_utc(d["last_seen_at"]),
+            "push": {"enabled": d["apns_token"] is not None,
+                     "environment": d["apns_env"] if d["apns_env"] in ("sandbox", "production") else None,
+                     "prefs": {k: bool(d["prefs"].get(k)) for k in PUSH_KEYS}}}
 
 
-def is_loopback(host: str | None) -> bool:
-    try:
-        return host in ("localhost",) or ipaddress.ip_address(host or "").is_loopback
-    except ValueError:
+def is_cut_short(e: BaseException | None) -> bool:
+    """h11's complaint when a streamed media response ends before its Content-Length (the file was deleted)."""
+    return type(e).__name__ == "LocalProtocolError" and "Too little data" in str(e)
+
+
+def in_console_session() -> bool:
+    """True when this process runs in the interactive desktop session (not session 0 under the service task)."""
+    if os.name != "nt":
         return False
+    import ctypes
+    k32 = ctypes.windll.kernel32
+    sid = ctypes.c_ulong()
+    if not k32.ProcessIdToSessionId(k32.GetCurrentProcessId(), ctypes.byref(sid)):
+        return False
+    return sid.value != 0 and sid.value == k32.WTSGetActiveConsoleSessionId()
 
 
-def parse_ts(v: str) -> float:
-    try:
-        return float(v)
-    except ValueError:
-        pass
-    try:
-        dt = datetime.fromisoformat(v)
-    except ValueError:
-        raise HTTPException(400, "ts must be epoch seconds or ISO 8601") from None
-    return dt.timestamp()
-
-
-def create_app(cfg, bind_host: str = "127.0.0.1") -> FastAPI:
-    store = Store(ui_home(cfg) / "ui.db")
+def create_app(cfg) -> FastAPI:
+    home = ui_home(cfg)
+    store = Store(home / "ui.db")
+    auth = Auth(cfg, store)
     sd = Sightings(cfg, store)
-    lib = Library(cfg, store)
-    app = FastAPI(title="Campi", version="1", docs_url="/api/docs", redoc_url=None, openapi_url="/api/openapi.json",
-                  description="Read-only view of the Campi timelapse service, plus the user's stars, hidden "
-                              "sightings and label corrections (stored in CampiTimelapse\\ui\\ui.db).")
+    lib = Library(cfg, store, sd)
+    hl = Highlights(cfg, store, sd, lib)
+    posters = Posters(cfg, home)
+    streams = LiveStreams(cfg)
+    snapshot = Snapshot(cfg)
+    probe = LiveProbe(cfg)
+    probe.get()  # first reachability check in the background, so the first /api/status already knows
+    app = FastAPI(title="Campi", version="1", docs_url=None, redoc_url=None, openapi_url=None,
+                  default_response_class=NoStoreJSON)
+    app.state.store, app.state.posters, app.state.sightings = store, posters, sd
 
-    starts_cache: dict = {}
+    # ------------------------------------------------------------ errors (§2.4)
 
-    def counts(lo: float, hi: float) -> int | None:
-        """Visible sightings in [lo, hi) (None without a sightings database); one query covers every clip."""
-        if not sd.exists():
-            return None
-        key = (sd._signature(), int(lo // 86400))
-        if starts_cache.get("key") != key:
-            day = int(lo // 86400) * 86400
-            starts_cache.update(key=key, starts=sd.starts_between(day - 86400, day + 2 * 86400))
-        s = starts_cache["starts"]
-        return bisect.bisect_left(s, hi) - bisect.bisect_left(s, lo)
+    @app.exception_handler(ApiError)
+    async def api_error(request: Request, e: ApiError):
+        return NoStoreJSON(e.body(), e.status)
 
-    def sighting_or_404(sid: str) -> dict:
-        d = sd.get(sid)
-        if d is None:
-            raise HTTPException(404, "no such sighting")
-        return d
+    @app.exception_handler(StarletteHTTPException)
+    async def http_error(request: Request, e: StarletteHTTPException):
+        if e.status_code in (404, 405):
+            return NoStoreJSON(not_found(f"no route {request.method} {request.url.path}").body(), 404)
+        code = "invalid_param" if e.status_code == 400 else "internal"
+        return NoStoreJSON({"error": {"code": code, "message": str(e.detail)}}, e.status_code)
 
-    # ------------------------------------------------------------ status
+    @app.exception_handler(RequestValidationError)
+    async def validation_error(request: Request, e: RequestValidationError):
+        first = e.errors()[0] if e.errors() else {}
+        return NoStoreJSON(invalid(f"{'.'.join(map(str, first.get('loc', ())))}: {first.get('msg', 'invalid')}").body(), 400)
 
-    @app.get("/api/status", tags=["status"])
-    def status():
-        """Same data as `campi status`, structured. `sightings.line` / `gaming.line` are the CLI's text."""
-        g = gather(cfg)
-        g["sightings_enabled"] = bool(cfg.sightings.enabled)
-        g["sightings_db"] = sd.exists()
-        g["config"] = {"base_fps": cfg.output.base_fps, "interp_factor": cfg.output.interp_factor,
-                       "window_min": cfg.render.window_min, "interval_min": cfg.render.interval_min,
-                       "clips_hours": cfg.retention.clips_hours, "keep_clips_days": cfg.sightings.keep_clips_days,
-                       "rotation": cfg.image.rotation, "level_deg": cfg.image.level_deg,
-                       "output_width": cfg.output.width, "output_height": cfg.output.height}
-        return g
-
-    # ------------------------------------------------------------ sightings
-
-    @app.get("/api/sightings", tags=["sightings"])
-    def sightings(from_: str | None = Query(None, alias="from", description="local date YYYY-MM-DD"),
-                  to: str | None = Query(None, description="local date YYYY-MM-DD (inclusive)"),
-                  make: str | None = None, class_: str | None = Query(None, alias="class"),
-                  source: str | None = Query(None, description="siglip | cloud | user"),
-                  label: str | None = None, hide_unsure: bool = False, hide_stationary: bool = False,
-                  starred: bool = False, include_hidden: bool = False, cursor: str | None = None,
-                  limit: int = Query(60, ge=1, le=500)):
-        """Newest first. Page with `cursor` = the previous page's `next_cursor`."""
-        f = {"from": from_, "to": to, "make": make, "class": class_, "source": source, "label": label,
-             "hide_unsure": hide_unsure, "hide_stationary": hide_stationary, "starred": starred,
-             "include_hidden": include_hidden}
-        try:
-            return with_seek(sd.list(f, cursor, limit))
-        except ValueError as e:
-            raise HTTPException(400, str(e)) from None
-
-    def with_seek(page: dict) -> dict:
-        for s in page["items"]:
-            add_seek_ts(s)
-        return page
-
-    def add_seek_ts(s: dict) -> dict:
-        """Middle of the pass: where /api/seek should land for this sighting."""
-        a = to_ts(s["started_at"])
-        s["seek_ts"] = round((a + to_ts(s["ended_at"])) / 2 if s.get("ended_at") else a, 3)
-        return s
-
-    @app.get("/api/sightings/{sid}", tags=["sightings"])
-    def sighting(sid: str):
-        return add_seek_ts(sighting_or_404(sid))
-
-    @app.post("/api/sightings/{sid}/star", tags=["sightings"])
-    def star_sighting(sid: str, body: Flag):
-        sighting_or_404(sid)
-        store.set_star("sighting", sid, body.value)
-        return add_seek_ts(sighting_or_404(sid))
-
-    @app.post("/api/sightings/{sid}/hide", tags=["sightings"])
-    def hide_sighting(sid: str, body: Flag):
-        """Hidden sightings are left out of every list, count, highlight and the collection."""
-        sighting_or_404(sid)
-        store.set_hidden(sid, body.value)
-        return add_seek_ts(sighting_or_404(sid))
-
-    @app.post("/api/sightings/{sid}/label", tags=["sightings"])
-    def label_sighting(sid: str, body: LabelIn):
-        """Correct the label (`null` or "" clears the correction). Applied everywhere, including counts."""
-        sighting_or_404(sid)
-        text = (body.label or "").strip()
-        if text:
-            name, mk, md = sd.resolve_label(text)
-            store.set_label(sid, name, mk, md)
+    @app.exception_handler(Exception)
+    async def internal(request: Request, e: Exception):
+        if is_cut_short(e):  # a media file went away mid-response: the connection closes, as the contract says
+            log.info("%s %s: file went away mid-response; connection closed", request.method, request.url.path)
         else:
+            log.exception("%s %s failed", request.method, request.url.path)
+        return NoStoreJSON({"error": {"code": "internal", "message": f"{type(e).__name__} (see the server log)"}}, 500)
+
+    # ------------------------------------------------------------ auth
+
+    def device(request: Request) -> dict:
+        return auth.require(request)
+
+    def media_device(request: Request) -> dict:
+        return auth.media(request)
+
+    def desktop(dev: dict = Depends(device)) -> dict:
+        """The device `campi ui` created (its id is in ui.db); pairing as "desktop" from elsewhere doesn't count."""
+        if dev["id"] != store.get("desktop_device_id"):
+            raise not_found("not available")
+        return dev
+
+    def signer(dev: dict):
+        return lambda path: auth.sign(path, dev["id"])
+
+    def body_obj(payload: Any) -> dict:
+        if not isinstance(payload, dict):
+            raise invalid("body must be a JSON object")
+        return payload
+
+    # ------------------------------------------------------------ pairing and devices (§4.1, §4.2)
+
+    @app.post("/api/pair")
+    def pair(payload: Any = Body(None)):
+        token, dev = auth.pair(payload)
+        log.info("paired device %s (%s, %s)", dev["id"], dev["name"], dev["platform"])
+        return NoStoreJSON({"token": token, "device": device_json(dev), "server_name": socket.gethostname(),
+                            "api_version": 1}, 201)
+
+    @app.get("/api/devices/me")
+    def me(dev: dict = Depends(device)):
+        return device_json(dev)
+
+    @app.put("/api/devices/me/push")
+    def set_push(payload: Any = Body(None), dev: dict = Depends(device)):
+        b = body_obj(payload)
+        tok, env, prefs = b.get("apns_token"), b.get("environment"), b.get("prefs")
+        if env not in ("sandbox", "production") or not isinstance(prefs, dict) or set(prefs) != set(PUSH_KEYS) \
+                or not all(isinstance(v, bool) for v in prefs.values()) \
+                or "apns_token" not in b or not (tok is None or (isinstance(tok, str) and APNS_TOKEN_RE.match(tok))):
+            raise invalid("need apns_token (hex or null), environment (sandbox | production) and all four prefs")
+        store.set_push(dev["id"], tok, env, prefs)
+        return device_json(store.device(dev["id"]))
+
+    @app.delete("/api/devices/me")
+    def unpair(dev: dict = Depends(device)):
+        store.revoke(dev["id"])
+        log.info("device %s (%s) unpaired itself", dev["id"], dev["name"])
+        return Response(status_code=204)
+
+    # ------------------------------------------------------------ status (§4.3)
+
+    @app.get("/api/status")
+    def status(dev: dict = Depends(device)):
+        return status_api.build(cfg, signer(dev), probe.get(), lib.latest_id())
+
+    # ------------------------------------------------------------ sightings (§4.4-4.6)
+
+    @app.get("/api/sightings")
+    def sightings(request: Request, dev: dict = Depends(device)):
+        return sd.list(request.query_params, signer(dev))
+
+    @app.get("/api/sightings/{sid}")
+    def sighting(sid: str, dev: dict = Depends(device)):
+        return sd.get(sid, signer(dev))
+
+    @app.post("/api/sightings/{sid}/star")
+    def star_sighting(sid: str, payload: Any = Body(None), dev: dict = Depends(device)):
+        sd.get(sid, signer(dev))
+        store.set_star("sighting", sid, flag(payload, "starred"))
+        return sd.get(sid, signer(dev))
+
+    @app.post("/api/sightings/{sid}/hide")
+    def hide_sighting(sid: str, payload: Any = Body(None), dev: dict = Depends(device)):
+        sd.get(sid, signer(dev))
+        store.set_hidden(sid, flag(payload, "hidden"))
+        return sd.get(sid, signer(dev))
+
+    @app.post("/api/sightings/{sid}/label")
+    def label_sighting(sid: str, payload: Any = Body(None), dev: dict = Depends(device)):
+        b = body_obj(payload)
+        if "label" not in b or not (b["label"] is None or isinstance(b["label"], str)):
+            raise invalid("body needs label (a collection label, or null to remove the correction)")
+        sd.get(sid, signer(dev))
+        if b["label"] is None or not b["label"].strip():
             store.set_label(sid, None)
-        return add_seek_ts(sighting_or_404(sid))
+        else:
+            k = sd.resolve_label(b["label"])
+            store.set_label(sid, k["label"], k["make"], k["model"])
+        return sd.get(sid, signer(dev))
 
-    @app.get("/api/collection", tags=["sightings"])
-    def collection():
-        """Every label in sightings_labels.txt (caught or not) plus discovered labels; tiers from counts."""
-        return sd.collection()
+    @app.get("/api/collection")
+    def collection(dev: dict = Depends(device)):
+        return sd.collection(signer(dev))
 
-    @app.get("/api/today", tags=["sightings"])
-    def today():
-        return sd.today()
+    # ------------------------------------------------------------ highlights (§4.7)
 
-    @app.get("/api/activity", tags=["sightings"])
-    def activity(days: int = Query(1, ge=1, le=31, description="1 = today by hour; N = last N days by day")):
-        """Visible sightings per local hour of today, or per local day: {unit, items: [{start_at, start_local, count}]}."""
-        return sd.activity(days)
+    @app.get("/api/highlights")
+    def highlights(request: Request, dev: dict = Depends(device)):
+        return hl.page(request.query_params, signer(dev))
 
-    # ------------------------------------------------------------ highlights
+    # ------------------------------------------------------------ timelapse files (§4.8-4.11)
 
-    @app.get("/api/highlights", tags=["highlights"])
-    def highlights(type: str | None = Query(None, description="comma list: " + ", ".join(HIGHLIGHT_TYPES)),
-                   before: str | None = Query(None, description="only items with `at` before this (cursor)"),
-                   limit: int = Query(50, ge=1, le=500)):
-        want = set(type.split(",")) if type else set(HIGHLIGHT_TYPES)
-        items = copy.deepcopy(sd.highlight_items())
-        clip_stars = store.stars("clip")
-        for it in items:
-            if it.get("sighting"):
-                add_seek_ts(it["sighting"])
-            if it["type"] == "busy_window":
-                start = to_ts(it["window"]["start_at"])
-                p = cfg.paths.out / f"campi_{datetime.fromtimestamp(start):%Y-%m-%d_%H%M}.mp4"
-                it["clip"] = lib.clip_info(p, start, clip_stars, counts) if p.is_file() else None
-                it["seek_ts"] = start
-        daily_stars = store.stars("daily")
-        for d in lib.daily():
-            end = datetime.combine(date.fromisoformat(d["day"]) + timedelta(days=1), datetime.min.time()).timestamp()
-            types = ["daily"] + (["starred"] if d["name"] in daily_stars else [])
-            items.append({"type": "daily", "types": types, "at": utc_iso(end), "title": f"Day {d['day']}",
-                          "daily": d})
-        for name in clip_stars:
-            m = CLIP_RE.match(name)
-            if not m:
-                continue
-            p = cfg.paths.out / name
-            start = clip_start(p)
-            info = lib.clip_info(p, start, clip_stars, counts) if p.is_file() else None
-            items.append({"type": "starred", "types": ["starred"], "at": utc_iso(start),
-                          "title": f"Starred clip {datetime.fromtimestamp(start):%Y-%m-%d %H:%M}", "clip": info,
-                          "seek_ts": start})
-        items = [i for i in items if want & set(i["types"]) and (not before or i["at"] < before)]
-        items.sort(key=lambda i: i["at"], reverse=True)
-        page = items[:limit]
-        return {"items": page, "next_cursor": page[-1]["at"] if len(items) > limit else None}
+    @app.get("/api/clips")
+    def clips(dev: dict = Depends(device)):
+        return lib.clips(signer(dev))
 
-    # ------------------------------------------------------------ timelapse files
-
-    @app.get("/api/clips", tags=["timelapse"])
-    def clips(hours: float = Query(24, gt=0, le=24 * 30)):
-        """10-minute clips whose window started in the last `hours`, newest first."""
-        return {"items": lib.clips(hours, counts), "next_cursor": None}
-
-    @app.get("/api/clips/newest", tags=["timelapse"])
-    def newest_clip():
-        """The dated clip latest.mp4 currently copies (latest.mp4 itself is never served)."""
-        c = lib.newest_clip(counts)
-        if not c:
-            raise HTTPException(404, "no clips yet")
+    @app.get("/api/clips/newest")
+    def newest_clip(dev: dict = Depends(desktop)):
+        """Desktop only: the clip latest.mp4 is a copy of (latest.mp4 itself is never served)."""
+        c = lib.newest_clip(signer(dev))
+        if c is None:
+            raise not_found("no clips yet")
         return c
 
-    @app.get("/api/daily", tags=["timelapse"])
-    def daily():
-        return {"items": lib.daily(), "next_cursor": None}
+    @app.get("/api/clips/{cid}")
+    def clip(cid: str, dev: dict = Depends(device)):
+        return lib.clip(cid, signer(dev))
 
-    @app.get("/api/archive", tags=["timelapse"])
-    def archive():
-        """Archive parts; the current part (still being appended to) has url null and can't be played."""
-        return {"items": lib.archive(), "next_cursor": None}
+    @app.post("/api/clips/{cid}/star")
+    def star_clip(cid: str, payload: Any = Body(None), dev: dict = Depends(device)):
+        value = flag(payload, "starred")
+        lib.clip(cid, signer(dev))
+        store.set_star("clip", cid, value)
+        return lib.clip(cid, signer(dev))
 
-    @app.get("/api/seek", tags=["timelapse"])
-    def seek(ts: str = Query(..., description="epoch seconds or ISO 8601")):
-        """Video + offset showing wall-clock time `ts`: the 10-minute clip while it exists (exact), else that day's
-        daily video (approximate). 404 if neither exists."""
-        r = lib.seek(parse_ts(ts))
-        if not r:
-            raise HTTPException(404, "no clip or daily video covers that time")
-        return r
+    @app.get("/api/daily")
+    def daily(request: Request, dev: dict = Depends(device)):
+        return lib.daily_page(request.query_params, signer(dev))
 
-    @app.post("/api/videos/{kind}/{name}/star", tags=["timelapse"])
-    def star_video(kind: str, name: str, body: Flag):
-        """Star a 10-minute clip (`kind` clips) or a daily video (`daily`); starred items appear in highlights."""
-        if kind == "clips" and CLIP_RE.match(name):
-            store.set_star("clip", name, body.value)
-        elif kind == "daily" and DAILY_RE.match(name):
-            store.set_star("daily", name, body.value)
-        else:
-            raise HTTPException(404, "unknown video")
-        return {"kind": kind, "name": name, "starred": body.value}
+    @app.get("/api/daily/{day}")
+    def daily_one(day: str, dev: dict = Depends(device)):
+        return lib.daily(day, signer(dev))
 
-    @app.post("/api/desktop/reveal", tags=["desktop"])
-    def reveal(body: RevealIn, request: Request):
-        """Desktop only: open Explorer with the file selected. Only for loopback clients of a loopback server."""
-        if not (is_loopback(bind_host) and is_loopback(request.client.host if request.client else None)):
-            raise HTTPException(501, "only available on this PC")
-        p = media.resolve(cfg, body.root, body.path, current_part=-1)  # the current archive part may be shown
+    @app.post("/api/daily/{day}/star")
+    def star_daily(day: str, payload: Any = Body(None), dev: dict = Depends(device)):
+        value = flag(payload, "starred")
+        lib.daily(day, signer(dev))
+        store.set_star("daily", day, value)
+        return lib.daily(day, signer(dev))
+
+    @app.get("/api/archive")
+    def archive(dev: dict = Depends(device)):
+        return lib.archive(signer(dev))
+
+    @app.get("/api/seek")
+    def seek(request: Request, dev: dict = Depends(device)):
+        ts = one(request.query_params, "ts")
+        if not ts:
+            raise invalid("ts is required (RFC 3339 or Unix seconds)")
+        return lib.seek(parse_instant(ts), signer(dev))
+
+    # ------------------------------------------------------------ desktop only (not in the contract)
+
+    @app.get("/api/today")
+    def today(dev: dict = Depends(desktop)):
+        return sd.today()
+
+    @app.get("/api/activity")
+    def activity(request: Request, dev: dict = Depends(desktop)):
+        return sd.activity(int_param(request.query_params, "days", 1, 1, 31))
+
+    @app.get("/api/desktop/info")
+    def desktop_info(dev: dict = Depends(desktop)):
+        return {"rotation": int(cfg.image.rotation), "level_deg": float(cfg.image.level_deg),
+                "output_width": int(cfg.output.width), "output_height": int(cfg.output.height),
+                "base_fps": int(cfg.output.base_fps), "interp_factor": int(cfg.output.interp_factor),
+                "interval_min": int(cfg.render.interval_min), "window_min": int(cfg.render.window_min),
+                "clips_hours": float(cfg.retention.clips_hours), "keep_clips_days": float(cfg.sightings.keep_clips_days),
+                "sightings_enabled": bool(cfg.sightings.enabled), "reveal_here": in_console_session()}
+
+    @app.post("/api/desktop/reveal")
+    def reveal(payload: Any = Body(None), dev: dict = Depends(desktop)):
+        """Open Explorer with the file selected. Only from a server running in the desktop session (the Campi
+        window reveals files itself when the API runs under the service)."""
+        b = body_obj(payload)
+        p = media.resolve(cfg, str(b.get("root")), str(b.get("path")), current_part=-1)  # current part may be shown
         if p is None:
-            raise HTTPException(404, "not found")
+            raise not_found("no such file")
+        if not in_console_session():
+            raise invalid("the API runs in the background service; use the Campi window to show files")
         subprocess.Popen(["explorer.exe", f"/select,{p}"], creationflags=NO_WINDOW)
         return {"shown": str(p)}
 
-    # ------------------------------------------------------------ media + live
+    # ------------------------------------------------------------ media + live (§7, §8)
 
-    @app.api_route("/media/{root}/{path:path}", methods=["GET", "HEAD"], tags=["media"])
-    def media_file(root: str, path: str, request: Request):
-        """Videos and images (HTTP Range supported). Only service output under the configured roots."""
+    @app.api_route("/media/{root}/{path:path}", methods=["GET", "HEAD"])
+    def media_file(root: str, path: str, request: Request, dev: dict = Depends(media_device)):
+        if root == "posters":
+            kind, _, name = path.partition("/")
+            p = posters.get(kind, name[:-4]) if name.endswith(".jpg") and "/" not in name else None
+            if p is None:
+                raise not_found(f"no poster {path}")
+            return media.serve(request, p, f"posters/{path}", "private, max-age=300")
         p = media.resolve(cfg, root, path, lib.current_part())
         if p is None:
-            return JSONResponse({"detail": "not found"}, status_code=404)
-        return media.serve(request, p, f"{root}/{path}")
+            raise not_found(f"no media {root}/{path}")
+        cache = "private, max-age=86400" if root == "sightings" and p.suffix == ".jpg" else "private, max-age=300"
+        return media.serve(request, p, f"{root}/{path}", cache)
 
-    @app.get("/live.mjpg", tags=["media"])
-    async def live(request: Request):
-        """The camera's live MJPEG stream (one upstream connection per viewer, closed when the viewer leaves)."""
-        return await live_mod.live(request, cfg)
+    @app.get("/live.mjpg")
+    async def live_mjpg(request: Request, dev: dict = Depends(media_device)):
+        return await streams.response(request, request.query_params)
 
-    # ------------------------------------------------------------ frontend
+    @app.get("/live.jpg")
+    def live_jpg(request: Request, dev: dict = Depends(media_device)):
+        jpg, ts = snapshot.get(request.query_params)
+        return Response(jpg, media_type="image/jpeg",
+                        headers={"Cache-Control": "no-store", "X-Frame-Time": iso(ts)})
 
-    @app.middleware("http")
-    async def revalidate_static(request: Request, call_next):
-        """Always revalidate the frontend (cheap 304s): after an update, a cached old lib.js next to a new view
-        module would break the module imports."""
-        resp = await call_next(request)
-        if request.url.path.startswith("/static/"):
-            resp.headers["Cache-Control"] = "no-cache"
-        return resp
+    # ------------------------------------------------------------ unknown /api routes: auth first, then 404
 
-    app.mount("/static", StaticFiles(directory=STATIC), name="static")
+    @app.api_route("/api/{rest:path}", methods=["GET", "POST", "PUT", "DELETE", "PATCH", "HEAD"])
+    def unknown_api(rest: str, request: Request, dev: dict = Depends(device)):
+        raise not_found(f"no route {request.method} /api/{rest}")
+
+    # ------------------------------------------------------------ frontend (unauthenticated: no data in it)
+
+    app.mount("/static", RevalidatedStatic(directory=STATIC), name="static")
 
     @app.get("/favicon.ico", include_in_schema=False)
     def favicon():
-        return FileResponse(STATIC / "campi.ico")
+        return FileResponse(os.path.join(STATIC, "campi.ico"))
 
     @app.get("/", include_in_schema=False)
     def index():
-        return FileResponse(STATIC / "index.html", headers={"Cache-Control": "no-cache"})
+        return FileResponse(os.path.join(STATIC, "index.html"), headers={"Cache-Control": "no-cache"})
 
     return app

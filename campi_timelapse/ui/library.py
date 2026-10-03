@@ -1,208 +1,305 @@
-"""Timelapse files for the UI: 10-minute clips, daily videos, archive parts, and seek (wall-clock time -> position in a
-video). Read-only: lists files and reads the frame index; never opens a video except through ffprobe for its length."""
+"""Timelapse files in the contract's shapes (§4.8-4.11, §5.4-5.5, §5.8, §6.4, §6.5): 10-minute clips, daily
+videos, archive parts, and seek (instant -> position in a video). Read-only: lists files, reads the render index
+and the frame index, and reads the first few KB of an MP4 for its duration."""
 from __future__ import annotations
 
 import bisect
-import json
-import math
 import re
-import subprocess
+import threading
 import time
-from datetime import date, datetime
+from datetime import date, datetime, timedelta
 from pathlib import Path
-from urllib.parse import quote
 
 from .. import frames as fr
+from .. import render_index
 from ..archive import CLIP_RE, clip_start
-from ..config import NO_WINDOW, read_json
-from ..sightings_db import utc_iso
+from ..config import read_json
+from . import mp4
+from .contract import invalid, iso, local_day, midnight, not_found, page
+from .media import ARCHIVE_RE, DAILY_RE
 
-DAILY_RE = re.compile(r"^campi_daily_(\d{4}-\d{2}-\d{2})\.mp4$")
-ARCHIVE_RE = re.compile(r"^campi_archive_(\d{3})\.mp4$")
-NEAREST_MAX_S = 600  # a daily-video seek further than this from any usable frame is "not in the video"
-
-
-def media_url(root: str, rel: str) -> str:
-    return f"/media/{root}/{quote(rel)}"
+SEEK_REASONS = ("pending_render", "not_rendered", "no_frames", "expired")
 
 
-def local_iso(ts: float) -> str:
-    return datetime.fromtimestamp(ts).astimezone().isoformat(timespec="seconds")
+def clip_id(name: str) -> str:
+    return name[len("campi_"):-len(".mp4")]
 
 
 class Library:
-    def __init__(self, cfg, store):
-        self.cfg, self.store = cfg, store
-        self._durations: dict[tuple, float | None] = {}
+    def __init__(self, cfg, store, sightings):
+        self.cfg, self.store, self.sd = cfg, store, sightings
+        self._days: dict[date, tuple] = {}
+        self._days_lock = threading.Lock()
 
-    # ------------------------------------------------------------ listings
+    # ------------------------------------------------------------ helpers
 
-    def current_part(self) -> int:
-        """The archive part the service appends to next (rewritten on every append: never served)."""
-        return int((read_json(self.cfg.paths.state / "archive.json", {}) or {}).get("part", 1))
+    def _stat(self, p: Path):
+        try:
+            return p.stat()
+        except OSError:
+            return None
 
-    def exact_starts(self) -> dict[str, float]:
-        """Window starts with seconds for clips the state files name (render-now / test clips aren't on the grid)."""
-        out = {}
-        latest = read_json(self.cfg.paths.state / "latest.json", {}) or {}
-        if latest.get("clip") and latest.get("window_start_ts"):
-            out[Path(latest["clip"]).name] = float(latest["window_start_ts"])
-        last = read_json(self.cfg.paths.state / "last_clip.json", {}) or {}
-        if last.get("out") and last.get("window_start"):
-            try:
-                out.setdefault(Path(last["out"]).name, datetime.fromisoformat(last["window_start"]).timestamp())
-            except ValueError:
-                pass
+    def _duration(self, p: Path, stt) -> float | None:
+        return mp4.duration(p, stt.st_size, stt.st_mtime_ns)
+
+    def aligned(self, ts: float) -> bool:
+        """On the supervisor's grid: local midnight + k * interval_min."""
+        step = int(self.cfg.render.interval_min) * 60
+        return abs((ts - midnight(local_day(ts))) % step) < 0.5
+
+    def grid_window(self, ts: float) -> tuple[float, float]:
+        """The scheduled window containing ts: it ends on the next boundary (like Supervisor.next_boundary)."""
+        step = int(self.cfg.render.interval_min) * 60
+        m = midnight(local_day(ts))
+        end = m + ((ts - m) // step + 1) * step
+        return end - int(self.cfg.render.window_min) * 60, end
+
+    def usable_day(self, d: date) -> list[float] | None:
+        """Sorted timestamps of usable frames in that day's index.csv; None if the day has no index. Cached on the
+        index file's size and mtime."""
+        idx = fr.day_dir(self.cfg, d) / "index.csv"
+        stt = self._stat(idx)
+        if stt is None:
+            return None
+        key = (stt.st_size, stt.st_mtime_ns)
+        with self._days_lock:
+            hit = self._days.get(d)
+            if hit and hit[0] == key:
+                return hit[1]
+        ts = sorted(f.ts for f in fr.usable(self.cfg, fr.load_day(self.cfg, d)))
+        with self._days_lock:
+            if len(self._days) > 8:
+                self._days.clear()
+            self._days[d] = (key, ts)
+        return ts
+
+    # ------------------------------------------------------------ clips
+
+    def clip_files(self) -> list[dict]:
+        """Existing clips (CLIP_RE only: never latest.mp4, .part or .tmp files) with their windows."""
+        out = []
+        win = int(self.cfg.render.window_min) * 60
+        for p in self.cfg.paths.out.glob("campi_*.mp4"):
+            if not CLIP_RE.match(p.name):
+                continue
+            stt = self._stat(p)
+            if stt is None:
+                continue
+            idx = render_index.read(self.cfg, p.name)
+            if idx and idx.get("output") == p.name:
+                ws, we, exact = float(idx["window_start_ts"]), float(idx["window_end_ts"]), True
+            else:
+                ws = clip_start(p)
+                we, exact, idx = ws + win, False, None
+            out.append({"id": clip_id(p.name), "path": p, "stat": stt, "start": ws, "end": we, "exact": exact,
+                        "index": idx})
+        out.sort(key=lambda c: (c["start"], c["id"]), reverse=True)
         return out
 
-    def clip_files(self) -> list[tuple[Path, float]]:
-        """(path, window start) of every finished 10-minute clip, oldest first. latest.mp4 and .part files never
-        match CLIP_RE."""
-        exact = self.exact_starts()
-        out = []
-        for p in self.cfg.paths.out.glob("campi_*.mp4"):
-            if CLIP_RE.match(p.name):
-                out.append((p, exact.get(p.name) or clip_start(p)))
-        return sorted(out, key=lambda x: (x[1], x[0].name))
+    def clip_json(self, c: dict, signer, stars: dict | None = None) -> dict:
+        stars = self.store.stars("clip") if stars is None else stars
+        stt = c["stat"]
+        return {
+            "id": c["id"], "day": local_day(c["start"]).isoformat(), "window_start": iso(c["start"]),
+            "window_end": iso(c["end"]), "exact_window": c["exact"], "duration_s": self._duration(c["path"], stt),
+            "size_bytes": stt.st_size, "modified_at": iso(stt.st_mtime),
+            "expires_after": iso(stt.st_mtime + float(self.cfg.retention.clips_hours) * 3600),
+            "sightings_count": self.sd.count_between(c["start"], c["end"]),
+            "starred": c["id"] in stars,
+            "media": {"video": signer(f"/media/clips/{c['path'].name}"),
+                      "poster": signer(f"/media/posters/clips/{c['id']}.jpg")},
+        }
 
-    def clip_info(self, p: Path, start: float, stars: dict, counts=None) -> dict | None:
-        try:
-            stt = p.stat()
-        except OSError:
-            return None  # expired between listing and stat
-        step, window = self.cfg.render.interval_min * 60, self.cfg.render.window_min * 60
-        if start % step:  # render-now / `campi test` clip: its window may be shorter (campi test = 1 minute)
-            dur = self.duration(p)
-            if dur:  # each captured frame is 1/base_fps s of video (night frames dropped: an upper bound)
-                window = min(window, math.ceil(dur * self.cfg.output.base_fps * self.cfg.capture.interval_s / 60) * 60)
-        return {"name": p.name, "start_at": utc_iso(start), "start_local": local_iso(start),
-                "end_at": utc_iso(start + window), "end_local": local_iso(start + window),
-                "on_grid": start % step == 0, "size": stt.st_size, "modified_at": utc_iso(stt.st_mtime),
-                "modified_local": local_iso(stt.st_mtime),
-                "expires_at": utc_iso(stt.st_mtime + self.cfg.retention.clips_hours * 3600),
-                "url": media_url("clips", p.name), "starred": p.name in stars,
-                "sightings": counts(start, start + window) if counts else None}
-
-    def clips(self, hours: float = 24, counts=None) -> list[dict]:
-        """Clips whose window started in the last `hours`, newest first."""
-        stars = self.store.stars("clip")
-        lo = time.time() - hours * 3600
-        out = [self.clip_info(p, s, stars, counts) for p, s in self.clip_files() if s >= lo]
-        return [c for c in reversed(out) if c]
-
-    def newest_clip(self, counts=None) -> dict | None:
-        """The dated clip latest.mp4 is a copy of (latest.mp4 itself is never served)."""
+    def latest_id(self) -> str | None:
         latest = read_json(self.cfg.paths.state / "latest.json", {}) or {}
-        files = self.clip_files()
-        named = [(p, s) for p, s in files if latest.get("clip") and p.name == Path(latest["clip"]).name]
-        for p, s in (named or files[::-1]):
-            info = self.clip_info(p, s, self.store.stars("clip"), counts)
-            if info:
-                return info
+        name = Path(latest.get("clip") or "").name
+        if CLIP_RE.match(name) and (self.cfg.paths.out / name).is_file():
+            return clip_id(name)
         return None
 
-    def daily_files(self) -> list[tuple[Path, date]]:
+    def clips(self, signer) -> dict:
+        stars = self.store.stars("clip")
+        files = self.clip_files()
+        ids = {c["id"] for c in files}
+        latest = self.latest_id()
+        return {"latest_id": latest if latest in ids else None,
+                "retention_hours": int(self.cfg.retention.clips_hours), "window_min": int(self.cfg.render.window_min),
+                "items": [self.clip_json(c, signer, stars) for c in files]}
+
+    def find_clip(self, cid: str) -> dict | None:
+        return next((c for c in self.clip_files() if c["id"] == cid), None)
+
+    def clip(self, cid: str, signer) -> dict:
+        c = self.find_clip(cid)
+        if c is None:
+            raise not_found(f"no clip {cid}")
+        return self.clip_json(c, signer)
+
+    def newest_clip(self, signer) -> dict | None:
+        files = self.clip_files()
+        latest = self.latest_id()
+        c = next((c for c in files if c["id"] == latest), files[0] if files else None)
+        return self.clip_json(c, signer) if c else None
+
+    # ------------------------------------------------------------ daily videos
+
+    def daily_files(self) -> list[tuple[Path, date, object]]:
         out = []
         for p in self.cfg.paths.daily.glob("campi_daily_*.mp4"):
             m = DAILY_RE.match(p.name)
-            if m:
-                out.append((p, date.fromisoformat(m.group(1))))
-        return sorted(out, key=lambda x: x[1])
+            stt = self._stat(p) if m else None
+            if stt is not None:
+                out.append((p, date.fromisoformat(m.group(1)), stt))
+        return sorted(out, key=lambda x: x[1], reverse=True)
 
-    def daily(self) -> list[dict]:
+    def daily_json(self, p: Path, d: date, stt, signer, stars: dict | None = None) -> dict:
+        stars = self.store.stars("daily") if stars is None else stars
+        return {"day": d.isoformat(), "duration_s": self._duration(p, stt), "size_bytes": stt.st_size,
+                "modified_at": iso(stt.st_mtime),
+                "sightings_count": self.sd.count_between(midnight(d), midnight(d + timedelta(days=1))),
+                "starred": d.isoformat() in stars,
+                "media": {"video": signer(f"/media/daily/{p.name}"),
+                          "poster": signer(f"/media/posters/daily/{d.isoformat()}.jpg")}}
+
+    def daily_page(self, q, signer) -> dict:
+        files = self.daily_files()
+        pg = page(files, lambda x: [x[1].isoformat()], q)
         stars = self.store.stars("daily")
-        out = []
-        for p, d in reversed(self.daily_files()):
-            try:
-                stt = p.stat()
-            except OSError:
-                continue
-            out.append({"day": d.isoformat(), "name": p.name, "size": stt.st_size,
-                        "modified_at": utc_iso(stt.st_mtime), "modified_local": local_iso(stt.st_mtime),
-                        "url": media_url("daily", p.name),
-                        "starred": p.name in stars})
-        return out
+        return {"items": [self.daily_json(p, d, stt, signer, stars) for p, d, stt in pg["items"]],
+                "next_cursor": pg["next_cursor"], "total": pg["total"]}
 
-    def archive(self) -> list[dict]:
-        cur = self.current_part()
-        out = []
-        for p in sorted(self.cfg.paths.archive.glob("campi_archive_*.mp4")):
+    def find_daily(self, day: str):
+        try:
+            d = date.fromisoformat(day)
+        except ValueError:
+            return None
+        return next((x for x in self.daily_files() if x[1] == d), None)
+
+    def daily(self, day: str, signer) -> dict:
+        x = self.find_daily(day)
+        if x is None:
+            raise not_found(f"no daily video for {day}")
+        return self.daily_json(*x, signer)
+
+    # ------------------------------------------------------------ archive
+
+    def current_part(self) -> int:
+        """§6.5: the higher of archive.json's part and the highest part on disk (append_pending creates part N+1
+        before it updates archive.json)."""
+        st = read_json(self.cfg.paths.state / "archive.json", {}) or {}
+        try:
+            cur = int(st.get("part", 1))
+        except (TypeError, ValueError):
+            cur = 1
+        for p in self.cfg.paths.archive.glob("campi_archive_*.mp4"):
             m = ARCHIVE_RE.match(p.name)
-            if not m:
-                continue  # campi_archive_001.tmp.mp4 while an append is running
-            try:
-                stt = p.stat()
-            except OSError:
+            if m:
+                cur = max(cur, int(m.group(1)))
+        return cur
+
+    def archive(self, signer) -> dict:
+        cur = self.current_part()
+        items = []
+        for p in self.cfg.paths.archive.glob("campi_archive_*.mp4"):
+            m = ARCHIVE_RE.match(p.name)  # never campi_archive_001.tmp.mp4 (an append in progress)
+            stt = self._stat(p) if m else None
+            if stt is None:
                 continue
             n = int(m.group(1))
-            out.append({"part": n, "name": p.name, "size": stt.st_size, "modified_at": utc_iso(stt.st_mtime),
-                        "modified_local": local_iso(stt.st_mtime),
-                        "current": n == cur, "url": None if n == cur else media_url("archive", p.name)})
-        return out[::-1]
+            current = n == cur
+            items.append({"part": n, "size_bytes": stt.st_size, "modified_at": iso(stt.st_mtime),
+                          "duration_s": None if current else self._duration(p, stt), "current": current,
+                          "media": {"video": None if current else signer(f"/media/archive/{p.name}")}})
+        items.sort(key=lambda a: a["part"], reverse=True)
+        return {"enabled": bool(self.cfg.archive.enabled), "items": items}
 
-    # ------------------------------------------------------------ seek
+    # ------------------------------------------------------------ seek (§6.4)
 
-    def duration(self, p: Path) -> float | None:
-        """Video length via ffprobe, cached per (name, size, mtime)."""
-        try:
-            stt = p.stat()
-        except OSError:
-            return None
-        key = (p.name, stt.st_size, stt.st_mtime_ns)
-        if key not in self._durations:
-            try:
-                out = subprocess.run([self.cfg.tools.ffprobe, "-v", "error", "-show_entries", "format=duration",
-                                      "-of", "json", str(p)], capture_output=True, text=True, timeout=30,
-                                     creationflags=NO_WINDOW).stdout
-                self._durations[key] = float(json.loads(out or "{}").get("format", {}).get("duration") or 0) or None
-            except (OSError, ValueError, subprocess.SubprocessError):
-                self._durations[key] = None
-        return self._durations[key]
+    def seek(self, ts: float, signer) -> dict:
+        now = time.time()
+        if ts > now + 1:
+            raise invalid("ts is in the future")
+        cfg = self.cfg
+        win = int(cfg.render.window_min) * 60
+        base = {"ts": iso(ts), "target": "none", "clip_id": None, "day": None, "video": None, "offset_s": None,
+                "approximate": False, "reason": None}
+
+        # 0. night / capture gap: that day's frame index exists but nothing usable near ts
+        days = {local_day(ts - win), local_day(ts), local_day(ts + win)}
+        indexed = {d: self.usable_day(d) for d in days}
+        if indexed.get(local_day(ts)) is not None:
+            near = [t for d in days for t in (indexed[d] or []) if abs(t - ts) <= win]
+            if not near:
+                return {**base, "reason": "no_frames"}
+
+        # 1. a clip whose window contains ts: exact window first, then on the grid, then the newest file
+        cands = [c for c in self.clip_files() if c["start"] <= ts < c["end"]]
+        cands.sort(key=lambda c: (c["exact"], self.aligned(c["start"]), c["stat"].st_mtime), reverse=True)
+        for c in cands:
+            if c["index"]:
+                k = bisect.bisect_left(c["index"]["frame_ts"], ts)
+                fps = float(c["index"].get("base_fps") or cfg.output.base_fps)
+            else:
+                k = len(fr.usable(cfg, fr.frames_between(cfg, c["start"], ts)))
+                fps = float(cfg.output.base_fps)
+            dur = self._duration(c["path"], c["stat"])
+            return {**base, "target": "clip", "clip_id": c["id"], "video": signer(f"/media/clips/{c['path'].name}"),
+                    "offset_s": self._clamp(k / fps, dur)}
+
+        # 2. that day's daily video
+        d = local_day(ts)
+        x = self.find_daily(d.isoformat())
+        if x is not None:
+            p, _, stt = x
+            dur = self._duration(p, stt)
+            idx = render_index.read(cfg, p.name)
+            approx = False
+            if idx and idx.get("output") == p.name:
+                off = bisect.bisect_left(idx["frame_ts"], ts) / float(idx.get("base_fps") or cfg.output.base_fps)
+            else:
+                minutes = sorted({int(t // 60) for t in (indexed.get(d) or [])})
+                if minutes and dur:
+                    off = dur * bisect.bisect_left(minutes, int(ts // 60)) / len(minutes)
+                else:
+                    off = 0.0
+                approx = True
+            return {**base, "target": "daily", "day": d.isoformat(), "video": signer(f"/media/daily/{p.name}"),
+                    "offset_s": self._clamp(off, dur), "approximate": approx}
+
+        # 3. nothing to show: why
+        return {**base, "reason": self._why_not(ts, now)}
 
     @staticmethod
-    def _nearest(frames: list, ts: float) -> int:
-        """Index of the usable frame closest to ts."""
-        i = bisect.bisect_left([f.ts for f in frames], ts)
-        if i >= len(frames) or (i > 0 and ts - frames[i - 1].ts < frames[i].ts - ts):
-            i -= 1
-        return max(0, i)
+    def _clamp(off: float, dur: float | None) -> float:
+        if dur:
+            off = min(off, max(0.0, dur - 0.05))
+        return round(max(0.0, off), 3)
 
-    def seek(self, ts: float) -> dict | None:
-        """Where wall-clock time ts is in the timelapse.
-
-        10-minute clip covering ts: render_frames turns each usable frame of the window into interp_factor frames at
-        base_fps * interp_factor, so usable frame i starts at i / base_fps seconds. Exact while the clip exists (its
-        raw frames are kept longer than the clip). Otherwise the daily video, proportionally: approximate."""
+    def _why_not(self, ts: float, now: float) -> str:
         cfg = self.cfg
-        fps = float(cfg.output.base_fps)
-        step, window = cfg.render.interval_min * 60, cfg.render.window_min * 60
-        cands = [(p, s) for p, s in self.clip_files() if s <= ts < s + window]
-        cands.sort(key=lambda x: (x[1] % step == 0, x[1]), reverse=True)  # on-grid first, then the latest start
-        for p, start in cands:
-            frames = fr.usable(cfg, fr.frames_between(cfg, start, start + window))
-            if not frames:
-                continue
-            dur = self.duration(p)
-            if dur is None or dur < len(frames) / fps - 1.0:
-                continue  # shorter than a full window (campi test) or unreadable
-            i = self._nearest(frames, ts)
-            off = i / fps
-            return {"kind": "clip", "name": p.name, "url": media_url("clips", p.name), "offset_s": round(off, 3),
-                    "duration_s": round(dur, 3), "fraction": round(off / dur, 5) if dur else 0,
-                    "frame_at": utc_iso(frames[i].ts), "frame_local": local_iso(frames[i].ts),
-                    "approximate": False}
-        day = datetime.fromtimestamp(ts).date()
-        p = cfg.paths.daily / f"campi_daily_{day.isoformat()}.mp4"
-        if not p.is_file():
-            return None
-        frames = fr.usable(cfg, sorted((f for f in fr.load_day(cfg, day) if f.path.exists()), key=lambda f: f.ts))
-        if not frames:
-            return None
-        i = self._nearest(frames, ts)
-        if abs(frames[i].ts - ts) > NEAREST_MAX_S:
-            return None  # night, or before capture started that day: nothing near that time in the video
-        frac = i / len(frames)
-        dur = self.duration(p) or min(len(frames), int(cfg.daily.target_seconds * fps)) / fps
-        return {"kind": "daily", "name": p.name, "url": media_url("daily", p.name),
-                "offset_s": round(frac * dur, 3), "duration_s": round(dur, 3), "fraction": round(frac, 5),
-                "frame_at": utc_iso(frames[i].ts), "frame_local": local_iso(frames[i].ts), "approximate": True}
+        ws, we = self.grid_window(ts)
+        if now < we + float(cfg.render.delay_s) + float(cfg.render.timeout_min) * 60:
+            return "pending_render"
+        queue = read_json(cfg.paths.state / "render_queue.json", []) or []
+        if any(isinstance(b, (int, float)) and abs(b - we) < 1 for b in queue):
+            return "pending_render"
+        st = read_json(cfg.paths.state / "status.json", {}) or {}
+        if st.get("supervisor_pid") and now - st.get("updated", 0) < 30 and st.get("clip_running"):
+            last = read_json(cfg.paths.state / "latest.json", {}) or {}
+            if ts >= float(last.get("window_start_ts") or 0) + int(cfg.render.window_min) * 60:
+                return "pending_render"  # a render is running and ts is newer than the last published clip
+        if ts < now - float(cfg.retention.clips_hours) * 3600:
+            return "expired"
+        return "not_rendered"
+
+
+def parse_clip_id(cid: str) -> float | None:
+    """Window start (epoch) from a clip id; None if it isn't one."""
+    m = re.fullmatch(r"(\d{4}-\d{2}-\d{2})_(\d{2})(\d{2})", cid)
+    if not m:
+        return None
+    try:
+        return datetime.strptime(m.group(1) + m.group(2) + m.group(3), "%Y-%m-%d%H%M").timestamp()
+    except ValueError:
+        return None
+

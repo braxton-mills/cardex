@@ -8,6 +8,7 @@ import shutil
 import time
 from datetime import date, datetime, timedelta
 
+from . import render_index
 from .frames import INDEX_HEADER
 
 log = logging.getLogger("housekeep")
@@ -15,20 +16,56 @@ log = logging.getLogger("housekeep")
 THINNED_MARK = ".thinned"
 
 
+def _unlink(p, what: str) -> bool:
+    """Delete one file; a file that is open elsewhere (PermissionError) is left for the next hourly run."""
+    try:
+        p.unlink(missing_ok=True)
+        return True
+    except PermissionError:
+        log.warning("%s %s is in use; will retry next run", what, p.name)
+    except OSError as e:
+        log.warning("could not delete %s %s: %s", what, p.name, e)
+    return False
+
+
 def expire_clips(cfg, now: float) -> int:
     n = 0
     cutoff = now - cfg.retention.clips_hours * 3600
     for p in cfg.paths.out.glob("campi_*.mp4"):  # latest.mp4 and daily\ never match
-        if p.stat().st_mtime < cutoff:
-            p.unlink(missing_ok=True)
+        try:
+            old = p.stat().st_mtime < cutoff
+        except OSError:
+            continue  # gone since the glob
+        if old and _unlink(p, "clip"):
+            render_index.delete(cfg, p.name)
             n += 1
     for p in list(cfg.paths.out.glob("*.part.mp4")) + list(cfg.paths.daily.glob("*.part.mp4")):
-        if p.stat().st_mtime < now - 3600:
-            p.unlink(missing_ok=True)
+        try:
+            old = p.stat().st_mtime < now - 3600
+        except OSError:
+            continue
+        if old:
+            _unlink(p, "partial render")
     for d in cfg.paths.work.iterdir():
-        if d.is_dir() and d.stat().st_mtime < now - 6 * 3600:
-            shutil.rmtree(d, ignore_errors=True)
+        try:
+            if d.is_dir() and d.stat().st_mtime < now - 6 * 3600:
+                shutil.rmtree(d, ignore_errors=True)
+        except OSError:
+            continue
+    expire_orphan_indexes(cfg)
     return n
+
+
+def expire_orphan_indexes(cfg) -> None:
+    """Render indexes whose clip / daily video no longer exists (deleted by hand, or a crash mid-expiry)."""
+    idir = render_index.index_dir(cfg)
+    if not idir.is_dir():
+        return
+    for p in idir.glob("*.json"):
+        name = p.stem + ".mp4"
+        video = cfg.paths.daily / name if name.startswith("campi_daily_") else cfg.paths.out / name
+        if not video.exists():
+            _unlink(p, "render index")
 
 
 def thin_day(cfg, ddir, cutoff: float) -> tuple[int, int]:

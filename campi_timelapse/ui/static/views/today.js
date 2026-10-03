@@ -1,9 +1,9 @@
 // Today: dashboard. Hero = the newest 10-minute clip (new sightings "drive by" across it); under it,
 // collection ring + sightings chart; right column = camera status, latest sighting (player-style), mix by class.
 import {
-  api, badge, cardHead, confetti, counter, empty, fill, fmt, h, icon, iconButton, offBanner, openPlayer,
-  openSighting, post, reduceMotion, releaseVideo, revealButton, ring, selection, sightingCard, sightingsOff, stagger,
-  starButton, tierSegments, toast, viewInTimelapse,
+  api, badge, cardHead, clipFile, confetti, counter, empty, epoch, fill, fmt, h, icon, iconButton, listStats,
+  offBanner, openPlayer, openSighting, post, reduceMotion, releaseVideo, revealButton, ring, seekTs, selection,
+  sightingCard, sightingsOff, stagger, starButton, tierSegments, toast, viewInTimelapse,
 } from '../lib.js';
 import { highlightCard } from './highlights.js';
 
@@ -44,7 +44,7 @@ export async function mount(el) {
     releaseVideo(video);
     shown = c;
     touched = false;
-    video = h('video', { src: c.url, muted: true, autoplay: true, loop: true, playsinline: true, preload: 'auto' });
+    video = h('video', { src: c.media.video, muted: true, autoplay: true, loop: true, playsinline: true, preload: 'auto' });
     video.addEventListener('seeking', () => { touched = true; });
     video.addEventListener('pause', () => { if (!video.ended) touched = true; });
     video.addEventListener('click', () => (video.paused ? video.play().catch(() => {}) : video.pause()));
@@ -59,13 +59,13 @@ export async function mount(el) {
     fill(top,
       h('div', { class: 'hero-title' },
         h('span', { class: 'live-dot' }), h('span', {}, 'Newest clip'),
-        h('b', { class: 'num' }, `${fmt.hm(c.start_local)}–${fmt.hm(c.end_local)}`),
-        c.sightings != null ? h('span', { class: 'muted' }, `· ${c.sightings} sightings`) : null),
+        h('b', { class: 'num' }, `${fmt.hm(c.window_start)}–${fmt.hm(c.window_end)}`),
+        c.sightings_count != null ? h('span', { class: 'muted' }, `· ${c.sightings_count} sightings`) : null),
       h('div', { class: 'grow' }),
-      newer ? h('button', { class: 'pill-btn amber', onclick: () => loadClip(newer) }, icon('arrowRight', 16), `Newer: ${fmt.hm(newer.start_local)}`) : null,
-      starButton(c.starred, (v) => post(`/api/videos/clips/${c.name}/star`, { value: v })),
-      revealButton('clips', c.name),
-      iconButton('maximize', 'Open in player', () => openPlayer({ url: c.url, title: `Clip ${fmt.hm(c.start_local)}–${fmt.hm(c.end_local)}`, reveal: revealButton('clips', c.name) })));
+      newer ? h('button', { class: 'pill-btn amber', onclick: () => loadClip(newer) }, icon('arrowRight', 16), `Newer: ${fmt.hm(newer.window_start)}`) : null,
+      starButton(c.starred, (v) => post(`/api/clips/${c.id}/star`, { starred: v })),
+      revealButton('clips', clipFile(c.id)),
+      iconButton('maximize', 'Open in player', () => openPlayer({ url: c.media.video, title: `Clip ${fmt.hm(c.window_start)}–${fmt.hm(c.window_end)}`, reveal: revealButton('clips', clipFile(c.id)) })));
   }
 
   async function newest() {
@@ -73,7 +73,7 @@ export async function mount(el) {
     try { c = await api('/api/clips/newest'); } catch { /* none yet */ }
     if (!alive) return;
     if (!c) { fill(hero, empty('No clips yet', 'The first 10-minute clip appears shortly after capture starts.')); shown = null; return; }
-    if (shown && c.name === shown.name) { heroOverlay(c, null); return; }
+    if (shown && c.id === shown.id) { heroOverlay(c, null); return; }
     if (video && touched) { heroOverlay(shown, c); return; } // offer it instead
     loadClip(c);
   }
@@ -84,8 +84,8 @@ export async function mount(el) {
     const rl = s.direction === 'RL';
     const pill = h('div', { class: `driveby ${rl ? 'rl' : 'lr'}`, style: { animationDelay: `${delay}ms` }, title: 'Open this sighting',
       onclick: () => openSighting(s.id) },
-    s.crop_url ? h('img', { src: s.crop_url, alt: '' }) : h('span', { class: 'head-ic' }, icon('car', 20)),
-    h('div', {}, h('b', {}, s.label || 'vehicle'), h('span', { class: 'num' }, fmt.time(s.started_local))));
+    s.media.crop ? h('img', { src: s.media.crop, alt: '' }) : h('span', { class: 'head-ic' }, icon('car', 20)),
+    h('div', {}, h('b', {}, s.label || 'vehicle'), h('span', { class: 'num' }, fmt.time(s.started_at))));
     pill.addEventListener('animationend', (e) => { if (e.target === pill) pill.remove(); });
     hero.append(pill);
   }
@@ -99,24 +99,30 @@ export async function mount(el) {
   }
 
   function renderStatus(st) {
-    const cap = st.capture || {};
-    const s = st.sightings || {};
-    const clip = st.last_clip || {};
-    const [age, unit] = fmt.agoParts(cap.last_frame_ts);
-    const [clipAge, clipUnit] = fmt.agoParts(clip.finished);
-    const ok = st.alive && cap.connected;
-    const det = !st.sightings_enabled ? 'off' : s.state === 'running'
-      ? (s.cpu_fallback ? 'CPU' : (/intel/i.test(s.device_name || '') ? 'iGPU' : (s.device || 'GPU'))) : s.state;
+    const cap = st.capture;
+    const s = st.sightings;
+    const clip = st.clips.last || {};
+    const alive = st.service.state === 'running';
+    const [age, unit] = fmt.agoParts(epoch(cap.last_frame_at));
+    const [clipAge, clipUnit] = fmt.agoParts(epoch(clip.finished_at));
+    const ok = alive && cap.connected;
+    const words = (x) => (x || '').replace(/_/g, ' ');
+    const det = !s.enabled ? 'off' : s.state === 'running'
+      ? (s.cpu_fallback ? 'CPU' : (/intel/i.test(s.device || '') ? 'iGPU' : (s.backend || 'GPU'))) : words(s.state);
+    const detLine = s.state === 'running'
+      ? `${s.backend || ''} on ${s.device || '?'}${s.phase ? ` (${words(s.phase)})` : ''}; classify queue ${s.classify_queue ?? 0}`
+      : (s.last_error || words(s.state));
+    const q = st.clips.queue;
     const alerts = [];
     if (st.gaming?.active) alerts.push(h('div', { class: 'alert' }, icon('gamepad', 16), `Gaming: ${st.gaming.exe}`));
-    if (st.render_queue && (st.render_queue.windows || st.render_queue.deferred)) {
+    if (q && (q.length || q.deferred)) {
       alerts.push(h('div', { class: 'alert' }, icon('layers', 16),
-        `${st.render_queue.windows} render${st.render_queue.windows === 1 ? '' : 's'} queued${st.render_queue.deferred ? ' · deferred' : ''}`));
+        `${q.length} render${q.length === 1 ? '' : 's'} queued${q.deferred ? ' · deferred' : ''}`));
     }
-    if (s.state === 'crash-looping') alerts.push(h('div', { class: 'alert bad' }, icon('chip', 16), 'Sightings crash-looping'));
-    if (!st.alive) alerts.push(h('div', { class: 'alert bad' }, icon('camera', 16), 'Service stopped · campi start'));
+    if (s.state === 'crash_looping') alerts.push(h('div', { class: 'alert bad' }, icon('chip', 16), 'Sightings crash-looping'));
+    if (!alive) alerts.push(h('div', { class: 'alert bad' }, icon('camera', 16), 'Service stopped · campi start'));
     fill(status,
-      cardHead('pin', cap.host || 'campi', h('span', { class: `state-pill ${ok ? 'ok' : 'bad'}` }, ok ? 'Recording' : (st.alive ? 'No stream' : 'Stopped'))),
+      cardHead('pin', cap.host || 'campi', h('span', { class: `state-pill ${ok ? 'ok' : 'bad'}` }, ok ? 'Recording' : (alive ? 'No stream' : 'Stopped'))),
       h('div', { class: 'big-row' },
         h('div', { class: 'big num' }, age, h('small', {}, unit)),
         h('div', { class: 'big-cap' }, 'since the', h('br'), 'last frame'),
@@ -124,10 +130,10 @@ export async function mount(el) {
         h('span', { class: `glyph ${ok ? '' : 'off'}` }, icon('camera', 44))),
       h('div', { class: 'tiles' },
         tile('Stream', 'wifi', cap.connected ? 'Live' : 'Down', '', cap.last_error || '', !cap.connected),
-        tile('Last clip', 'film', clipAge, clipUnit, clip.out || clip.reason || clip.error || '', clip.status && clip.status !== 'ok'),
-        tile('Next clip', 'clock', st.alive && st.service.next_clip ? String(st.service.next_clip).slice(11, 16) : '–', ''),
-        tile('Detector', 'chip', det, '', s.line || '', st.sightings_enabled && s.state !== 'running'),
-        tile('Gemini', 'gemini', s.cloud ? counter('gemini', s.cloud.today ?? 0) : 'off', s.cloud ? `/${s.cloud.cap}` : '', s.cloud?.pending ? `${s.cloud.pending} queued` : ''),
+        tile('Last clip', 'film', clipAge, clipUnit, clip.clip_id || clip.detail || '', clip.status && clip.status !== 'ok'),
+        tile('Next clip', 'clock', st.clips.next_at ? fmt.hm(st.clips.next_at) : '–', ''),
+        tile('Detector', 'chip', det, '', detLine, s.enabled && s.state !== 'running'),
+        tile('Gemini', 'gemini', s.cloud?.enabled ? counter('gemini', s.cloud.calls_today) : 'off', s.cloud?.enabled ? `/${s.cloud.cap}` : '', ''),
         tile('Disk', 'drive', counter('disk', Math.round(st.disk.free_gb)), 'GB', `free on ${st.disk.drive}`, st.disk.free_gb < 60)),
       alerts.length ? h('div', { class: 'alerts' }, alerts) : null);
   }
@@ -137,20 +143,20 @@ export async function mount(el) {
   function renderNow(animate) {
     const s = lastSightings[nowIdx];
     if (!s) { fill(latestCard, cardHead('car', 'Latest sighting'), empty('No sightings yet today')); return; }
-    const conf = s.label_by === 'user' ? 1 : (s.confidence ?? 0);
+    const conf = s.decided_by === 'user' ? 1 : (s.confidence ?? 0);
     const fillBar = h('div', { class: 'meter-fill', style: { width: '0%' } });
     const knob = h('div', { class: 'meter-knob', style: { left: '0%' } });
     fill(latestCard,
       cardHead('car', nowIdx === 0 ? 'Latest sighting' : `${nowIdx + 1} sightings ago`, h('a', { class: 'amber-link', href: '#/sightings' }, 'All')),
       h('div', { class: `now-row ${animate ? 'swap' : ''}`, onclick: () => openSighting(s.id, { ids: lastSightings.map((x) => x.id) }) },
-        h('div', { class: 'now-thumb' }, s.crop_url ? h('img', { src: s.crop_url, alt: s.label }) : null),
+        h('div', { class: 'now-thumb' }, s.media.crop ? h('img', { src: s.media.crop, alt: s.label }) : null),
         h('div', { class: 'now-text' }, h('b', {}, s.label || 'vehicle'),
-          h('span', {}, [fmt.time(s.started_local), s.year_range, s.color].filter(Boolean).join(' · ')))),
+          h('span', {}, [fmt.time(s.started_at), s.year_range, s.color].filter(Boolean).join(' · ')))),
       h('div', { class: 'meter' }, fillBar, knob),
-      h('div', { class: 'meter-labels' }, h('span', {}, fmt.labelBy(s.label_by)), h('span', { class: 'num' }, s.label_by === 'user' ? 'corrected' : fmt.pct(s.confidence))),
+      h('div', { class: 'meter-labels' }, h('span', {}, s.cloud_status === 'pending' ? 'SigLIP · asking Gemini…' : fmt.labelBy(s.decided_by)), h('span', { class: 'num' }, s.decided_by === 'user' ? 'corrected' : fmt.pct(s.confidence))),
       h('div', { class: 'now-ctl' },
         iconButton('prev', 'Older sighting', nowIdx < lastSightings.length - 1 ? () => { nowIdx += 1; renderNow(true); } : null, 'ghost'),
-        h('button', { class: 'play-btn big', title: 'View in timelapse', onclick: () => viewInTimelapse(s.seek_ts, s.label) }, icon('play', 24)),
+        h('button', { class: 'play-btn big', title: 'View in timelapse', onclick: () => viewInTimelapse(seekTs(s), s.label) }, icon('play', 24)),
         iconButton('next', 'Newer sighting', nowIdx > 0 ? () => { nowIdx -= 1; renderNow(true); } : null, 'ghost')));
     requestAnimationFrame(() => requestAnimationFrame(() => { // let the meter slide to its value
       fillBar.style.width = `${conf * 100}%`;
@@ -172,23 +178,24 @@ export async function mount(el) {
 
   // Collection: how much of the label list has been caught, by rarity tier, plus today's newest catches.
   function renderCollection(c, catches) {
-    const animate = lastCaught !== c.caught;
-    lastCaught = c.caught;
+    const ls = listStats(c);
+    const animate = lastCaught !== ls.caught;
+    lastCaught = ls.caught;
     const segs = tierSegments(c.items);
     const recent = catches.slice(0, 4);
     fill(collCard,
       cardHead('grid', 'Collection', h('a', { class: 'pill-btn', href: '#/collection' }, 'Open')),
       h('div', { class: 'coll-row' },
-        ring(segs, c.total, [h('b', {}, counter('ring-caught', c.caught)), h('span', { class: 'muted' }, `of ${c.total} caught`)], { animate }),
+        ring(segs, ls.total, [h('b', {}, counter('ring-caught', ls.caught)), h('span', { class: 'muted' }, `of ${ls.total} caught`)], { animate }),
         h('div', { class: 'tier-legend' }, segs.map((g) => h('div', { class: 'tl-row' },
           h('i', { class: `tl-dot ${g.key}` }), h('span', {}, g.key), h('b', { class: 'num' }, String(g.value)))),
-        h('div', { class: 'tl-row muted' }, h('i', { class: 'tl-dot none' }), h('span', {}, 'not yet'), h('b', { class: 'num' }, String(c.total - c.caught))),
-        c.discovered ? h('div', { class: 'tl-row muted' }, h('i', { class: 'tl-dot discovered' }), h('span', {}, 'discovered'), h('b', { class: 'num' }, String(c.discovered))) : null)),
+        h('div', { class: 'tl-row muted' }, h('i', { class: 'tl-dot none' }), h('span', {}, 'not yet'), h('b', { class: 'num' }, String(ls.total - ls.caught))),
+        ls.discovered ? h('div', { class: 'tl-row muted' }, h('i', { class: 'tl-dot discovered' }), h('span', {}, 'discovered'), h('b', { class: 'num' }, String(ls.discovered))) : null)),
       h('div', { class: 'catches' },
         h('span', { class: 'catches-title' }, recent.length ? `New today · ${catches.length}` : 'No new catches yet today'),
         h('div', { class: 'catch-row' }, recent.map((i) => h('button', {
-          class: 'catch', title: `${i.sighting.label} · first seen ${fmt.hm(i.sighting.started_local)}`, onclick: () => openSighting(i.sighting.id),
-        }, i.sighting.crop_url ? h('img', { src: i.sighting.crop_url, alt: '' }) : icon('car', 18), h('span', {}, i.sighting.label))))));
+          class: 'catch', title: `${i.sighting.label} · first seen ${fmt.hm(i.sighting.started_at)}`, onclick: () => openSighting(i.sighting.id),
+        }, i.sighting.media.crop ? h('img', { src: i.sighting.media.crop, alt: '' }) : icon('car', 18), h('span', {}, i.sighting.label))))));
   }
 
   async function renderChart() {
@@ -207,10 +214,10 @@ export async function mount(el) {
     const busiest = items.reduce((b, i, k) => (i.count > items[b].count ? k : b), 0);
     const sel = picked != null && picked < items.length ? picked : busiest;
     const it = items[sel];
-    const label = (i) => (a.unit === 'hour' ? i.start_local.slice(11, 13) : fmt.weekday(i.start_local.slice(0, 10)));
+    const label = (i) => (a.unit === 'hour' ? i.start.slice(11, 13) : fmt.weekday(i.start.slice(0, 10)));
     const action = a.unit === 'hour'
-      ? h('button', { class: 'pill-btn', onclick: () => viewInTimelapse(new Date(it.start_at).getTime() / 1000 + 300, `${label(it)}:00`) }, icon('play', 14), 'Play hour')
-      : h('a', { class: 'pill-btn', href: `#/sightings?from=${it.start_local.slice(0, 10)}&to=${it.start_local.slice(0, 10)}` }, 'Open day');
+      ? h('button', { class: 'pill-btn', onclick: () => viewInTimelapse(epoch(it.start) + 300, `${label(it)}:00`) }, icon('play', 14), 'Play hour')
+      : h('a', { class: 'pill-btn', href: `#/sightings?from=${it.start.slice(0, 10)}&to=${it.start.slice(0, 10)}` }, 'Open day');
     const menu = h('select', { class: 'pill-select', onchange: (e) => { chartMode = e.target.value; picked = null; chartAnim = true; renderChart(); } },
       h('option', { value: 'today', selected: chartMode === 'today' }, 'Today'), h('option', { value: 'week', selected: chartMode === 'week' }, 'Week'));
     fill(chart,
@@ -218,7 +225,7 @@ export async function mount(el) {
         h('div', {}, h('h2', {}, 'Sightings'),
           h('div', { class: 'chart-sub' }, h('b', {}, counter(`chart-${chartMode}`, total)), h('span', {}, chartMode === 'week' ? 'vehicles in 7 days' : 'vehicles today'))),
         h('div', { class: 'grow' }), menu),
-      h('div', { class: 'chart-pick' }, h('span', { class: 'num' }, a.unit === 'hour' ? `${label(it)}:00–${label(it)}:59` : fmt.day(it.start_local.slice(0, 10))),
+      h('div', { class: 'chart-pick' }, h('span', { class: 'num' }, a.unit === 'hour' ? `${label(it)}:00–${label(it)}:59` : fmt.day(it.start.slice(0, 10))),
         h('b', {}, counter(`pick-${chartMode}-${sel}`, it.count, { ms: 500 })), h('span', { class: 'muted' }, 'sightings'), h('div', { class: 'grow' }), action),
       h('div', { class: `bars ${chartAnim ? 'anim' : ''}` }, items.map((i, k) => h('button', {
         class: `bar ${k === sel ? 'on' : ''}`, title: `${label(i)} · ${i.count}`, style: { '--i': String(k) },
@@ -236,12 +243,12 @@ export async function mount(el) {
     if (!alive) return;
     renderStatus(st);
     await newest();
-    const on = st.sightings_enabled || st.sightings_db;
+    const on = st.sightings.enabled || st.sightings.has_history;
     fill(banner, offBanner(st));
     for (const n of [latestCard, mix, chart, latest, hl]) n.hidden = !on;
     if (!on) { fill(collCard, sightingsOff()); return; }
     const [t, page, hls, col] = await Promise.all([
-      api('/api/today'), api('/api/sightings?limit=12'), api('/api/highlights?limit=200&type=new_catch,rare,busy_window,starred'),
+      api('/api/today'), api('/api/sightings?limit=12'), api('/api/highlights?limit=200&type=new_catch,rare,busiest,starred'),
       api('/api/collection'),
     ]);
     if (!alive) return;

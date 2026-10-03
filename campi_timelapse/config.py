@@ -38,6 +38,14 @@ GAMING_DEFAULTS = {
     "auto": True, "game_dirs": [], "extra_exes": [], "ignore_exes": [], "gpu_busy_pct": 20, "gpu_busy_s": 30,
     "defer_renders": True, "pause_sightings": False,
 }
+# [api] / [api.push] defaults: the API (iPhone app + desktop UI) only runs under the supervisor when enabled.
+API_DEFAULTS = {
+    "enabled": False, "port": 8765, "public_url": "", "max_live_viewers": 3, "media_url_ttl_h": 12,
+}
+PUSH_DEFAULTS = {
+    "enabled": False, "key_file": "{home}\\CampiTimelapse\\secrets\\apns_AuthKey.p8", "key_id": "", "team_id": "",
+    "bundle_id": "com.braxtonmills.campi",
+}
 
 FOLDERID_DOWNLOADS = "{374DE290-123F-4565-9164-39C4925E467B}"
 
@@ -90,8 +98,11 @@ def load_config(path: Path | None = None) -> SimpleNamespace:
     raw["sightings"] = {**SIGHTINGS_DEFAULTS, **raw.get("sightings", {})}
     raw["sightings"]["cloud"] = {**CLOUD_DEFAULTS, **raw["sightings"].get("cloud", {})}
     raw["gaming"] = {**GAMING_DEFAULTS, **raw.get("gaming", {})}
+    raw["api"] = {**API_DEFAULTS, **raw.get("api", {})}
+    raw["api"]["push"] = {**PUSH_DEFAULTS, **raw["api"].get("push", {})}
     cfg = _ns(raw)
     cfg.sightings.cloud.api_key_file = _expand(cfg.sightings.cloud.api_key_file)
+    cfg.api.push.key_file = _expand(cfg.api.push.key_file)
     cfg.config_path = path
 
     if cfg.image.rotation not in (0, 90, 180, 270):
@@ -120,6 +131,9 @@ def load_config(path: Path | None = None) -> SimpleNamespace:
     # Optional sightings worker: not created here, so nothing new appears on disk while it is disabled.
     cfg.paths.sightings = data / "sightings"
     cfg.paths.sightings_python = data / "venv-sightings" / "Scripts" / "pythonw.exe"
+    # Optional API (iPhone app + desktop UI): its own venv; all its data lives in ui\ (never created here).
+    cfg.paths.ui = data / "ui"
+    cfg.paths.ui_python = data / "venv-ui" / "Scripts" / "pythonw.exe"
 
     cfg.tools.ffmpeg = _tool(cfg.tools.ffmpeg, "ffmpeg")
     cfg.tools.ffprobe = _tool(cfg.tools.ffprobe, "ffprobe")

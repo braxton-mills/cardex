@@ -19,8 +19,10 @@ export async function mount(el, _params, ctx) {
   let clockTimer = null;
   // Level it like the renders do ([image] rotation + level_deg, cropped so there are no black corners)
   let transform = '';
+  let src = null;
+  try { src = (await api('/api/status')).live.mjpeg; } catch { /* no stream URL: say so below */ }
   try {
-    const c = (await api('/api/status')).config;
+    const c = await api('/api/desktop/info');
     const t = (c.level_deg * Math.PI) / 180;
     const r = Math.max(c.output_width / c.output_height, c.output_height / c.output_width);
     const scale = Math.abs(Math.cos(t)) + r * Math.abs(Math.sin(t));
@@ -31,7 +33,8 @@ export async function mount(el, _params, ctx) {
 
   function start() {
     if (img) return;
-    const me = h('img', { src: `/live.mjpg?t=${Date.now()}`, alt: 'live camera', style: { transform } });
+    if (!src) { fill(frame, h('p', { class: 'muted' }, 'The live stream is unavailable (the API did not answer).')); return; }
+    const me = h('img', { src, alt: 'live camera', style: { transform } });
     me.addEventListener('load', () => { if (img === me) setState('LIVE', true); }, { once: true });
     me.addEventListener('error', () => {
       if (img !== me) return; // our own abort below

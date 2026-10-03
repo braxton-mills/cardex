@@ -1,7 +1,7 @@
 // Shell: hamburger nav, top bar, router, keyboard and visibility handling.
 // Each view module exports mount(el, params, ctx) -> {unmount, onVisible?, video?}.
 import {
-  $, api, closeDetail, closeModal, detailOpen, detailStep, detailVideo, fill, fmt, h, icon, iconButton, modalVideo,
+  $, api, closeDetail, closeModal, detailOpen, detailStep, detailVideo, epoch, fill, fmt, h, icon, iconButton, modalVideo,
   prefs, reduceMotion, selection, starDetail,
 } from './lib.js';
 import * as today from './views/today.js';
@@ -58,13 +58,14 @@ fill($('#top-actions'),
 async function updateChip() {
   let st;
   try { st = await api('/api/status'); } catch { fill(chip, h('span', { class: 'cam-av bad' }, icon('camera', 20)), h('div', {}, h('b', {}, 'Campi'), h('span', {}, 'UI server unreachable'))); return; }
-  const cap = st.capture || {};
-  const ok = st.alive && cap.connected;
-  chip.title = ok ? `Service pid ${st.service.supervisor_pid}; stream ${cap.host}` : (st.alive ? (cap.last_error || 'stream disconnected') : 'service stopped (campi start)');
+  const cap = st.capture;
+  const alive = st.service.state === 'running';
+  const ok = alive && cap.connected;
+  chip.title = ok ? `Service pid ${st.service.pid}; stream ${cap.host}` : (alive ? (cap.last_error || 'stream disconnected') : 'service stopped (campi start)');
   fill(chip,
     h('span', { class: `cam-av ${ok ? 'ok' : 'bad'}` }, icon('camera', 20)),
     h('div', {}, h('b', {}, cap.host || 'Campi'),
-      h('span', {}, st.alive ? (cap.connected ? `recording · frame ${fmt.ago(cap.last_frame_ts)}` : 'stream disconnected') : 'service stopped')));
+      h('span', {}, alive ? (cap.connected ? `recording · frame ${fmt.ago(epoch(cap.last_frame_at))}` : 'stream disconnected') : 'service stopped')));
 }
 updateChip();
 setInterval(updateChip, 30000);

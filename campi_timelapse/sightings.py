@@ -404,6 +404,8 @@ class Writer(threading.Thread):
         ask_cloud = rec.pop("_ask_cloud", False)
         if self.cloud and not ask_cloud and not db.label_seen_before(con, rec["label"]):
             ask_cloud = True  # first-ever sighting of this label
+        rec["cloud_status"] = ("pending" if ask_cloud else "skipped") if self.cloud else None
+        rec["updated_at"] = db.utc_iso(time.time())
         db.insert(con, rec)
         self.written += 1
         if self.cloud and ask_cloud:

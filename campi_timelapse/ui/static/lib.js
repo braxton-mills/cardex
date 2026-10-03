@@ -44,19 +44,55 @@ export function fill(el, ...children) {
   return el;
 }
 
+// The desktop is a paired device like any phone: `campi ui` opens /#token=<t> (a fragment never reaches the
+// server); it's kept for this window only and taken off the address.
+const TOKEN_KEY = 'campi.token';
+function takeToken() {
+  const m = location.hash.match(/^#token=([A-Za-z0-9_-]+)/);
+  if (m) {
+    try { sessionStorage.setItem(TOKEN_KEY, m[1]); } catch { /* storage blocked: this page load only */ }
+    window.campiToken = m[1];
+    history.replaceState(null, '', `${location.pathname}#/today`);
+  }
+}
+takeToken();
+const token = () => { try { return sessionStorage.getItem(TOKEN_KEY) || window.campiToken; } catch { return window.campiToken; } };
+
+function signedOut() {
+  if ($('#signed-out')) return;
+  document.body.append(h('div', { id: 'signed-out', class: 'modal' }, h('div', { class: 'modal-box signed-out' },
+    h('h2', {}, 'Open Campi from the Start menu'),
+    h('p', { class: 'muted' }, 'This window has no valid access token (it was opened directly, or the desktop device was '
+      + 'revoked). Close it and run campi ui again.'))));
+}
+
 export async function api(path, opts = {}) {
-  const init = { ...opts, headers: { 'Content-Type': 'application/json' } };
+  const init = { ...opts, headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token() || ''}` } };
   if (opts.body !== undefined) init.body = JSON.stringify(opts.body);
   const r = await fetch(path, init);
   if (!r.ok) {
     let msg = r.statusText;
-    try { msg = (await r.json()).detail || msg; } catch { /* not JSON */ }
-    const e = new Error(typeof msg === 'string' ? msg : JSON.stringify(msg));
+    let code = '';
+    try { const b = await r.json(); msg = b.error?.message || msg; code = b.error?.code || ''; } catch { /* not JSON */ }
+    if (r.status === 401) signedOut();
+    const e = new Error(msg);
     e.status = r.status;
+    e.code = code;
     throw e;
   }
-  return r.json();
+  return r.status === 204 ? null : r.json();
 }
+
+// epoch seconds of a contract datetime ("2026-10-03T14:05:12.345-05:00")
+export const epoch = (iso) => (iso ? Date.parse(iso) / 1000 : null);
+// where "View in timelapse" lands for a sighting: the middle of the pass
+export const seekTs = (s) => (epoch(s.started_at) + epoch(s.ended_at || s.started_at)) / 2;
+// file names for "Show in folder"
+export const clipFile = (id) => `campi_${id}.mp4`;
+export const dailyFile = (day) => `campi_daily_${day}.mp4`;
+export const archiveFile = (part) => `campi_archive_${String(part).padStart(3, '0')}.mp4`;
+// a /media/sightings/... URL (signed) -> its path relative to the sightings folder
+export const sightingRel = (url) => (url || '').split('?')[0].replace('/media/sightings/', '').split('/').map(decodeURIComponent).join('/');
 export const post = (path, body) => api(path, { method: 'POST', body });
 
 export function qs(params) {
@@ -147,7 +183,7 @@ export function confetti(n = 90) {
 
 const pad = (n) => String(n).padStart(2, '0');
 export const fmt = {
-  // *_local strings carry the PC's offset; show their wall-clock part as-is
+  // API datetimes carry the PC's offset; show their wall-clock part as-is
   time: (iso) => (iso ? iso.slice(11, 19) : ''),
   hm: (iso) => (iso ? iso.slice(11, 16) : ''),
   date: (iso) => (iso ? iso.slice(0, 10) : ''),
@@ -271,20 +307,20 @@ export function viewHead(...children) {
 export function sightingCard(s, onOpen) {
   const card = h('article', { class: `card sighting ${s.hidden ? 'is-hidden' : ''}`, tabindex: '-1', dataset: { id: s.id } },
     h('div', { class: 'crop' },
-      s.crop_url ? h('img', { src: s.crop_url, loading: 'lazy', alt: s.label || 'vehicle' }) : h('div', { class: 'nocrop' }, 'no crop'),
+      s.media.crop ? h('img', { src: s.media.crop, loading: 'lazy', alt: s.label || 'vehicle' }) : h('div', { class: 'nocrop' }, 'no crop'),
       h('div', { class: 'crop-flags' },
         s.unsure ? badge('unsure', 'warn') : null,
         s.stationary ? badge('parked', 'muted') : null,
         s.hidden ? badge('hidden', 'muted') : null),
-      starButton(s.starred, (v) => post(`/api/sightings/${s.id}/star`, { value: v }).then((r) => { s.starred = r.starred; }))),
+      starButton(s.starred, (v) => post(`/api/sightings/${s.id}/star`, { starred: v }).then((r) => { s.starred = r.starred; }))),
     h('div', { class: 'meta' },
       h('div', { class: 'label', title: s.label || '' }, s.label || '(unlabelled)'),
       h('div', { class: 'sub' },
-        h('span', { class: 'num' }, fmt.time(s.started_local)),
+        h('span', { class: 'num' }, fmt.time(s.started_at)),
         s.direction ? h('span', { class: 'dir', title: s.direction === 'LR' ? 'left to right' : 'right to left' }, fmt.dir(s.direction)) : null,
-        s.label_by === 'user' ? null : h('span', { class: 'num' }, fmt.pct(s.confidence)),
+        s.decided_by === 'user' ? null : h('span', { class: 'num' }, fmt.pct(s.confidence)),
         h('span', { class: 'grow' }),
-        badge(fmt.labelBy(s.label_by), `by-${s.label_by}`)),
+        s.cloud_status === 'pending' ? badge('asking Gemini', 'by-cloud') : badge(fmt.labelBy(s.decided_by), `by-${s.decided_by}`)),
       (s.year_range || s.color) ? h('div', { class: 'sub2' }, [s.year_range, s.color].filter(Boolean).join(' · ')) : null));
   card.addEventListener('click', () => onOpen(s, card));
   card._sighting = s;
@@ -303,12 +339,24 @@ export function sightingsOff() {
 
 // Sightings disabled in config.toml but a database exists: say so above the history.
 export function offBanner(status) {
-  return status && !status.sightings_enabled ? h('p', { class: 'banner' }, 'Sightings is off; showing what was recorded before.') : null;
+  return status && !status.sightings.enabled ? h('p', { class: 'banner' }, 'Sightings is off; showing what was recorded before.') : null;
 }
+// Sightings off and never recorded: the sightings views show sightingsOff() instead
+export const noSightings = (status) => !!status && !status.sightings.enabled && !status.sightings.has_history;
 
+// Explorer opens in this desktop session: through the Campi window (pywebview) when there is one, since the API
+// may run under the background service; a server started by `campi ui --browser` does it itself.
 export function revealButton(root, path, withLabel = false) {
   const go = async () => {
-    try { await post('/api/desktop/reveal', { root, path }); } catch (err) { toast(err.status === 501 ? 'Show in folder only works on this PC' : err.message, 'error'); }
+    try {
+      const shell = window.pywebview?.api;
+      if (shell?.reveal) {
+        const r = await shell.reveal(root, path);
+        if (r && r.error) toast(r.error, 'error');
+      } else {
+        await post('/api/desktop/reveal', { root, path });
+      }
+    } catch (err) { toast(err.message, 'error'); }
   };
   if (!withLabel) return iconButton('folder', 'Show in folder', go, 'small');
   return h('button', { class: 'pill-btn', onclick: (e) => { e.stopPropagation(); go(); } }, icon('folder', 16), 'Show in folder');
@@ -316,7 +364,7 @@ export function revealButton(root, path, withLabel = false) {
 
 // Collection ring: the label list as a circle, one colored arc per rarity tier for what's been caught, the
 // empty track for what hasn't. segments: [{key, value}] in drawing order; total = every label on the list.
-export const TIER_ORDER = ['legendary', 'rare', 'uncommon', 'common'];
+export const TIER_ORDER = ['rare', 'uncommon', 'common'];
 export function ring(segments, total, center, { animate = true } = {}) {
   const r = 92;
   const C = 2 * Math.PI * r;
@@ -340,9 +388,16 @@ export function ring(segments, total, center, { animate = true } = {}) {
     h('div', { class: 'ring-center' }, center));
 }
 
-// caught labels per tier, for ring()
+// The ring is about the label list (sightings_labels.txt); discovered and retired labels are counted beside it.
+export function listStats(c) {
+  const list = c.items.filter((i) => i.origin === 'labels_file');
+  return { list, total: list.length, caught: list.filter((i) => i.count > 0).length,
+    discovered: c.items.filter((i) => i.origin === 'discovered' && i.count > 0).length };
+}
+
+// caught list labels per tier, for ring()
 export function tierSegments(items) {
-  return TIER_ORDER.map((key) => ({ key, value: items.filter((i) => i.tier === key && !i.discovered).length }));
+  return TIER_ORDER.map((key) => ({ key, value: items.filter((i) => i.tier === key && i.origin === 'labels_file').length }));
 }
 
 // ---------------------------------------------------------------- video player (amber controls)
@@ -446,22 +501,25 @@ export function openPlayer({ url, title, offset = 0, pause = false, note = null,
   return video;
 }
 
+const SEEK_WHY = {
+  pending_render: 'That window hasn\'t been rendered yet; try again in a few minutes.',
+  not_rendered: 'No video covers that time (that 10-minute window was skipped).',
+  no_frames: 'Nothing was recorded around then (night, or the camera was offline).',
+  expired: 'No video covers that time anymore: 10-minute clips are kept 24 h, and that day has no daily video.',
+};
+
 export async function viewInTimelapse(ts, what = '') {
   let r;
   try {
-    r = await api(`/api/seek${qs({ ts })}`);
-  } catch (e) {
-    toast(e.status === 404
-      ? 'No video covers that time: 10-minute clips are kept 24 h, and the daily video is made after midnight.'
-      : e.message, 'error');
-    return;
-  }
+    r = await api(`/api/seek${qs({ ts: ts.toFixed(3) })}`);
+  } catch (e) { toast(e.message, 'error'); return; }
+  if (r.target === 'none') { toast(SEEK_WHY[r.reason] || 'No video covers that time.', 'error'); return; }
   const note = h('span', { class: 'seeknote' },
-    h('span', { class: 'num' }, `frame ${fmt.time(r.frame_local)}`),
-    r.approximate ? badge('approximate · daily video', 'warn') : badge(r.kind === 'clip' ? '10-minute clip' : r.kind, 'amber'),
+    h('span', { class: 'num' }, `around ${fmt.time(r.ts)}`),
+    r.approximate ? badge('approximate · daily video', 'warn') : badge(r.target === 'clip' ? '10-minute clip' : 'daily video', 'amber'),
     h('span', { class: 'muted' }, 'Space plays'));
-  openPlayer({ url: r.url, title: what || r.name, offset: r.offset_s + 0.01, pause: true, note,
-    reveal: revealButton(r.kind === 'clip' ? 'clips' : 'daily', r.name) });
+  openPlayer({ url: r.video, title: what || (r.clip_id || r.day), offset: r.offset_s + 0.01, pause: true, note,
+    reveal: r.target === 'clip' ? revealButton('clips', clipFile(r.clip_id)) : revealButton('daily', dailyFile(r.day)) });
 }
 
 // ---------------------------------------------------------------- sighting detail panel
@@ -486,58 +544,61 @@ export async function openSighting(id, list = null) {
   detail.s = s;
   detail.list = list;
   const changed = (r) => { Object.assign(s, r); list?.onChange?.(r); };
-  const labelInput = h('input', { type: 'text', value: s.label_by === 'user' ? s.label : '', placeholder: s.label || 'label', list: 'label-options' });
+  const labelInput = h('input', { type: 'text', value: s.decided_by === 'user' ? s.label : '', placeholder: s.label || 'label', list: 'label-options' });
   const saveLabel = async (value) => {
     try {
       const r = await post(`/api/sightings/${s.id}/label`, { label: value });
       changed(r);
       toast(value ? `Label set to ${r.label}` : 'Correction removed');
       openSighting(s.id, list);
-    } catch (e) { toast(e.message, 'error'); }
+    } catch (e) {
+      toast(e.code === 'unknown_label' ? `"${value}" isn't in the collection; pick one from the list` : e.message, 'error');
+    }
   };
-  const origin = s.label_by === 'cloud'
-    ? `Gemini ${fmt.pct(s.confidence)} · SigLIP said ${s.siglip_label || '?'} ${fmt.pct(s.siglip_confidence)}`
-    : s.label_by === 'user'
-      ? `You · model said ${s.model_label || '?'}${s.source === 'cloud' ? ' (Gemini)' : ''}`
-      : `SigLIP ${fmt.pct(s.confidence)}${s.cloud?.state === 'pending' ? ' · Gemini pending' : ''}`;
+  const CLOUD_NOTE = { pending: ' · asking Gemini…', capped: ' · Gemini daily cap reached', failed: ' · Gemini failed' };
+  const origin = s.decided_by === 'cloud'
+    ? `Gemini ${fmt.pct(s.confidence)} · SigLIP said ${s.siglip.label || '?'} ${fmt.pct(s.siglip.confidence)}`
+    : s.decided_by === 'user'
+      ? `You · model said ${s.machine.label || '?'}${s.machine.source === 'cloud' ? ' (Gemini)' : ''}`
+      : `SigLIP ${fmt.pct(s.confidence)}${CLOUD_NOTE[s.cloud_status] || ''}`;
   const tiles = [
-    ['When', `${fmt.time(s.started_local)}${s.ended_local && s.ended_local !== s.started_local ? `–${fmt.time(s.ended_local)}` : ''}`, fmt.day(fmt.date(s.started_local))],
+    ['When', `${fmt.time(s.started_at)}${s.ended_at && fmt.time(s.ended_at) !== fmt.time(s.started_at) ? `–${fmt.time(s.ended_at)}` : ''}`, fmt.day(s.day)],
     ['Class', s.yolo_class || '–', s.stationary ? 'parked' : (s.direction ? `${fmt.dir(s.direction)} ${s.direction === 'LR' ? 'left to right' : 'right to left'}` : '')],
     ['Years', s.year_range || '–', s.color || ''],
-    ['Label by', fmt.labelBy(s.label_by), origin],
+    ['Label by', fmt.labelBy(s.decided_by), origin],
   ];
   const runners = (s.runner_ups || []).map((r) => h('li', {},
     h('span', { class: 'r-label' }, r.label), h('span', { class: 'r-bar' }, h('span', { style: { width: `${Math.max(2, r.p * 100)}%` } })),
     h('span', { class: 'r-p num' }, fmt.pct(r.p))));
-  const clip = s.clip_url ? h('video', { src: s.clip_url, loop: true, muted: true, autoplay: true, preload: 'auto' }) : null;
+  const clip = s.media.clip ? h('video', { src: s.media.clip, loop: true, muted: true, autoplay: true, preload: 'auto' }) : null;
   detail.el = h('aside', { class: 'detail' },
     h('header', { class: 'detail-head' },
       h('div', { class: 'grow' },
         h('div', { class: 'eyebrow' }, [s.make, s.yolo_class].filter(Boolean).join(' · ') || 'sighting'),
         h('h2', {}, s.label || '(unlabelled)')),
-      starButton(s.starred, (v) => post(`/api/sightings/${s.id}/star`, { value: v }).then(changed)),
+      starButton(s.starred, (v) => post(`/api/sightings/${s.id}/star`, { starred: v }).then(changed)),
       iconButton('x', 'Close (Esc)', closeDetail)),
     h('div', { class: 'detail-body' },
-      s.crop_url ? h('a', { href: s.crop_url, target: '_blank', class: 'crop-big' }, h('img', { src: s.crop_url, alt: 'crop' })) : null,
+      s.media.crop ? h('a', { href: s.media.crop, target: '_blank', class: 'crop-big' }, h('img', { src: s.media.crop, alt: 'crop' })) : null,
       h('div', { class: 'actions' },
-        h('button', { class: 'primary', onclick: () => viewInTimelapse(s.seek_ts, s.label) }, icon('play', 18), 'View in timelapse'),
+        h('button', { class: 'primary', onclick: () => viewInTimelapse(seekTs(s), s.label) }, icon('play', 18), 'View in timelapse'),
         h('button', {
           class: 'pill-btn',
           onclick: async () => {
-            try { const r = await post(`/api/sightings/${s.id}/hide`, { value: !s.hidden }); changed(r); toast(r.hidden ? 'Hidden from lists and counts' : 'Unhidden'); openSighting(s.id, list); } catch (e) { toast(e.message, 'error'); }
+            try { const r = await post(`/api/sightings/${s.id}/hide`, { hidden: !s.hidden }); changed(r); toast(r.hidden ? 'Hidden from lists and counts' : 'Unhidden'); openSighting(s.id, list); } catch (e) { toast(e.message, 'error'); }
           },
         }, icon(s.hidden ? 'eye' : 'eyeOff', 16), s.hidden ? 'Unhide' : 'Hide'),
-        revealButton('sightings', (s.crop_url || '').replace('/media/sightings/', '').split('/').map(decodeURIComponent).join('/'), true)),
+        s.media.crop ? revealButton('sightings', sightingRel(s.media.crop), true) : null),
       h('div', { class: 'mini-tiles' }, tiles.map(([k, v, sub]) => h('div', { class: 'mini' }, h('span', { class: 'cap' }, k), h('b', {}, v), sub ? h('span', { class: 'cap2' }, sub) : null))),
       [s.unsure && 'unsure', s.hidden && 'hidden'].filter(Boolean).length
         ? h('div', { class: 'flags' }, s.unsure ? badge('unsure', 'warn') : null, s.hidden ? badge('hidden', 'muted') : null) : null,
       h('form', { class: 'relabel', onsubmit: (e) => { e.preventDefault(); const v = labelInput.value.trim(); if (v) saveLabel(v); } },
         h('span', { class: 'head-ic' }, icon('tag', 16)), labelInput, h('button', { type: 'submit', class: 'pill-btn' }, 'Correct label'),
-        s.label_by === 'user' ? h('button', { type: 'button', class: 'pill-btn ghost', onclick: () => saveLabel(null) }, 'Undo') : null),
-      runners.length ? h('section', {}, h('h4', {}, s.label_by === 'cloud' ? "SigLIP's runner-ups" : 'Runner-up guesses'), h('ol', { class: 'runners' }, runners)) : null,
+        s.decided_by === 'user' ? h('button', { type: 'button', class: 'pill-btn ghost', onclick: () => saveLabel(null) }, 'Undo') : null),
+      runners.length ? h('section', {}, h('h4', {}, s.decided_by === 'cloud' ? "SigLIP's runner-ups" : 'Runner-up guesses'), h('ol', { class: 'runners' }, runners)) : null,
       h('section', {}, h('h4', {}, 'Clip'),
         clip ? player(clip, { compact: true }) : h('p', { class: 'muted' }, 'No clip (sighting clips are kept for a limited number of days).')),
-      s.frame_url ? h('section', {}, h('h4', {}, 'Full frame'), h('a', { href: s.frame_url, target: '_blank' }, h('img', { class: 'frame', src: s.frame_url, alt: 'full frame', loading: 'lazy' }))) : null));
+      s.media.frame ? h('section', {}, h('h4', {}, 'Full frame'), h('a', { href: s.media.frame, target: '_blank' }, h('img', { class: 'frame', src: s.media.frame, alt: 'full frame', loading: 'lazy' }))) : null));
   document.body.append(detail.el);
   ensureLabelOptions();
 }

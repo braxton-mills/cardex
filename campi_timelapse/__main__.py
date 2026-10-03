@@ -119,6 +119,30 @@ def cmd_ui(cfg, args) -> int:
     return rc
 
 
+def cmd_api(cfg, args) -> int:
+    """The HTTP API for the iPhone app and the desktop UI (venv-ui): run by the supervisor when [api] enabled,
+    or in a console with `campi api` for debugging. Never imported by the service."""
+    try:
+        from .ui import server
+    except ImportError as e:
+        if sys.stdout is not None:
+            print(f"the API needs its own env: run install.ps1 -UI ({e})")
+        return 1
+    return server.run_api(cfg, port=args.port)
+
+
+def cmd_ui_cli(cfg, args) -> int:
+    """campi pair / campi devices (venv-ui: ui.db and the QR code)."""
+    try:
+        from .ui import cli
+    except ImportError as e:
+        print(f"this command needs the UI env: run install.ps1 -UI ({e})")
+        return 1
+    if args.cmd == "pair":
+        return cli.pair(cfg)
+    return cli.devices(cfg, args.action, args.device_id)
+
+
 def cmd_samples(cfg) -> int:
     """Grab one live frame and save before/after rotation samples."""
     import urllib.request
@@ -182,8 +206,14 @@ def main(argv=None) -> int:
     gm.add_argument("mode", choices=["on", "off", "auto"])
     ui = sub.add_parser("ui", help="desktop app: sightings, clips, daily videos, highlights (venv-ui; install.ps1 -UI)")
     ui.add_argument("--browser", action="store_true", help="open in the default browser instead of a window")
-    ui.add_argument("--port", type=int, default=8765)
+    ui.add_argument("--port", type=int, help="serve here (default: the running API, else a free port)")
     ui.add_argument("--host", default="127.0.0.1", help="bind address (default: this PC only)")
+    api = sub.add_parser("api", help="HTTP API for the iPhone app and the desktop UI (venv-ui; [api] in config.toml)")
+    api.add_argument("--port", type=int, help="default: [api] port")
+    sub.add_parser("pair", help="pair a phone: prints a QR code and a one-time code (venv-ui)")
+    dv = sub.add_parser("devices", help="list paired devices; `devices revoke ID` unpairs one (venv-ui)")
+    dv.add_argument("action", nargs="?", choices=["revoke"])
+    dv.add_argument("device_id", nargs="?")
     args = ap.parse_args(argv)
 
     cfg = load_config(args.config)
@@ -197,6 +227,10 @@ def main(argv=None) -> int:
         return cmd_game(cfg, args.mode)
     if args.cmd == "ui":
         return cmd_ui(cfg, args)
+    if args.cmd == "api":
+        return cmd_api(cfg, args)
+    if args.cmd in ("pair", "devices"):
+        return cmd_ui_cli(cfg, args)
 
     log_name = {"run": "supervisor", "render-clip": "render", "render-daily": "daily",
                 "sightings-worker": "sightings"}.get(args.cmd, args.cmd)

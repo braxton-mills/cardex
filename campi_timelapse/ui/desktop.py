@@ -1,48 +1,37 @@
-"""`campi ui` launcher: the API server on a background thread of this process and a WebView2 window (pywebview) on the
-main thread. Closing the window stops the server and exits the process; there are no child processes to orphan
-(WebView2's msedgewebview2 helpers exit with their host). --browser serves in the foreground for a normal browser."""
+"""`campi ui` launcher: a WebView2 window (pywebview) onto the Campi API.
+
+The desktop is a paired device like any phone (device `desktop`). Each launch gives it a fresh token (only its hash
+is stored), handed to the page in the URL fragment, which never reaches the server or the logs.
+
+- If the API runs under the service ([api] enabled = true, or `campi api`), the window opens onto it.
+- Otherwise this process serves the API itself on a free loopback port, on a background thread, without push
+  notifications; closing the window stops it. --browser serves in the foreground for a normal browser.
+
+"Show in folder" goes through the window (js_api), so Explorer opens in this desktop session even when the API runs
+in session 0 under the service.
+"""
 from __future__ import annotations
 
 import ctypes
+import json
 import logging
-import logging.handlers
 import os
-import sys
+import socket
+import subprocess
 import threading
 import time
+import urllib.error
+import urllib.request
 import webbrowser
 from pathlib import Path
 
-import uvicorn  # venv-ui only: an ImportError here means `install.ps1 -UI` hasn't been run
-
-from ..config import FileLock, read_json, write_json
-from .store import ui_home
+from ..config import NO_WINDOW, FileLock, read_json, write_json
+from . import auth
+from .server import make_server, setup_logging
+from .store import Store, ui_home
 
 log = logging.getLogger("ui")
 TITLE = "Campi"
-
-
-def setup_logging(home) -> None:
-    """ui\\ui.log (the service's logs\\ folder is never touched); the console too when there is one (not pythonw)."""
-    root = logging.getLogger()
-    root.setLevel(logging.INFO)
-    fmt = logging.Formatter("%(asctime)s %(levelname)-7s [%(name)s] %(message)s")
-    fh = logging.handlers.RotatingFileHandler(home / "ui.log", maxBytes=2_000_000, backupCount=2, encoding="utf-8")
-    fh.setFormatter(fmt)
-    root.addHandler(fh)
-    if sys.stderr is not None:
-        sh = logging.StreamHandler()
-        sh.setFormatter(fmt)
-        root.addHandler(sh)
-    logging.getLogger("uvicorn.access").setLevel(logging.WARNING)
-    logging.getLogger("asyncio").addFilter(_ignore_proactor_reset)
-
-
-def _ignore_proactor_reset(record: logging.LogRecord) -> bool:
-    """Windows' Proactor loop logs a traceback whenever a client resets a finished connection (python/cpython#83191);
-    harmless, and players do it all the time."""
-    exc = record.exc_info[1] if record.exc_info else None
-    return not (isinstance(exc, ConnectionResetError) and "_call_connection_lost" in record.getMessage())
 
 
 def focus_existing() -> bool:
@@ -75,70 +64,128 @@ def set_window_icon() -> None:
 
 def say(msg: str) -> None:
     log.info(msg)
-    if sys.stdout is not None and sys.stderr is None:
-        print(msg)
 
 
-def run(cfg, browser: bool = False, port: int = 8765, host: str = "127.0.0.1") -> int:
+def desktop_token(store: Store) -> str:
+    """A fresh token for the `desktop` device (created on first use); the previous one stops working."""
+    did = store.get("desktop_device_id")
+    dev = store.device(did) if did else None
+    if dev is None or dev["revoked_at"]:
+        token, dev = auth.create_device(store, "desktop", "desktop")
+        store.put("desktop_device_id", dev["id"])  # desktop-only endpoints answer this device alone
+        log.info("created the desktop device %s", dev["id"])
+        return token
+    token = auth.new_token()
+    store.set_token(dev["id"], auth.token_hash(token))
+    return token
+
+
+def running_api(port: int) -> str | None:
+    """Base URL of a Campi API already listening on 127.0.0.1:port (it answers 401 without a token)."""
+    url = f"http://127.0.0.1:{port}"
+    try:
+        urllib.request.urlopen(f"{url}/api/status", timeout=1.5)
+    except urllib.error.HTTPError as e:
+        try:
+            if e.code == 401 and json.loads(e.read()).get("error", {}).get("code") == "unauthorized":
+                return url
+        except ValueError:
+            pass
+    except (OSError, ValueError):
+        pass
+    return None
+
+
+class Shell:
+    """pywebview js_api: things the page asks the window process to do in this desktop session."""
+
+    def __init__(self, cfg):
+        self._cfg = cfg
+
+    def reveal(self, root: str, path: str) -> dict:
+        from .media import resolve
+        p = resolve(self._cfg, str(root), str(path), current_part=-1)  # the current archive part may be shown
+        if p is None:
+            return {"error": "That file no longer exists."}
+        subprocess.Popen(["explorer.exe", f"/select,{p}"], creationflags=NO_WINDOW)
+        return {"shown": str(p)}
+
+
+def run(cfg, browser: bool = False, port: int | None = None, host: str = "127.0.0.1") -> int:
     t0 = time.monotonic()
     home = ui_home(cfg)
     home.mkdir(parents=True, exist_ok=True)
-    setup_logging(home)
+    setup_logging(home, "ui")
 
     lock = FileLock(home / "ui.lock")
     if not lock.acquire():
         inst = read_json(home / "instance.json", {}) or {}
-        url = inst.get("url")
-        if browser and url:
-            webbrowser.open(url)
-            say(f"campi ui is already running ({url}); opened it in the browser")
-        elif focus_existing():
+        if focus_existing():
             say("campi ui is already running; brought its window to the front")
         else:
-            say(f"campi ui is already running ({url or 'pid ' + str(inst.get('pid'))})")
+            say(f"campi ui is already running ({inst.get('url') or 'pid ' + str(inst.get('pid'))})")
         return 0
 
-    from .app import create_app
-
-    url = f"http://{'127.0.0.1' if host in ('0.0.0.0', '::') else host}:{port}/"
-    app = create_app(cfg, host)
-    # log_config=None: uvicorn's default console formatter calls sys.stdout.isatty(), which crashes under pythonw.
-    server = uvicorn.Server(uvicorn.Config(app, host=host, port=port, log_config=None, access_log=False,
-                                           use_colors=False, timeout_graceful_shutdown=2, lifespan="off"))
-    write_json(home / "instance.json", {"pid": os.getpid(), "url": url, "mode": "browser" if browser else "window"})
-    log.info("campi ui starting (pid %d, %s, %s, sightings %s)", os.getpid(), url,
-             "browser" if browser else "window", "on" if cfg.sightings.enabled else "off")
     try:
+        store = Store(home / "ui.db")
+        token = desktop_token(store)
+        base = running_api(int(cfg.api.port)) if port is None else None
+        server = th = None
+        if base:
+            log.info("attaching to the API on %s", base)
+        else:
+            from .app import create_app
+            sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+            sock.bind((host, port or 0))
+            port = sock.getsockname()[1]
+            base = f"http://{'127.0.0.1' if host in ('0.0.0.0', '::') else host}:{port}"
+            server = make_server(create_app(cfg), host, port)
+            th = threading.Thread(target=server.run, kwargs={"sockets": [sock]}, name="uvicorn", daemon=True)
+        url = f"{base}/"
+        write_json(home / "instance.json", {"pid": os.getpid(), "url": url, "mode": "browser" if browser else "window",
+                                            "server": "own" if server else "attached"})
+        log.info("campi ui starting (pid %d, %s, %s, %s server, sightings %s)", os.getpid(), url,
+                 "browser" if browser else "window", "own" if server else "the service's",
+                 "on" if cfg.sightings.enabled else "off")
+        if th:
+            th.start()
+            while not server.started:
+                if not th.is_alive():
+                    log.error("server did not start (port in use? try campi ui --port N)")
+                    return 1
+                time.sleep(0.02)
+            log.info("server ready in %.1fs", time.monotonic() - t0)
+        page = f"{url}#token={token}"
         if browser:
-            def open_when_ready():
-                while not server.started:
-                    time.sleep(0.05)
-                log.info("server ready in %.1fs; opening %s", time.monotonic() - t0, url)
-                webbrowser.open(url)
-            threading.Thread(target=open_when_ready, daemon=True).start()
-            server.run()  # foreground; Ctrl+C stops it
+            webbrowser.open(page)
+            if th:
+                say(f"serving {url} for the browser; Ctrl+C stops")
+                try:
+                    while th.is_alive():
+                        th.join(0.5)
+                except KeyboardInterrupt:
+                    server.should_exit = True
+                    th.join(5)
             return 0
-        return run_window(server, url, t0, home)
+        rc = run_window(cfg, page, t0, home)
+        if server:
+            log.info("window closed; stopping server")
+            server.should_exit = True
+            th.join(timeout=5)
+            if th.is_alive():
+                log.warning("server thread still running after 5 s; exiting anyway")
+        return rc
     finally:
         (home / "instance.json").unlink(missing_ok=True)
         lock.release()
         log.info("campi ui exited")
 
 
-def run_window(server, url: str, t0: float, home) -> int:
+def run_window(cfg, page: str, t0: float, home) -> int:
     import webview
 
-    th = threading.Thread(target=server.run, name="uvicorn", daemon=True)
-    th.start()
-    while not server.started:
-        if not th.is_alive():
-            log.error("server did not start (port in use? try campi ui --port N)")
-            return 1
-        time.sleep(0.02)
-    log.info("server ready in %.1fs", time.monotonic() - t0)
-
-    window = webview.create_window(TITLE, url, width=1440, height=920, min_size=(960, 600),
-                                   background_color="#0e1116", text_select=True)
+    window = webview.create_window(TITLE, page, width=1440, height=920, min_size=(960, 600),
+                                   background_color="#0e1116", text_select=True, js_api=Shell(cfg))
     shown = {"done": False}
 
     def loaded():
@@ -162,11 +209,6 @@ def run_window(server, url: str, t0: float, home) -> int:
     window.events.restored += lambda: set_hidden(False)
     # WebView2 profile (cache, remembered filters) under ui\webview, not in a temp folder
     webview.start(gui="edgechromium", private_mode=False, storage_path=str(home / "webview"))
-    log.info("window closed; stopping server")
-    server.should_exit = True
-    th.join(timeout=5)
-    if th.is_alive():
-        log.warning("server thread still running after 5 s; exiting anyway")
     return 0
 
 

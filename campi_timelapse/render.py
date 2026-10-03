@@ -15,6 +15,7 @@ import cv2
 import numpy as np
 
 from . import frames as fr
+from . import render_index
 from .config import NO_WINDOW, FileLock, read_json, side_log, write_json
 from .imageproc import apply_gain, crop_dims, deflicker_gains, level
 from .rife import GpuMonitor, Rife, gpu_sample, summarize
@@ -130,6 +131,7 @@ def render_frames(cfg, frames: list[fr.Frame], out_path: Path, job_name: str, en
     proc = subprocess.Popen(ffmpeg_cmd(cfg, encoder, w, h, fps, part), stdin=subprocess.PIPE,
                             stdout=subprocess.DEVNULL, stderr=ff_log, creationflags=NO_WINDOW)
     written = interpolated = 0
+    encoded_ts: list[float] = []  # source frames actually encoded, in order (the render index)
     try:
         for si, seg in enumerate(segs):
             gains = (deflicker_gains([f.luma for f in seg], cfg.deflicker.window, cfg.deflicker.min_gain,
@@ -155,6 +157,7 @@ def render_frames(cfg, frames: list[fr.Frame], out_path: Path, job_name: str, en
             n = len(kept)
             if n == 0:
                 continue
+            encoded_ts += [f.ts for f in kept]
             if rife and n >= 2:
                 outs = rife.interpolate(ind, sdir / "out", n * factor)
                 items = [(p, kept[min(k // factor, n - 1)].ts) for k, p in enumerate(outs)]
@@ -205,6 +208,7 @@ def render_frames(cfg, frames: list[fr.Frame], out_path: Path, job_name: str, en
         "duration_s": round(float(info.get("format", {}).get("duration", 0)), 2),
         "size": f"{v['width']}x{v['height']}", "encoder": v.get("codec_name") + f" ({encoder})",
         "elapsed_s": round(time.monotonic() - t0, 1), "gpu": gpu,
+        "frame_ts": encoded_ts,
     }
     if gpu:
         side_log(cfg, "gpu").info("%s RIFE %s peak_util=%s%% mean_util=%s%% (baseline %s%%) mem_delta=%sMiB "
@@ -254,6 +258,7 @@ def render_clip(cfg, end_ts: float | None = None, minutes: float | None = None) 
         else:
             log.info("rendering %s from %d frames (%d captured)", out.name, len(frames), len(all_frames))
             res = render_with_fallback(cfg, frames, out, f"clip_{start:%Y%m%d_%H%M}_{os.getpid()}")
+            render_index.write(cfg, out, start_ts, end_ts, res.pop("frame_ts"))
             latest_state = cfg.paths.state / "latest.json"
             if start_ts >= (read_json(latest_state, {}) or {}).get("window_start_ts", 0):  # never go back in time
                 tmp = cfg.paths.out / "latest.tmp.mp4"
@@ -293,6 +298,9 @@ def render_daily(cfg, day: date | None = None) -> dict:
             sel = fr.sample_evenly(frames, target)
             log.info("rendering daily %s: %d of %d usable frames", day, len(sel), len(frames))
             res = render_with_fallback(cfg, sel, out, f"daily_{day.isoformat()}_{os.getpid()}")
+            day_start = datetime.combine(day, datetime.min.time()).timestamp()
+            day_end = datetime.combine(day + timedelta(days=1), datetime.min.time()).timestamp()
+            render_index.write(cfg, out, day_start, day_end, res.pop("frame_ts"))
             res.update(status="ok", day=day.isoformat())
             log.info("daily done: %s", json.dumps(res))
         res["finished"] = time.time()

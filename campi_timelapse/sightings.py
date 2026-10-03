@@ -33,9 +33,10 @@ import numpy as np
 
 from . import sightings_db as db
 from .capture import StreamError, iter_jpegs, validate
-from .config import NO_WINDOW, PROJECT, side_log, write_json
+from .config import NO_WINDOW, side_log, write_json
 from .discover import current_host, with_host
 from .imageproc import ROTATE
+from .labels import Labels, labels_path
 
 log = logging.getLogger("sightings")
 for _noisy in ("httpx", "httpcore", "huggingface_hub", "urllib3", "filelock"):  # model-download chatter
@@ -53,29 +54,6 @@ STREAM_ERRORS = (OSError, StreamError, http.client.HTTPException, StopIteration)
 
 
 # ---------------------------------------------------------------- labels and models
-
-class Labels:
-    """sightings_labels.txt: 'Make | Model' or a plain generic vehicle type per line; '#' comments."""
-
-    def __init__(self, path: Path):
-        self.path = path
-        self.names, self.make, self.model = [], [], []
-        for line in path.read_text(encoding="utf-8").splitlines():
-            line = line.split("#", 1)[0].strip()
-            if not line:
-                continue
-            if "|" in line:
-                mk, md = (s.strip() for s in line.split("|", 1))
-                self.names.append(md if md.startswith(mk) else f"{mk} {md}")  # car_id's rule: "Mazda3", "Ram 1500"
-                self.make.append(mk)
-                self.model.append(md)
-            else:
-                self.names.append(line)
-                self.make.append(None)
-                self.model.append(None)
-        if not self.names:
-            raise ValueError(f"no labels in {path}")
-
 
 class MakeModelClassifier:
     """Zero-shot make/model scoring with SigLIP 2 (same as car_id.py)."""
@@ -142,8 +120,7 @@ class Models:
         torch.set_num_threads(CPU_THREADS)
         cv2.setNumThreads(CPU_THREADS)
         s = cfg.sightings
-        lp = Path(s.labels_file)
-        self.labels = Labels(lp if lp.is_absolute() else PROJECT / lp)
+        self.labels = Labels(labels_path(cfg))
 
         # ultralytics' ByteTrack keeps a lost track for track_buffer *frames*; size it to lost_after_s at our
         # detect rate, so an ID we already reported isn't revived as the same vehicle.
@@ -740,8 +717,7 @@ def open_stream(cfg):
 
 
 def load_labels(cfg) -> Labels:
-    lp = Path(cfg.sightings.labels_file)
-    return Labels(lp if lp.is_absolute() else PROJECT / lp)
+    return Labels(labels_path(cfg))
 
 
 def clean_partial_media(root: Path):

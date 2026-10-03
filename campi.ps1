@@ -17,6 +17,7 @@
     campi sightings-bench [--parity]     detection FPS fp16/int8 + SigLIP ms/crop on the Intel GPU
     campi rife-bench      render one recent window with RIFE on the NVIDIA and the Intel GPU (work folder only)
     campi game on|off|auto   gaming mode override (renders wait while a game runs)
+    campi ui [--browser] [--port N]   desktop app: sightings, clips, daily videos, highlights (install.ps1 -UI)
 #>
 param([Parameter(Position = 0)][string]$Command = 'status',
       [Parameter(Position = 1, ValueFromRemainingArguments = $true)][string[]]$Rest)
@@ -25,6 +26,7 @@ $Project = $PSScriptRoot
 $Py = Join-Path $Project '.venv-service\Scripts\python.exe'
 $PyW = Join-Path $Project '.venv-service\Scripts\pythonw.exe'
 $PySightings = Join-Path $env:USERPROFILE 'CampiTimelapse\venv-sightings\Scripts\python.exe'
+$UiScripts = Join-Path $env:USERPROFILE 'CampiTimelapse\venv-ui\Scripts'
 $TaskName = 'CampiTimelapse'
 Set-Location $Project
 
@@ -98,6 +100,14 @@ switch ($Command) {
     'sightings' { & $Py -m campi_timelapse sightings @Rest }
     'rife-bench' { & $Py -m campi_timelapse rife-bench }
     'game' { & $Py -m campi_timelapse game @Rest }
+    'ui' {
+        # The window runs windowless (pythonw) and the console returns right away; --browser stays here (Ctrl+C stops)
+        $browser = $Rest -contains '--browser'
+        $exe = Join-Path $UiScripts $(if ($browser) { 'python.exe' } else { 'pythonw.exe' })
+        if (-not (Test-Path $exe)) { Write-Host 'UI env not installed: run install.ps1 -UI'; exit 1 }
+        if ($browser) { & $exe -m campi_timelapse ui @Rest }
+        else { Start-Process $exe -ArgumentList (@('-m', 'campi_timelapse', 'ui') + @($Rest | Where-Object { $_ })) -WorkingDirectory $Project }
+    }
     { $_ -in 'sightings-record', 'sightings-test', 'sightings-bench' } {
         if (-not (Test-Path $PySightings)) { Write-Host 'sightings env not installed: run install.ps1 -Sightings'; exit 1 }
         & $PySightings -m campi_timelapse $Command @Rest

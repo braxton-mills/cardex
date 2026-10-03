@@ -1,0 +1,27 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Campi</title>
+  <link rel="icon" href="/static/campi.ico">
+  <link rel="stylesheet" href="/static/app.css">
+</head>
+<body>
+  <nav class="nav">
+    <div class="brand"><span class="dot"></span>Campi</div>
+    <a href="#/today" data-view="today">Today</a>
+    <a href="#/highlights" data-view="highlights">Highlights</a>
+    <a href="#/sightings" data-view="sightings">Sightings</a>
+    <a href="#/collection" data-view="collection">Collection</a>
+    <a href="#/timelapse" data-view="timelapse">Timelapse</a>
+    <a href="#/live" data-view="live">Live</a>
+    <div class="grow"></div>
+    <div class="keys"><kbd>J</kbd><kbd>K</kbd> next / prev<br><kbd>Space</kbd> play / pause<br><kbd>S</kbd> star · <kbd>Esc</kbd> close</div>
+  </nav>
+  <main id="main"></main>
+  <datalist id="label-options"></datalist>
+  <div id="toast" class="toast" role="status"></div>
+  <script type="module" src="/static/app.js"></script>
+</body>
+</html>

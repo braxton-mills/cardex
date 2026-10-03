@@ -8,8 +8,10 @@
    - with -Sightings: the optional vehicle sightings worker's own venv
      (%USERPROFILE%\CampiTimelapse\venv-sightings: CUDA torch, ultralytics, open_clip, transformers) and its
      model weights (several GB). Then set [sightings] enabled = true in config.toml and run `campi restart`.
+   - with -UI: the desktop app's own venv (%USERPROFILE%\CampiTimelapse\venv-ui: fastapi, uvicorn, pywebview),
+     a WebView2 runtime check, and a Start Menu shortcut "Campi" that runs `campi ui` without a console window.
 #>
-param([switch]$Sightings)
+param([switch]$Sightings, [switch]$UI)
 $ErrorActionPreference = 'Stop'
 $Project = $PSScriptRoot
 Set-Location $Project
@@ -45,6 +47,32 @@ if ($Sightings) {
     # label text embeddings) and a device report
     & $spy -m campi_timelapse sightings-worker --check
     if ($LASTEXITCODE -ne 0) { throw 'sightings check failed (see above)' }
+}
+
+if ($UI) {
+    # Separate env so the timelapse env never changes; only `campi ui` uses it
+    $uv = Join-Path $env:USERPROFILE 'CampiTimelapse\venv-ui'
+    $upy = Join-Path $uv 'Scripts\python.exe'
+    if (-not (Test-Path $upy)) { uv venv $uv --python 3.12 }
+    uv pip install --python $upy fastapi uvicorn pywebview
+    # The window is Edge WebView2 (preinstalled on Windows 11); `campi ui --browser` works without it
+    $wv = 'Microsoft\EdgeUpdate\Clients\{F3017226-FE2A-4295-8BDF-00C3A9A7E4C5}'
+    $ver = foreach ($k in "HKLM:\SOFTWARE\WOW6432Node\$wv", "HKLM:\SOFTWARE\$wv", "HKCU:\Software\$wv") {
+        $v = (Get-ItemProperty $k -ErrorAction SilentlyContinue).pv
+        if ($v -and $v -ne '0.0.0.0') { $v }
+    }
+    if ($ver) { Write-Host "WebView2 runtime $(@($ver)[0])" }
+    else { Write-Warning 'WebView2 runtime not found: winget install Microsoft.EdgeWebView2Runtime (or use campi ui --browser)' }
+    # Start Menu shortcut: pythonw, so no console window
+    $lnk = Join-Path ([Environment]::GetFolderPath('Programs')) 'Campi.lnk'
+    $sc = (New-Object -ComObject WScript.Shell).CreateShortcut($lnk)
+    $sc.TargetPath = Join-Path $uv 'Scripts\pythonw.exe'
+    $sc.Arguments = '-m campi_timelapse ui'
+    $sc.WorkingDirectory = $Project
+    $sc.IconLocation = Join-Path $Project 'campi_timelapse\ui\static\campi.ico'
+    $sc.Description = 'Campi: sightings, timelapse clips, daily videos and highlights'
+    $sc.Save()
+    Write-Host "Start Menu shortcut: $lnk"
 }
 
 # The task runs whether or not you are logged on, which needs admin rights to register.

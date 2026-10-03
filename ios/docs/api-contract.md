@@ -560,7 +560,9 @@ are never listed.
 - **Path safety.** The resolved file must be inside its root, after resolving `..`, symlinks and junctions;
   anything else → 404.
 - **Methods.** `GET` and `HEAD`. A single byte range (`Range: bytes=a-b`, `a-`, `-n`) → 206 with
-  `Content-Range`. Multi-range requests may be answered with 200 and the full body. An unsatisfiable range →
+  `Content-Range`, covering **exactly** the requested range (an end past the file is clamped to the last byte).
+  Never shorten it, e.g. to a fixed chunk size: stream long ranges in pieces within one response. *(note: AVPlayer
+  asks for large and open-ended ranges and fails on a shorter 206, CoreMedia −12939 "content range mismatch".)* Multi-range requests may be answered with 200 and the full body. An unsatisfiable range →
   416 `invalid_range`.
 - **Headers.** Always `Accept-Ranges: bytes`, `Content-Length`, `Content-Type` (`video/mp4`, `image/jpeg`),
   `ETag: "<size>-<mtime_ns>"`, `Last-Modified`. Honour `If-None-Match` (304) and `If-Range`.
@@ -659,6 +661,9 @@ Service alerts (`campi.alert`):
 ## 10. Changelog
 - **v1** (2026-10-03): initial contract.
 - **v1** (2026-10-03): clarified that `LiveStatus.rotation` is clockwise (as `imageproc.ROTATE`). No wire change.
+- **v1** (2026-10-03): §7.1: a 206 covers exactly the requested range and is never cut to a chunk size (found in
+  integration: the PC capped every 206 at 4 MiB, so no video played on the phone). No wire change for a
+  conforming server; `contract_check.py` now tests large and open-ended ranges.
 
 ---
 

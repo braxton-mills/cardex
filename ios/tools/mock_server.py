@@ -779,6 +779,7 @@ class Handler(BaseHTTPRequestHandler):
     latency = 0.0
     quiet = False
     bundle_id = "com.braxtonmills.campi"
+    range_cap = 0
 
     def log_message(self, fmt, *args):
         if not self.quiet:
@@ -1156,6 +1157,8 @@ class Handler(BaseHTTPRequestHandler):
                     return
                 if m:
                     status = 206
+                    if self.range_cap:   # --range-cap: reproduce a server that cuts 206s short (not allowed, §7.1)
+                        end = min(end, start + self.range_cap - 1)
         length = end - start + 1
         self.send_response(status)
         self.send_header("Content-Type", ctype)
@@ -1360,6 +1363,8 @@ def main(argv=None):
                     help="live stream state: busy = 503 live_busy, unreachable = 502 pi_unreachable, "
                          "unavailable = status.live.available false and no recent frame")
     ap.add_argument("--rotation", type=int, choices=[0, 90, 180, 270], default=0, help="status.live.rotation")
+    ap.add_argument("--range-cap", type=int, default=0, metavar="BYTES",
+                    help="non-compliant: cut every 206 to BYTES (reproduces a PC bug; AVPlayer then fails)")
     ap.add_argument("--quiet", action="store_true")
     ap.add_argument("--write-fixtures", action="store_true")
     ap.add_argument("--print-push", choices=["new_catch", "rare", "discovered", "service"])
@@ -1379,7 +1384,7 @@ def main(argv=None):
         return
     store.live_state, store.rotation = a.live, a.rotation
     Handler.store, Handler.views = store, Views(store)
-    Handler.latency, Handler.quiet, Handler.bundle_id = a.latency, a.quiet, a.bundle_id
+    Handler.latency, Handler.quiet, Handler.bundle_id, Handler.range_cap = a.latency, a.quiet, a.bundle_id, a.range_cap
     srv = ThreadingHTTPServer((a.host, a.port), Handler)
     srv.daemon_threads = True
     base = a.public_url or f"http://{'127.0.0.1' if a.host == '0.0.0.0' else a.host}:{a.port}"

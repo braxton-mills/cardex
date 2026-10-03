@@ -439,6 +439,21 @@ class Checker:
                 str(h2.get("Content-Range")))
         st, _, body = self.req("GET", url, auth=False, headers={"Range": "bytes=-10"})
         self.ok(st == 206 and len(body) == 10, f"{what} suffix range", f"{st}, {len(body)}")
+        # Large ranges come back whole, never cut short (AVPlayer rejects a shorter 206: CoreMedia -12939).
+        big = 8 << 20
+        if length > 1 << 20:
+            a = length // 3
+            b = min(a + big - 1, length - 1)
+            st, h3, body = self.req("GET", url, auth=False, headers={"Range": f"bytes={a}-{b}"})
+            self.ok(st == 206 and h3.get("Content-Range") == f"bytes {a}-{b}/{length}" and len(body) == b - a + 1,
+                    f"{what} large range bytes={a}-{b} answered in full",
+                    f"{st}, {h3.get('Content-Range')}, {len(body)} bytes")
+            a = max(0, length - (6 << 20))
+            st, h4, body = self.req("GET", url, auth=False, headers={"Range": f"bytes={a}-"})
+            self.ok(st == 206 and h4.get("Content-Range") == f"bytes {a}-{length - 1}/{length}"
+                    and len(body) == length - a,
+                    f"{what} open-ended range bytes={a}- runs to the end of the file",
+                    f"{st}, {h4.get('Content-Range')}, {len(body)} bytes")
         st, _, _ = self.req("GET", url, auth=False, headers={"Range": f"bytes={length + 10}-"})
         self.ok(st == 416, f"{what} unsatisfiable range -> 416", f"got {st}")
         st, _, _ = self.req("GET", url, auth=False, headers={"If-None-Match": h.get("ETag") or ""})

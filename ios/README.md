@@ -87,6 +87,9 @@ Testing notes:
 - Accessibility: `testAccessibilityAudit` runs Xcode's audit on every screen (contrast, hit areas, labels);
   `testLargestTextSize` screenshots every screen at the largest accessibility text size for review.
   `testNoSightingsDatabase` needs a second mock: `python3 tools/mock_server.py --port 8766 --no-sightings-db`.
+- `testUnplayableVideoExplainsItself` needs a mock that cuts byte ranges short, like the PC bug found in integration:
+  `python3 tools/mock_server.py --port 8767 --range-cap 4194304`. The player must explain, not just show AVKit's
+  crossed-out play button. Player events are logged under subsystem `com.braxtonmills.campi`, category `player`.
 - Cardex text is generated in the simulator only when this Mac has Apple Intelligence turned on; otherwise the
   test sees the fallback card. `-cardexFallback` forces the fallback (and an in-memory cache).
 - Keep `-collect-test-diagnostics never`: without it, a failing UI test makes xcodebuild run

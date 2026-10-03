@@ -421,6 +421,40 @@ final class SmokeTests: XCTestCase {
         }
     }
 
+    /// A server that cuts 206s short (the PC bug found in integration) must give a clear error, not AVKit's bare
+    /// crossed-out play button. Needs: python3 tools/mock_server.py --port 8767 --range-cap 4194304
+    @MainActor
+    func testUnplayableVideoExplainsItself() async throws {
+        let other = "http://127.0.0.1:8767"
+        var req = URLRequest(url: URL(string: other + "/mock/pair-code")!, timeoutInterval: 2)
+        req.httpMethod = "POST"
+        guard let (data, _) = try? await URLSession.shared.data(for: req),
+              let code = (try? JSONSerialization.jsonObject(with: data) as? [String: String])?["code"] else {
+            throw XCTSkip("no mock with --range-cap on \(other)")
+        }
+        let app = XCUIApplication()
+        app.launchArguments = ["-resetPairing"]
+        app.launch()
+        for _ in 0..<6 where !(app.buttons["pair.submit"].exists && app.buttons["pair.submit"].isHittable) { app.swipeUp() }
+        app.textFields["pair.server"].tap()
+        app.textFields["pair.server"].typeText(other)
+        app.textFields["pair.code"].tap()
+        app.textFields["pair.code"].typeText(code)
+        app.buttons["pair.submit"].tap()
+        XCTAssertTrue(app.buttons["today.status"].waitForExistence(timeout: 15))
+        allowNotificationsIfAsked()
+        app.tabBars.buttons["Timelapse"].tap()
+        app.buttons["Daily"].tap()
+        let daily = app.buttons.matching(identifier: "timelapse.daily").firstMatch
+        XCTAssertTrue(daily.waitForExistence(timeout: 10))
+        daily.tap()
+        XCTAssertTrue(app.staticTexts["Can't play this video"].waitForExistence(timeout: 30),
+                      "no explanation when AVPlayer fails")
+        XCTAssertTrue(app.staticTexts.containing(NSPredicate(format: "label CONTAINS 'byte range'")).firstMatch.exists,
+                      "the explanation doesn't name the range problem")
+        attach(app, "60-unplayable-video")
+    }
+
     // MARK: Widget (M5)
 
     static func mockOffline(seconds: Double) async throws {

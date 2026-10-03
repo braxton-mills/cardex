@@ -6,6 +6,7 @@ import Observation
 final class TodayModel {
     private(set) var status: Status?
     private(set) var latest: [Sighting] = []
+    private(set) var highlights: [Highlight] = []
     private(set) var error: APIError?
     private(set) var lastRefresh: Date?
     private(set) var isLoading = false
@@ -19,9 +20,12 @@ final class TodayModel {
             let status = try await client.status()
             var query = SightingQuery(from: status.today, to: status.today, limit: 12)
             query.hideUnsure = false
-            let latest = status.sightings.hasHistory ? try await client.sightings(query).items : []
+            async let latest = status.sightings.hasHistory ? client.sightings(query).items : []
+            async let highlights = client.highlights(HighlightQuery(from: status.today, to: status.today, limit: 10)).items
+            let (l, h) = try await (latest, highlights)
             self.status = status
-            self.latest = latest
+            self.latest = l
+            self.highlights = h
             error = nil
             lastRefresh = .now
         } catch {

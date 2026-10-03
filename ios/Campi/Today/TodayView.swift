@@ -7,6 +7,7 @@ struct TodayView: View {
     @State private var model = TodayModel()
     @State private var showStatus = false
     @State private var showSettings = false
+    @State private var video: VideoTarget?
 
     var body: some View {
         NavigationStack {
@@ -23,7 +24,10 @@ struct TodayView: View {
                         .buttonStyle(.plain)
                         .accessibilityIdentifier("today.status")
                         CountsRow(status: status)
-                        LatestSightings(status: status, sightings: model.latest)
+                        LatestSightings(status: status, sightings: model.latest.map(app.sightings.resolve))
+                        if !model.highlights.isEmpty {
+                            TodayHighlights(highlights: model.highlights, play: play)
+                        }
                     } else {
                         ProgressView().frame(maxWidth: .infinity, minHeight: 200)
                     }
@@ -41,11 +45,20 @@ struct TodayView: View {
                 if let status = model.status { StatusDetailView(status: status) }
             }
             .sheet(isPresented: $showSettings) { SettingsView(status: model.status) }
+            .sightingDestinations()
+            .videoPlayer($video)
         }
         // Poll only while visible and in the foreground.
         .task(id: scenePhase) {
             guard scenePhase == .active, let client = app.client else { return }
             await model.keepFresh(client: client, app: app)
+        }
+    }
+
+    private func play(_ h: Highlight) {
+        Task {
+            guard let client = app.client else { return }
+            if let target = try? await HighlightPlayback.target(for: h, client: client) { video = target }
         }
     }
 
@@ -130,7 +143,11 @@ struct LatestSightings: View {
             } else {
                 ScrollView(.horizontal, showsIndicators: false) {
                     LazyHStack(spacing: 12) {
-                        ForEach(sightings) { SightingCard(sighting: $0) }
+                        ForEach(sightings) { s in
+                            NavigationLink(value: s) { SightingCard(sighting: s) }
+                                .buttonStyle(.plain)
+                                .accessibilityIdentifier("today.sighting")
+                        }
                     }
                 }
                 .scrollClipDisabled()
@@ -186,5 +203,24 @@ struct UnreachableView: View {
             Button("Try Again", action: retry).buttonStyle(.borderedProminent)
         }
         .frame(minHeight: 400)
+    }
+}
+
+struct TodayHighlights: View {
+    let highlights: [Highlight]
+    let play: (Highlight) -> Void
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 4) {
+            Text("Today's highlights").font(.title3.bold())
+            VStack(spacing: 0) {
+                ForEach(highlights) { h in
+                    HighlightRow(highlight: h, play: play)
+                        .buttonStyle(.plain)
+                        .padding(.vertical, 6)
+                    if h.id != highlights.last?.id { Divider() }
+                }
+            }
+        }
     }
 }

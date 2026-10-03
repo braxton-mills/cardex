@@ -30,13 +30,13 @@ struct MainTabs: View {
                 TodayView()
             }
             SwiftUI.Tab("Highlights", systemImage: "sparkles", value: .highlights) {
-                ComingSoonView(title: "Highlights", systemImage: "sparkles", milestone: "M2")
+                HighlightsView()
             }
             SwiftUI.Tab("Sightings", systemImage: "car.side", value: .sightings) {
-                ComingSoonView(title: "Sightings", systemImage: "car.side", milestone: "M2")
+                SightingsView()
             }
             SwiftUI.Tab("Collection", systemImage: "square.grid.3x3.fill", value: .collection) {
-                ComingSoonView(title: "Collection", systemImage: "square.grid.3x3.fill", milestone: "M2")
+                CollectionView()
             }
             SwiftUI.Tab("Timelapse", systemImage: "film.stack", value: .timelapse) {
                 ComingSoonView(title: "Timelapse", systemImage: "film.stack", milestone: "M3")

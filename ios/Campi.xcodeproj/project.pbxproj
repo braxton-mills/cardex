@@ -8,18 +8,28 @@
 
 /* Begin PBXBuildFile section */
 		04828B348F05CECD58F81D59 /* StatusDetailView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0B71C46D980691C749B7E9D7 /* StatusDetailView.swift */; };
+		0B1EF2E03E121E0E3C5803A0 /* SightingsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 553367140C77690FB7CA8169 /* SightingsView.swift */; };
 		0CE19E9A06368C38AFE93124 /* PairingView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3C8AC259857185CC4AF23A27 /* PairingView.swift */; };
+		3BF7C81316B30A80DC7DF0F6 /* SightingDetailView.swift in Sources */ = {isa = PBXBuildFile; fileRef = AE8C003F6CBE22F6E0AF2C61 /* SightingDetailView.swift */; };
 		3D37B4765F2F4F915814C203 /* AppModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = FB0A57E7C5F1E166B85093ED /* AppModel.swift */; };
+		40EE5FD23A1E386620E7D4DE /* Badges.swift in Sources */ = {isa = PBXBuildFile; fileRef = 57FA544A415D300B8E119BF3 /* Badges.swift */; };
+		45FD47A0EC2628DE07F6D9D1 /* LabelPickerView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 303A36E5C88D9218DF1F93B0 /* LabelPickerView.swift */; };
 		52CC54D15295CA97856B04B1 /* CampiKit in Frameworks */ = {isa = PBXBuildFile; productRef = C38C3DA85464FB33EAAA3DE9 /* CampiKit */; };
 		786C29246F9ECCE07F1BE32C /* SettingsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = DD247E2EB2267C55A4F08A5F /* SettingsView.swift */; };
 		7DAFE2353591790E0671832E /* TodayModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = D57E5E87171B8F4122942817 /* TodayModel.swift */; };
+		82DF684D58ACC85F085E158C /* SightingsModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = C5F7F80899FD8B7A14D1796C /* SightingsModel.swift */; };
 		8A115BB302582CF7B3CBE309 /* RootView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 39744264472CDD72B3022907 /* RootView.swift */; };
 		A932689EA4D6DAB637FF4FB1 /* SmokeTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = ECF6EAC467FC4E523FCE0A8A /* SmokeTests.swift */; };
 		AA9C17E25599BE6A53C0FF4E /* TodayView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5711821ADE4404E23CC9A802 /* TodayView.swift */; };
+		AD6FB95B6E968A76C83E52FA /* CollectionView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 20185174CADBEE36C595822E /* CollectionView.swift */; };
 		B719E9D380BBAD5667966C09 /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = 5A2AF8456A878CD732AB84DA /* Assets.xcassets */; };
+		B8A8BAAFCB29DFD038E2C4D0 /* HighlightsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 24686F5EFB70E6FE7EC01587 /* HighlightsView.swift */; };
+		C54A645D46F5E46FEEFE5353 /* SightingStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = F6713C58CB0D8B470730FB61 /* SightingStore.swift */; };
 		D90FC23952D39993941BC901 /* CampiApp.swift in Sources */ = {isa = PBXBuildFile; fileRef = 79182482FD527B71C6977FA5 /* CampiApp.swift */; };
 		ED13FCFD10572138D5995061 /* Formatting.swift in Sources */ = {isa = PBXBuildFile; fileRef = 251F3A9F83732407FE7E1EE8 /* Formatting.swift */; };
+		F5C8C766CA78D63B516F86BE /* PlayerView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 70F09E70F330808A90E5E281 /* PlayerView.swift */; };
 		F9AD438088856016D7AC0C1D /* RemoteImage.swift in Sources */ = {isa = PBXBuildFile; fileRef = 11198FCA1C6DF015D1E32A14 /* RemoteImage.swift */; };
+		FDA4717F4D00BE6C21050A75 /* SightingFilterView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3796895C830058CD2D5A3B22 /* SightingFilterView.swift */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXContainerItemProxy section */
@@ -35,18 +45,28 @@
 /* Begin PBXFileReference section */
 		0B71C46D980691C749B7E9D7 /* StatusDetailView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = StatusDetailView.swift; sourceTree = "<group>"; };
 		11198FCA1C6DF015D1E32A14 /* RemoteImage.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RemoteImage.swift; sourceTree = "<group>"; };
+		20185174CADBEE36C595822E /* CollectionView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CollectionView.swift; sourceTree = "<group>"; };
+		24686F5EFB70E6FE7EC01587 /* HighlightsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HighlightsView.swift; sourceTree = "<group>"; };
 		251F3A9F83732407FE7E1EE8 /* Formatting.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Formatting.swift; sourceTree = "<group>"; };
+		303A36E5C88D9218DF1F93B0 /* LabelPickerView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LabelPickerView.swift; sourceTree = "<group>"; };
+		3796895C830058CD2D5A3B22 /* SightingFilterView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SightingFilterView.swift; sourceTree = "<group>"; };
 		39744264472CDD72B3022907 /* RootView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RootView.swift; sourceTree = "<group>"; };
 		3C8AC259857185CC4AF23A27 /* PairingView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PairingView.swift; sourceTree = "<group>"; };
+		553367140C77690FB7CA8169 /* SightingsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SightingsView.swift; sourceTree = "<group>"; };
 		5711821ADE4404E23CC9A802 /* TodayView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TodayView.swift; sourceTree = "<group>"; };
+		57FA544A415D300B8E119BF3 /* Badges.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Badges.swift; sourceTree = "<group>"; };
 		5A2AF8456A878CD732AB84DA /* Assets.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; path = Assets.xcassets; sourceTree = "<group>"; };
+		70F09E70F330808A90E5E281 /* PlayerView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PlayerView.swift; sourceTree = "<group>"; };
 		79182482FD527B71C6977FA5 /* CampiApp.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CampiApp.swift; sourceTree = "<group>"; };
+		AE8C003F6CBE22F6E0AF2C61 /* SightingDetailView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SightingDetailView.swift; sourceTree = "<group>"; };
 		C5658DCF12B1BFDCC7CAFC16 /* Campi.entitlements */ = {isa = PBXFileReference; lastKnownFileType = text.plist.entitlements; path = Campi.entitlements; sourceTree = "<group>"; };
+		C5F7F80899FD8B7A14D1796C /* SightingsModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SightingsModel.swift; sourceTree = "<group>"; };
 		D57E5E87171B8F4122942817 /* TodayModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TodayModel.swift; sourceTree = "<group>"; };
 		D82A1FDC6C0B611D29F8EB0B /* CampiUITests.xctest */ = {isa = PBXFileReference; includeInIndex = 0; lastKnownFileType = wrapper.cfbundle; path = CampiUITests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
 		DD247E2EB2267C55A4F08A5F /* SettingsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SettingsView.swift; sourceTree = "<group>"; };
 		E314793F7245A404662086F9 /* Campi.app */ = {isa = PBXFileReference; includeInIndex = 0; lastKnownFileType = wrapper.application; path = Campi.app; sourceTree = BUILT_PRODUCTS_DIR; };
 		ECF6EAC467FC4E523FCE0A8A /* SmokeTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SmokeTests.swift; sourceTree = "<group>"; };
+		F6713C58CB0D8B470730FB61 /* SightingStore.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SightingStore.swift; sourceTree = "<group>"; };
 		F7671C44D83AD560AEE21700 /* CampiKit */ = {isa = PBXFileReference; lastKnownFileType = folder; name = CampiKit; path = CampiKit; sourceTree = SOURCE_ROOT; };
 		F7F3A236A03C0059E6C0CB95 /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist; path = Info.plist; sourceTree = "<group>"; };
 		FB0A57E7C5F1E166B85093ED /* AppModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppModel.swift; sourceTree = "<group>"; };
@@ -64,6 +84,22 @@
 /* End PBXFrameworksBuildPhase section */
 
 /* Begin PBXGroup section */
+		19A833C4434DD7FD138B26C4 /* Highlights */ = {
+			isa = PBXGroup;
+			children = (
+				24686F5EFB70E6FE7EC01587 /* HighlightsView.swift */,
+			);
+			path = Highlights;
+			sourceTree = "<group>";
+		};
+		2683DCA8C8A8DF857D333AFE /* Player */ = {
+			isa = PBXGroup;
+			children = (
+				70F09E70F330808A90E5E281 /* PlayerView.swift */,
+			);
+			path = Player;
+			sourceTree = "<group>";
+		};
 		2BD9699749AF3099FD8DF2EB /* Resources */ = {
 			isa = PBXGroup;
 			children = (
@@ -92,8 +128,10 @@
 		3A47446909D8DC9DF82FD8C7 /* Shared */ = {
 			isa = PBXGroup;
 			children = (
+				57FA544A415D300B8E119BF3 /* Badges.swift */,
 				251F3A9F83732407FE7E1EE8 /* Formatting.swift */,
 				11198FCA1C6DF015D1E32A14 /* RemoteImage.swift */,
+				F6713C58CB0D8B470730FB61 /* SightingStore.swift */,
 			);
 			path = Shared;
 			sourceTree = "<group>";
@@ -112,10 +150,14 @@
 			isa = PBXGroup;
 			children = (
 				4BAEC8F4810A3A18BE75B7AA /* App */,
+				D43BC815B4261967BA481AB2 /* Collection */,
+				19A833C4434DD7FD138B26C4 /* Highlights */,
 				A17638718EB11E9F7649892B /* Pairing */,
+				2683DCA8C8A8DF857D333AFE /* Player */,
 				2BD9699749AF3099FD8DF2EB /* Resources */,
 				83AEC35FBF972A2C313B7124 /* Settings */,
 				3A47446909D8DC9DF82FD8C7 /* Shared */,
+				F3CF86D706D6CE927DDB490C /* Sightings */,
 				AF442BE55E548748EB4DD857 /* Today */,
 				C5658DCF12B1BFDCC7CAFC16 /* Campi.entitlements */,
 				F7F3A236A03C0059E6C0CB95 /* Info.plist */,
@@ -157,6 +199,26 @@
 				5711821ADE4404E23CC9A802 /* TodayView.swift */,
 			);
 			path = Today;
+			sourceTree = "<group>";
+		};
+		D43BC815B4261967BA481AB2 /* Collection */ = {
+			isa = PBXGroup;
+			children = (
+				20185174CADBEE36C595822E /* CollectionView.swift */,
+			);
+			path = Collection;
+			sourceTree = "<group>";
+		};
+		F3CF86D706D6CE927DDB490C /* Sightings */ = {
+			isa = PBXGroup;
+			children = (
+				303A36E5C88D9218DF1F93B0 /* LabelPickerView.swift */,
+				AE8C003F6CBE22F6E0AF2C61 /* SightingDetailView.swift */,
+				3796895C830058CD2D5A3B22 /* SightingFilterView.swift */,
+				C5F7F80899FD8B7A14D1796C /* SightingsModel.swift */,
+				553367140C77690FB7CA8169 /* SightingsView.swift */,
+			);
+			path = Sightings;
 			sourceTree = "<group>";
 		};
 		FC31AB8FD5D0476D032D411A /* Packages */ = {
@@ -268,12 +330,22 @@
 			buildActionMask = 2147483647;
 			files = (
 				3D37B4765F2F4F915814C203 /* AppModel.swift in Sources */,
+				40EE5FD23A1E386620E7D4DE /* Badges.swift in Sources */,
 				D90FC23952D39993941BC901 /* CampiApp.swift in Sources */,
+				AD6FB95B6E968A76C83E52FA /* CollectionView.swift in Sources */,
 				ED13FCFD10572138D5995061 /* Formatting.swift in Sources */,
+				B8A8BAAFCB29DFD038E2C4D0 /* HighlightsView.swift in Sources */,
+				45FD47A0EC2628DE07F6D9D1 /* LabelPickerView.swift in Sources */,
 				0CE19E9A06368C38AFE93124 /* PairingView.swift in Sources */,
+				F5C8C766CA78D63B516F86BE /* PlayerView.swift in Sources */,
 				F9AD438088856016D7AC0C1D /* RemoteImage.swift in Sources */,
 				8A115BB302582CF7B3CBE309 /* RootView.swift in Sources */,
 				786C29246F9ECCE07F1BE32C /* SettingsView.swift in Sources */,
+				3BF7C81316B30A80DC7DF0F6 /* SightingDetailView.swift in Sources */,
+				FDA4717F4D00BE6C21050A75 /* SightingFilterView.swift in Sources */,
+				C54A645D46F5E46FEEFE5353 /* SightingStore.swift in Sources */,
+				82DF684D58ACC85F085E158C /* SightingsModel.swift in Sources */,
+				0B1EF2E03E121E0E3C5803A0 /* SightingsView.swift in Sources */,
 				04828B348F05CECD58F81D59 /* StatusDetailView.swift in Sources */,
 				7DAFE2353591790E0671832E /* TodayModel.swift in Sources */,
 				AA9C17E25599BE6A53C0FF4E /* TodayView.swift in Sources */,

@@ -16,6 +16,13 @@ final class AppModel {
     /// Set when the PC rejected our token (revoked with `campi devices revoke`, or the PC's ui.db was reset).
     var unpairedReason: String?
 
+    /// Latest known version of every sighting the user acted on, so all screens agree (M2).
+    let sightings = SightingStore()
+    /// The label collection, shared by Collection, the label picker and the make filter.
+    private(set) var collection: LabelCollection?
+    /// Set when a label correction changed counts; Collection reloads on next appearance.
+    var collectionStale = false
+
     private let store: ConnectionStore
 
     init(store: ConnectionStore) {
@@ -80,10 +87,22 @@ final class AppModel {
         }
     }
 
+    /// Loads the collection once (or again when `force` or stale).
+    func loadCollection(force: Bool = false) async throws -> LabelCollection {
+        if let collection, !force, !collectionStale { return collection }
+        guard let client else { throw APIError.unreachable("not paired") }
+        let c = try await client.collection()
+        collection = c
+        collectionStale = false
+        return c
+    }
+
     private func forget(reason: String?) {
         store.clear()
         connection = nil
         client = nil
+        collection = nil
+        sightings.reset()
         unpairedReason = reason
         Task { await ImageLoader.shared.clear() }
     }

@@ -88,6 +88,114 @@ final class SmokeTests: XCTestCase {
         attach(app, "6-deeplink-bad-code")
     }
 
+    /// Launches fresh and pairs with the mock by typing a fresh code; ends on Today.
+    @MainActor
+    private func launchPaired() async throws -> XCUIApplication {
+        let pairCode = try await Self.freshCode()
+        let app = XCUIApplication()
+        app.launchArguments = ["-resetPairing"]
+        app.launch()
+        XCTAssertTrue(app.textFields["pair.server"].waitForExistence(timeout: 10))
+        app.textFields["pair.server"].tap()
+        app.textFields["pair.server"].typeText(Self.mock)
+        app.textFields["pair.code"].tap()
+        app.textFields["pair.code"].typeText(pairCode)
+        app.buttons["pair.submit"].tap()
+        XCTAssertTrue(app.navigationBars["CAMPI-PC"].waitForExistence(timeout: 15), "pairing failed")
+        return app
+    }
+
+    @MainActor
+    func testSightingsDetailCollectionHighlights() async throws {
+        let app = try await launchPaired()
+
+        // Sightings grid -> detail
+        app.tabBars.buttons["Sightings"].tap()
+        let card = app.buttons.matching(identifier: "sightings.card").firstMatch
+        XCTAssertTrue(card.waitForExistence(timeout: 10))
+        sleep(1)
+        attach(app, "07-sightings")
+        card.tap()
+        let star = app.buttons["detail.star"]
+        XCTAssertTrue(star.waitForExistence(timeout: 10))
+        let before = star.value as? String
+        star.tap()
+        XCTAssertTrue(waitFor(star, value: before == "starred" ? "not starred" : "starred"), "star didn't toggle")
+        attach(app, "08-detail")
+        star.tap()   // restore
+        XCTAssertTrue(waitFor(star, value: before ?? "not starred"))
+
+        // Label picker opens with the collection
+        app.buttons["detail.correct"].tap()
+        XCTAssertTrue(app.navigationBars["Correct Label"].waitForExistence(timeout: 5))
+        XCTAssertTrue(app.buttons.matching(NSPredicate(format: "label BEGINSWITH 'Toyota Camry'")).firstMatch
+            .waitForExistence(timeout: 10))
+        attach(app, "09-label-picker")
+        app.navigationBars["Correct Label"].buttons["Cancel"].tap()
+
+        // View in timelapse: a player, or an explanation (e.g. the window isn't rendered yet)
+        app.buttons["detail.timelapse"].tap()
+        let done = app.buttons["player.done"]
+        let alert = app.alerts.firstMatch
+        XCTAssertTrue(waitForAny([done, alert], timeout: 15), "View in timelapse showed nothing")
+        sleep(1)
+        attach(app, "10-view-in-timelapse")
+        if done.exists { done.tap() } else { alert.buttons["OK"].tap() }
+        app.navigationBars.buttons.element(boundBy: 0).tap()   // back to the grid
+
+        // Filters: starred only, then reset
+        app.buttons["Filters"].tap()
+        XCTAssertTrue(app.navigationBars["Filters"].waitForExistence(timeout: 5))
+        app.switches["Starred only"].switches.firstMatch.tap()
+        app.navigationBars["Filters"].buttons["Apply"].tap()
+        sleep(2)
+        attach(app, "11-starred-filter")
+        app.buttons["Filters"].tap()
+        app.buttons["Reset All"].tap()
+        app.navigationBars["Filters"].buttons["Apply"].tap()
+
+        // Collection -> one label's sightings
+        app.tabBars.buttons["Collection"].tap()
+        let tile = app.buttons.matching(identifier: "collection.tile").firstMatch
+        XCTAssertTrue(tile.waitForExistence(timeout: 10))
+        sleep(1)
+        attach(app, "12-collection")
+        tile.tap()
+        XCTAssertTrue(app.buttons.matching(identifier: "sightings.card").firstMatch.waitForExistence(timeout: 10))
+        sleep(1)
+        attach(app, "13-collection-item")
+
+        // Highlights -> daily video plays
+        app.tabBars.buttons["Highlights"].tap()
+        XCTAssertTrue(app.buttons.matching(identifier: "highlight.row").firstMatch.waitForExistence(timeout: 10))
+        sleep(1)
+        attach(app, "14-highlights")
+        app.buttons["Daily video"].firstMatch.tap()
+        let row = app.buttons.matching(identifier: "highlight.row").firstMatch
+        XCTAssertTrue(row.waitForExistence(timeout: 10))
+        row.tap()
+        XCTAssertTrue(done.waitForExistence(timeout: 15), "daily video didn't open")
+        sleep(2)
+        attach(app, "15-daily-player")
+        done.tap()
+    }
+
+    @MainActor
+    private func waitFor(_ el: XCUIElement, value: String, timeout: TimeInterval = 10) -> Bool {
+        let exp = XCTNSPredicateExpectation(predicate: NSPredicate(format: "value == %@", value), object: el)
+        return XCTWaiter.wait(for: [exp], timeout: timeout) == .completed
+    }
+
+    @MainActor
+    private func waitForAny(_ els: [XCUIElement], timeout: TimeInterval) -> Bool {
+        let end = Date().addingTimeInterval(timeout)
+        while Date() < end {
+            if els.contains(where: \.exists) { return true }
+            usleep(250_000)
+        }
+        return false
+    }
+
     @MainActor
     private func attach(_ app: XCUIApplication, _ name: String) {
         let a = XCTAttachment(screenshot: app.screenshot())

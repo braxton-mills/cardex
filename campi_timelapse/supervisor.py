@@ -75,17 +75,28 @@ class Supervisor:
         self.sightings_started = 0.0
         self.sightings_exits: list[float] = []
         self.sightings_missing_logged = False
+        self.sightings_paused = False      # stopped for gaming (not a crash)
+        # render queue (window-end boundaries, oldest first) and game-aware deferral
+        self.render_queue_path = cfg.paths.state / "render_queue.json"
+        self.render_queue: list[float] = sorted(read_json(self.render_queue_path, []) or [])
+        self.game = None                   # GameDetector, created on first poll
+        self.game_state: dict = {}
+        self.game_active_since = None
+        self.game_resume_at = 0.0          # renders may resume at this time after the last game exits
+        self.next_game_poll = 0.0
+        self.deferred_logged = False
         self.stop_file = cfg.paths.state / "stop.request"
         self.status_path = cfg.paths.state / "status.json"
         self.started = time.time()
 
     # -- children ---------------------------------------------------------
-    def spawn(self, *args: str, low_priority=False, exe: str | None = None) -> subprocess.Popen:
+    def spawn(self, *args: str, low_priority=False, exe: str | None = None, env: dict | None = None) -> subprocess.Popen:
         exe = exe or sys.executable  # pythonw.exe under Task Scheduler, so children get no console either
         flags = NO_WINDOW | (BELOW_NORMAL if low_priority else 0)
         p = subprocess.Popen([exe, "-m", "campi_timelapse", "--config", str(self.cfg.config_path), *args],
                              cwd=str(PROJECT), creationflags=flags, stdin=subprocess.DEVNULL,
-                             stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+                             stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL,
+                             env={**os.environ, **env} if env else None)
         self.job.add(p)
         return p
 
@@ -126,6 +137,9 @@ class Supervisor:
             elif now - self.sightings_started > 600:
                 self.sightings_backoff = 10.0
             return
+        if p and self.sightings_paused:
+            self.sightings = None  # stopped by us for gaming: not a crash, no backoff
+            return
         if p:
             rc = p.returncode
             self.sightings = None
@@ -136,7 +150,7 @@ class Supervisor:
                       self.sightings_backoff)
             self.sightings_backoff = min(self.sightings_backoff * 2, 600)
             return
-        if now < self.sightings_next_start:
+        if now < self.sightings_next_start or self.sightings_paused:
             return
         exe = self.cfg.paths.sightings_python
         if not exe.exists():
@@ -144,9 +158,95 @@ class Supervisor:
                 log.error("sightings enabled but %s is missing; run install.ps1 -Sightings", exe)
                 self.sightings_missing_logged = True
             return
-        self.sightings = self.spawn("sightings-worker", low_priority=True, exe=str(exe))
+        # openvino backend: the worker must never touch the RTX card (it also pins an Intel OpenVINO device)
+        env = {"CUDA_VISIBLE_DEVICES": ""} if self.cfg.sightings.backend == "openvino" else None
+        self.sightings = self.spawn("sightings-worker", low_priority=True, exe=str(exe), env=env)
         self.sightings_started = now
         log.info("sightings worker started (pid %d)", self.sightings.pid)
+
+    # -- gaming ------------------------------------------------------------
+    def poll_game(self, now: float) -> None:
+        if now < self.next_game_poll:
+            return
+        self.next_game_poll = now + 15
+        try:
+            if self.game is None:
+                from .gaming import GameDetector
+                self.game = GameDetector(self.cfg)
+            st = self.game.poll(now)
+        except Exception as e:  # detection must never take the supervisor down
+            log.warning("game detection failed: %s", e)
+            st = {"active": False, "error": str(e)}
+        was = bool(self.game_state.get("active"))
+        if st.get("active") and not was:
+            self.game_active_since = now
+            log.info("paused: gaming (%s, %s)%s%s", st.get("exe"), st.get("source"),
+                     "; renders deferred" if self.renders_defer_enabled() else "",
+                     "; sightings stopped" if self.cfg.gaming.pause_sightings else "")
+        elif was and not st.get("active"):
+            self.game_resume_at = now + 120
+            self.game_active_since = None
+            log.info("game ended (%s); renders resume in 2 min", self.game_state.get("exe"))
+        self.game_state = {**st, "since": self.game_active_since}
+        self.apply_sightings_pause(bool(st.get("active")))
+
+    def renders_defer_enabled(self) -> bool:
+        from .gaming import targets_nvidia
+        return bool(self.cfg.gaming.defer_renders) and targets_nvidia(self.cfg.tools.rife_gpu)
+
+    def renders_deferred(self, now: float) -> bool:
+        deferred = self.renders_defer_enabled() and (bool(self.game_state.get("active")) or now < self.game_resume_at)
+        if not deferred and self.deferred_logged:
+            log.info("resumed: renders (%d queued)", len(self.render_queue))
+        self.deferred_logged = deferred
+        return deferred
+
+    def apply_sightings_pause(self, gaming: bool) -> None:
+        if not (self.cfg.sightings.enabled and self.cfg.gaming.pause_sightings):
+            if self.sightings_paused:
+                self.sightings_paused = False
+            return
+        if gaming and not self.sightings_paused:
+            self.sightings_paused = True
+            if self.sightings and self.sightings.poll() is None:
+                subprocess.run(["taskkill", "/T", "/F", "/PID", str(self.sightings.pid)], capture_output=True,
+                               creationflags=NO_WINDOW)
+            log.info("paused: gaming; sightings worker stopped")
+        elif not gaming and self.sightings_paused:
+            self.sightings_paused = False
+            self.sightings_next_start = 0.0
+            log.info("resumed: sightings worker")
+
+    # -- render queue -------------------------------------------------------
+    def save_render_queue(self) -> None:
+        write_json(self.render_queue_path, self.render_queue)
+
+    def queue_render(self, boundary: float) -> None:
+        if boundary not in self.render_queue:
+            self.render_queue.append(boundary)
+            self.render_queue.sort()
+            self.save_render_queue()
+
+    def drop_stale_renders(self, now: float) -> None:
+        """A window can only be rendered while its raw frames are still all there."""
+        limit = now - self.cfg.retention.raw_hours * 3600
+        stale = [b for b in self.render_queue if b - self.cfg.render.window_min * 60 < limit]
+        for b in stale:
+            log.warning("dropping queued window ending %s: its frames are older than raw_hours (%dh)",
+                        datetime.fromtimestamp(b).strftime("%Y-%m-%d %H:%M"), self.cfg.retention.raw_hours)
+        if stale:
+            self.render_queue = [b for b in self.render_queue if b not in stale]
+            self.save_render_queue()
+
+    def start_queued_render(self, now: float) -> None:
+        if self.clip or not self.render_queue or self.renders_deferred(now):
+            return
+        boundary = self.render_queue.pop(0)  # oldest first: archive appends and latest.mp4 stay in order
+        self.save_render_queue()
+        p = self.spawn("render-clip", "--end", str(boundary), low_priority=True)
+        late = now - boundary - self.cfg.render.delay_s
+        self.clip = (p, now, f"clip render ending {datetime.fromtimestamp(boundary):%H:%M}"
+                             + (f" (queued {late / 60:.0f} min)" if late > 60 else ""))
 
     def reset_backoff(self, now: float) -> None:
         """Forget earlier crashes once capture has stayed up for 5 minutes."""
@@ -199,6 +299,11 @@ class Supervisor:
             "next_clip": datetime.fromtimestamp(next_clip).isoformat(timespec="seconds"),
             "free_gb": round(free, 1), "output_dir": str(self.cfg.paths.out),
             **(self.sightings_status(now) if self.cfg.sightings.enabled else {}),
+            "render_queue": len(self.render_queue),
+            "render_queue_oldest": (datetime.fromtimestamp(self.render_queue[0]).isoformat(timespec="minutes")
+                                    if self.render_queue else None),
+            "renders_deferred": self.deferred_logged,
+            "gaming": self.game_state,
         })
 
     def sightings_status(self, now: float) -> dict:
@@ -209,6 +314,7 @@ class Supervisor:
             "sightings_recent_exits": len(recent),
             "sightings_crash_looping": len(recent) >= 3,
             "sightings_next_start": self.sightings_next_start if not self.sightings else None,
+            "sightings_paused": self.sightings_paused,
         }
 
     def run(self, foreground: bool = False) -> int:
@@ -246,17 +352,14 @@ class Supervisor:
                 if cfg.sightings.enabled:
                     self.check_sightings(now)
 
+                self.poll_game(now)
+                self.reap("clip", cfg.render.timeout_min * 60, now)
                 if now >= next_clip + cfg.render.delay_s:
                     boundary = next_clip
                     next_clip = self.next_boundary(now)
-                    if self.reap("clip", cfg.render.timeout_min * 60, now):
-                        p = self.spawn("render-clip", "--end", str(boundary), low_priority=True)
-                        self.clip = (p, now, f"clip render ending {datetime.fromtimestamp(boundary):%H:%M}")
-                    else:
-                        log.warning("previous clip render still running; skipping window ending %s",
-                                    datetime.fromtimestamp(boundary).strftime("%H:%M"))
-                else:
-                    self.reap("clip", cfg.render.timeout_min * 60, now)
+                    self.queue_render(boundary)  # rendered when the slot is free and not deferred (gaming)
+                self.drop_stale_renders(now)
+                self.start_queued_render(now)
 
                 today = date.today()
                 if cfg.daily.enabled and last_daily_check != today and \
@@ -265,7 +368,7 @@ class Supervisor:
                     y = today - timedelta(days=1)
                     if self.daily_due(y) and y not in self.daily_queue:
                         self.daily_queue.append(y)
-                if self.reap("daily", 3 * 3600, now) and self.daily_queue:
+                if self.reap("daily", 3 * 3600, now) and self.daily_queue and not self.renders_deferred(now):
                     d = self.daily_queue.pop(0)
                     p = self.spawn("render-daily", "--date", d.isoformat(), low_priority=True)
                     self.daily = (p, now, f"daily render {d}")

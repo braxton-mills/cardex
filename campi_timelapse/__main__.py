@@ -41,6 +41,11 @@ def cmd_status(cfg) -> int:
         print(f"last daily   : {daily.get('status')} {daily.get('day', '')}: "
               f"{daily.get('out') or daily.get('reason') or daily.get('error')}")
     print(f"sightings    : {sightings_status(cfg, st if alive else {}, now)}")
+    if alive:
+        print(f"gaming       : {gaming_status(cfg, st)}")
+        q = st.get("render_queue") or 0
+        print(f"render queue : {q} window(s)" + (f", oldest ending {st.get('render_queue_oldest')}" if q else "")
+              + ("; DEFERRED (gaming)" if st.get("renders_deferred") else ""))
     print(f"disk free    : {shutil.disk_usage(cfg.paths.frames).free / 1e9:.1f} GB ({cfg.paths.frames.drive})")
     print(f"frames       : {cfg.paths.frames}")
     print(f"clips        : {cfg.paths.out}")
@@ -61,8 +66,16 @@ def sightings_status(cfg, st: dict, now: float) -> str:
         nxt = st.get("sightings_next_start") or now
         line = (f"CRASH-LOOPING ({st.get('sightings_recent_exits')} exits in 15 min; "
                 f"next try in {max(0, nxt - now):.0f}s; last error: {ws.get('last_error') or 'see campi logs sightings'})")
+    elif st.get("sightings_paused"):
+        line = "paused: gaming"
     elif pid and pid in (ws.get("pid"), ws.get("ppid")):
-        line = f"running (pid {pid}, {ws.get('phase')}, restarts {st.get('sightings_restarts', 0)})"
+        dev = ("CPU FALLBACK" if ws.get("cpu_fallback") else
+               f"{ws.get('device')} {ws.get('device_name') or ''}".strip() if ws.get("device") else "(loading models)")
+        line = (f"running (pid {pid}, {ws.get('phase')}, restarts {st.get('sightings_restarts', 0)}); "
+                f"{ws.get('backend', cfg.sightings.backend)} on {dev}; classify queue {ws.get('classify_queue', 0)}")
+        if cfg.sightings.cloud.enabled:
+            line += (f"; cloud {ws.get('cloud_today', '?')}/{cfg.sightings.cloud.cloud_max_per_day} today, "
+                     f"{ws.get('cloud_pending', 0)} queued")
     elif pid:
         line = f"starting (pid {pid})"
     else:
@@ -73,6 +86,67 @@ def sightings_status(cfg, st: dict, now: float) -> str:
         line += (f"; last sighting {sightings_db.local_str(last) if last else 'never'}, "
                  f"today {summ['today']}, total {summ['total']}")
     return line
+
+
+def gaming_status(cfg, st: dict) -> str:
+    g = st.get("gaming") or {}
+    if not g:
+        return "not polled yet"
+    if g.get("error"):
+        return f"detection error: {g['error']}"
+    mode = g.get("mode", "auto")
+    if g.get("active"):
+        since = g.get("since")
+        line = f"ACTIVE: {g.get('exe')}" + (f" for {(time.time() - since) / 60:.0f} min" if since else "")
+    else:
+        line = {"off": "off (campi game off)", "on": "on"}.get(mode, "auto, no game running" if cfg.gaming.auto
+                                                                   else "auto detection disabled")
+    if g.get("counters") and g["counters"] != "ok":
+        line += f"; GPU counters {g['counters']}"
+    return line + f" [mode {mode}]"
+
+
+def cmd_game(cfg, mode: str) -> int:
+    (cfg.paths.state / "game_mode").write_text(mode, encoding="utf-8")
+    print(f"gaming mode: {mode} (the supervisor picks it up within 15 s)")
+    return 0
+
+
+def cmd_rife_bench(cfg) -> int:
+    """Render the same recent daytime 10-minute window with RIFE on the NVIDIA and the Intel GPU (work folder only:
+    no latest.mp4, no archive) and report wall time for each. The configured rife_gpu is not changed."""
+    import copy
+    from datetime import datetime
+    from . import frames as fr
+    from .render import nvenc_available, render_frames
+    step = cfg.render.window_min * 60
+    end = datetime.now().replace(second=0, microsecond=0).timestamp()
+    end -= end % step
+    frames = []
+    for _ in range(36):  # newest complete window with enough daytime frames, up to 6 h back
+        frames = fr.usable(cfg, fr.frames_between(cfg, end - step, end))
+        if len(frames) >= cfg.render.min_usable_frac * step / cfg.capture.interval_s:
+            break
+        end -= step
+    else:
+        print("no recent daytime window with enough frames")
+        return 1
+    encoder = "nvenc" if nvenc_available(cfg) else "x264"
+    out_dir = cfg.paths.work / "rife-bench"
+    out_dir.mkdir(parents=True, exist_ok=True)
+    results = {}
+    for gpu in ("NVIDIA", "Intel"):
+        c = copy.deepcopy(cfg)
+        c.tools.rife_gpu = gpu
+        t0 = time.time()
+        res = render_frames(c, frames, out_dir / f"bench_{gpu.lower()}.mp4", f"rifebench_{gpu.lower()}_{int(t0)}",
+                            encoder)
+        results[gpu] = {"wall_s": round(time.time() - t0, 1), "rife_s": (res.get("gpu") or {}).get("rife_seconds"),
+                        "device": (res.get("gpu") or {}).get("device"), "frames_out": res.get("frames_out")}
+        print(f"{gpu:<7} {results[gpu]}", flush=True)
+    print(json.dumps({"window_end": datetime.fromtimestamp(end).isoformat(timespec="minutes"),
+                      "frames_in": len(frames), "encoder": encoder, **results}, indent=2))
+    return 0
 
 
 def cmd_sightings(cfg, n: int) -> int:
@@ -135,12 +209,20 @@ def main(argv=None) -> int:
     sl = sub.add_parser("sightings", help="list the last N vehicle sightings")
     sl.add_argument("n", nargs="?", type=int, default=20)
     sw = sub.add_parser("sightings-worker", help="vehicle sightings worker (run by the supervisor; sightings venv)")
-    sw.add_argument("--check", action="store_true", help="load models, report the GPU, exit")
+    sw.add_argument("--check", action="store_true", help="one-time model prep + device report, then exit")
+    sw.add_argument("--prep", action="store_true", help=argparse.SUPPRESS)  # label text embeddings (CPU)
     sr = sub.add_parser("sightings-record", help="save the raw stream to a file for sightings-test")
     sr.add_argument("seconds", type=float)
     sr.add_argument("--out")
     stt = sub.add_parser("sightings-test", help="run the sightings pipeline on a file into a separate test DB")
     stt.add_argument("--source", required=True)
+    stt.add_argument("--backend", choices=["cuda", "openvino"])
+    stt.add_argument("--cloud", action="store_true", help="also ask Gemini (needs [sightings.cloud] api_key_file)")
+    sb = sub.add_parser("sightings-bench", help="detection FPS fp16/int8, SigLIP ms/crop (openvino)")
+    sb.add_argument("--parity", action="store_true", help="also compare OpenVINO vs torch-CPU SigLIP embeddings")
+    sub.add_parser("rife-bench", help="render one recent window with RIFE on the NVIDIA and the Intel GPU")
+    gm = sub.add_parser("game", help="gaming mode override")
+    gm.add_argument("mode", choices=["on", "off", "auto"])
     args = ap.parse_args(argv)
 
     cfg = load_config(args.config)
@@ -150,6 +232,8 @@ def main(argv=None) -> int:
         return cmd_samples(cfg)
     if args.cmd == "sightings":
         return cmd_sightings(cfg, args.n)
+    if args.cmd == "game":
+        return cmd_game(cfg, args.mode)
 
     log_name = {"run": "supervisor", "render-clip": "render", "render-daily": "daily",
                 "sightings-worker": "sightings"}.get(args.cmd, args.cmd)
@@ -174,7 +258,7 @@ def main(argv=None) -> int:
             res = append_pending(cfg)
         elif args.cmd == "sightings-worker":
             from .sightings import run_worker
-            return run_worker(cfg, check_only=args.check)
+            return run_worker(cfg, check_only=args.check, prep=args.prep)
         elif args.cmd == "sightings-record":
             from pathlib import Path
             from .sightings import record
@@ -183,12 +267,18 @@ def main(argv=None) -> int:
             from pathlib import Path
             from . import sightings_db
             from .sightings import run_test
-            rows = run_test(cfg, Path(args.source))
+            rows, timings = run_test(cfg, Path(args.source), args.backend, args.cloud)
             print(sightings_db.format_rows(rows))
             for r in rows:
                 print(json.dumps(dict(r)))
-            print(f"test db + media: {cfg.paths.data / 'sightings-test'}")
+            print("timings: " + json.dumps(timings, indent=2))
+            print(f"test db + media: {cfg.paths.data / 'sightings-test' / timings['backend']}")
             return 0
+        elif args.cmd == "sightings-bench":
+            from .sightings import run_bench
+            res = run_bench(cfg, args.parity)
+        elif args.cmd == "rife-bench":
+            return cmd_rife_bench(cfg)
         elif args.cmd == "housekeep":
             from . import housekeeping
             housekeeping.run(cfg)

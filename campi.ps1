@@ -13,7 +13,10 @@
     campi archive         append any clips not yet in the long archive video
     campi sightings [N]   last N vehicle sightings (optional worker; see README)
     campi sightings-record SECONDS   save the raw stream to a file for testing
-    campi sightings-test --source FILE   run the sightings pipeline on a file into a separate test DB
+    campi sightings-test --source FILE [--backend cuda|openvino] [--cloud]   pipeline on a file, separate test DB
+    campi sightings-bench [--parity]     detection FPS fp16/int8 + SigLIP ms/crop on the Intel GPU
+    campi rife-bench      render one recent window with RIFE on the NVIDIA and the Intel GPU (work folder only)
+    campi game on|off|auto   gaming mode override (renders wait while a game runs)
 #>
 param([Parameter(Position = 0)][string]$Command = 'status',
       [Parameter(Position = 1, ValueFromRemainingArguments = $true)][string[]]$Rest)
@@ -93,7 +96,9 @@ switch ($Command) {
     'samples' { & $Py -m campi_timelapse samples }
     'archive' { & $Py -m campi_timelapse archive }
     'sightings' { & $Py -m campi_timelapse sightings @Rest }
-    { $_ -in 'sightings-record', 'sightings-test' } {
+    'rife-bench' { & $Py -m campi_timelapse rife-bench }
+    'game' { & $Py -m campi_timelapse game @Rest }
+    { $_ -in 'sightings-record', 'sightings-test', 'sightings-bench' } {
         if (-not (Test-Path $PySightings)) { Write-Host 'sightings env not installed: run install.ps1 -Sightings'; exit 1 }
         & $PySightings -m campi_timelapse $Command @Rest
     }

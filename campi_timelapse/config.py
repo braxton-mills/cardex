@@ -27,6 +27,16 @@ SIGHTINGS_DEFAULTS = {
     "clip_model": "ViT-SO400M-16-SigLIP2-384", "labels_file": "sightings_labels.txt", "min_crop_px": 64,
     "min_samples": 3, "lost_after_s": 2.0, "unsure_below": 0.30, "stationary_px": 40, "roi": [],
     "pause_at_night": True, "save_clips": True, "pre_roll_s": 2, "post_roll_s": 3, "keep_clips_days": 30,
+    "backend": "openvino", "detect_model": "yolo26s", "detect_imgsz": 640, "detect_precision": "auto",
+    "ov_device": "GPU", "classify_crops": 5,
+}
+CLOUD_DEFAULTS = {
+    "enabled": False, "model": "gemini-3.1-flash-lite", "api_key_file": "{home}\\CampiTimelapse\\secrets\\gemini.key",
+    "cloud_margin": 0.15, "cloud_max_per_day": 400,
+}
+GAMING_DEFAULTS = {
+    "auto": True, "game_dirs": [], "extra_exes": [], "ignore_exes": [], "gpu_busy_pct": 20, "gpu_busy_s": 30,
+    "defer_renders": True, "pause_sightings": False,
 }
 
 FOLDERID_DOWNLOADS = "{374DE290-123F-4565-9164-39C4925E467B}"
@@ -78,7 +88,10 @@ def load_config(path: Path | None = None) -> SimpleNamespace:
     with open(path, "rb") as f:
         raw = tomllib.load(f)
     raw["sightings"] = {**SIGHTINGS_DEFAULTS, **raw.get("sightings", {})}
+    raw["sightings"]["cloud"] = {**CLOUD_DEFAULTS, **raw["sightings"].get("cloud", {})}
+    raw["gaming"] = {**GAMING_DEFAULTS, **raw.get("gaming", {})}
     cfg = _ns(raw)
+    cfg.sightings.cloud.api_key_file = _expand(cfg.sightings.cloud.api_key_file)
     cfg.config_path = path
 
     if cfg.image.rotation not in (0, 90, 180, 270):

@@ -99,3 +99,39 @@ save_clips = true
 pre_roll_s = 2               # clip starts this long before the vehicle is first seen ...
 post_roll_s = 3              # ... and ends this long after it was last seen (max 60 s)
 keep_clips_days = 30         # crops, frames, and rows are kept forever
+backend = "openvino"           # openvino (UHD 770, never the 5070) | cuda (YOLO11m + SigLIP 2 on the RTX card)
+detect_model = "yolo26s"       # openvino backend: exported to sightings\models\ by `sightings-worker --check`
+detect_imgsz = 640
+detect_precision = "auto"      # fp16 | int8 | auto (int8 only if sightings-bench shows it keeps up and agrees)
+ov_device = "GPU"              # OpenVINO device (Intel only; an NVIDIA device is never used); CPU fallback is automatic
+classify_crops = 5             # best crops per vehicle kept during a pass and scored when it ends
+
+[sightings.cloud]
+# Gemini second opinion for unsure / close / first-ever labels. The row is written first and updated later.
+enabled = false
+model = "gemini-3.1-flash-lite"
+api_key_file = "{home}\\CampiTimelapse\\secrets\\gemini.key"   # outside the repo; never logged
+cloud_margin = 0.15            # also ask when top-1 minus top-2 share is below this
+cloud_max_per_day = 400        # counted in the DB, resets at local midnight
+
+[gaming]
+# While a game uses the RTX card: renders wait (capture never pauses) and catch up in order afterwards.
+auto = true                    # detect games automatically (`campi game on|off|auto` overrides)
+game_dirs = [
+  "C:\\Program Files (x86)\\Steam\\steamapps\\common",
+  "D:\\SteamLibrary\\steamapps\\common",
+  "C:\\Program Files\\Epic Games",
+  "D:\\Epic Games",
+  "D:\\EA Games",
+  "D:\\Rockstar Games",
+  "C:\\XboxGames",
+  "C:\\Riot Games",
+]
+extra_exes = []
+ignore_exes = ["wallpaper32.exe", "wallpaper64.exe", "Launcher.exe", "LauncherPatcher.exe", "RockstarService.exe",
+               "SocialClubHelper.exe", "EADesktop.exe", "EABackgroundService.exe", "EpicGamesLauncher.exe",
+               "EasyAntiCheat*.exe", "UnityCrashHandler*.exe", "CrashReportClient.exe"]
+gpu_busy_pct = 20              # a matching process must use the 5070's 3D engine above this ...
+gpu_busy_s = 30                # ... for this long before it counts as a game
+defer_renders = true           # clip/daily renders wait while gaming (when rife_gpu is the NVIDIA card)
+pause_sightings = false        # stop the sightings worker while gaming (it no longer uses the 5070)

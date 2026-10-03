@@ -36,10 +36,13 @@ if ($Sightings) {
     if (-not (Test-Path $spy)) { uv venv $sv --python 3.12 }
     uv pip install --python $spy torch torchvision --index-url https://download.pytorch.org/whl/cu128
     uv pip install --python $spy ultralytics lap open_clip_torch 'transformers[sentencepiece]' opencv-python-headless
+    # OpenVINO backend (Intel UHD 770: detection + SigLIP vision; NNCF for INT8) and the optional Gemini client
+    uv pip install --python $spy openvino nncf google-genai
     # ultralytics depends on opencv-python, which clashes with the headless build (same cv2 module)
     uv pip uninstall --python $spy opencv-python
     uv pip install --python $spy --reinstall opencv-python-headless
-    # Download the YOLO + SigLIP 2 weights now and confirm CUDA (prints the GPU and free VRAM)
+    # One-time model prep for the configured backend (openvino: YOLO26 FP16/INT8 export, SigLIP 2 vision IR,
+    # label text embeddings) and a device report
     & $spy -m campi_timelapse sightings-worker --check
     if ($LASTEXITCODE -ne 0) { throw 'sightings check failed (see above)' }
 }

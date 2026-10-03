@@ -25,7 +25,28 @@ campi daily [YYYY-MM-DD]
 campi samples       # before/after rotation samples from the live stream
 campi archive       # append any clips not yet in the archive (runs automatically after every clip)
 campi sightings [N] # optional vehicle sightings (see Sightings below)
+campi game on|off|auto   # gaming mode override (see Gaming below)
+campi rife-bench    # render one recent window with RIFE on the NVIDIA and the Intel GPU (work folder only)
 ```
+
+## Gaming and the render queue
+Renders run RIFE (and NVENC) on the RTX 5070, so they wait while you play:
+- **Render queue**: when a 10-minute window closes while a render is running or deferred, it is queued (never
+  skipped) and rendered later, one at a time, oldest first, so the archive and `latest.mp4` stay in order. A queued
+  window is dropped (with a log line) only once its frames are older than `retention.raw_hours`.
+- **Game detection** (`[gaming]`, every 15 s): a process counts as a game when its exe is under one of `game_dirs`
+  (or matches `extra_exes`), isn't in `ignore_exes` (launchers, anti-cheat, crash handlers; globs, case-insensitive),
+  and has kept the RTX card's 3D engine above `gpu_busy_pct` for `gpu_busy_s`. GPU use per process comes from the
+  same Windows "GPU Engine" counters as Task Manager; a launcher idling in the tray never qualifies. If the counters
+  can't be read, it falls back to the path match and `campi status` says so.
+- While a game runs (`defer_renders`, when `rife_gpu` is the NVIDIA card): clip and daily renders wait; capture
+  never pauses. Renders resume 2 minutes after the last game exits and catch up in order. `pause_sightings`
+  (off by default; the openvino worker doesn't touch the RTX card) also stops the sightings worker.
+- `campi game on|off|auto` overrides detection (stored in `state\game_mode`). `campi status` shows the gaming state,
+  which exe triggered it, and the render queue (length, oldest window). Log lines: `paused: gaming (...)`,
+  `game ended`, `resumed: renders`.
+- `campi rife-bench` renders the same recent window with `rife_gpu = "NVIDIA"` and `"Intel"` into
+  `CampiTimelapse\work\rife-bench\` and prints both times; it doesn't change your config. Result: RTX 5070 61 s (RIFE 24.8 s), UHD 770 142 s (RIFE 105.5 s), both well inside the 10-minute window.
 
 Archive notes: appending is a stream copy (no re-encode), but MP4 can't grow in place, so each append rewrites
 the current part (a few seconds). If a part is open in a player, the clip is appended after the next clip instead.
@@ -61,36 +82,78 @@ Setup from scratch: `powershell -ExecutionPolicy Bypass -File install.ps1`.
 - `pi/setup_campi_stream.sh` patches a stock server script and installs the service.
 
 ## Sightings (optional)
-A separate worker that logs vehicles passing the camera: YOLO11m + ByteTrack on `/stream.mjpg`, SigLIP 2 zero-shot
+A separate worker that logs vehicles passing the camera: YOLO + ByteTrack on `/stream.mjpg`, SigLIP 2 zero-shot
 make/model guess averaged over each vehicle's pass, **one row per pass**. Off by default; with
 `[sightings] enabled = false` nothing starts and nothing extra is imported.
 
+Backends (`[sightings] backend`):
+- **`openvino`** (default): YOLO26s + SigLIP 2's vision tower on the **Intel UHD 770**, so the RTX 5070 is left for
+  games. The worker is launched with `CUDA_VISIBLE_DEVICES` empty and picks the OpenVINO device by name; OpenVINO
+  can see the RTX card too (as `GPU.1`), and an NVIDIA device is never used. If the Intel GPU can't be used, it
+  falls back to the CPU (2 threads) and `campi status` says `CPU FALLBACK`. Clips are encoded with Quick Sync
+  (`h264_qsv`, libx264 fallback), never NVENC.
+- **`cuda`**: the original path, YOLO11m @1280 + the full SigLIP 2 on the RTX card (NVENC clips). Kept for A/B tests.
+
 Enable:
 1. `powershell -ExecutionPolicy Bypass -File install.ps1 -Sightings` creates its own env
-   (`%USERPROFILE%\CampiTimelapse\venv-sightings`: CUDA 12.8 torch, ultralytics, open_clip, transformers), downloads
-   the YOLO + SigLIP 2 weights (a few GB) and checks the GPU. The timelapse env is untouched.
+   (`%USERPROFILE%\CampiTimelapse\venv-sightings`: CUDA 12.8 torch, ultralytics, open_clip, transformers, openvino,
+   nncf, google-genai) and runs `sightings-worker --check`, the one-time model prep: YOLO26s exported to OpenVINO IR
+   (FP16, plus INT8 calibrated on ~300 of your own daytime frames), SigLIP 2's vision tower as FP16 IR, and the
+   label text embeddings (computed once on the CPU; rebuilt automatically when `sightings_labels.txt` changes).
+   The timelapse env is untouched.
 2. Set `enabled = true` under `[sightings]` in `config.toml`, then `campi restart`.
+
+Detection: `detect_imgsz` 640; with a `roi`, each frame is cropped to the ROI's bounding box (+5%) before detection
+and boxes are mapped back. `detect_precision = "auto"` uses INT8 only if `sightings-bench` showed it keeps up with
+`detect_fps` and finds at least 97% of what FP16 finds (it writes `models\precision.json`).
+
+Classification: while a vehicle is in view only its best `classify_crops` crops are kept (largest box first, then
+sharpest); they are scored when the pass ends on a separate classify thread at low priority, so classification
+never slows detection. `min_samples` counts collected crops.
+
+Cloud second opinion (`[sightings.cloud]`, off by default): Gemini (`model`) is asked about a sighting when SigLIP's
+top share is below `unsure_below`, the top two are within `cloud_margin`, or it's the first-ever row with that label.
+The row is written with SigLIP's answer first; the request waits in the `cloud_queue` table (survives restarts and
+outages, retries 30 s doubling to 1 h) and the row is updated when the answer arrives (`source = 'cloud'`, flag `G`;
+SigLIP's answer stays in `siglip_label` / `siglip_confidence`; media is not renamed). Cars the cloud names that
+aren't in the label list go to `discovered_labels`. At most `cloud_max_per_day` requests (counted in the DB, reset at
+local midnight). The key is read from `api_key_file` (outside the repo) and never logged. Note: on the free tier
+Google may use the requests (your car crops) to improve its models.
+
+Benchmarks on this PC (i7-12700K, UHD 770 / RTX 5070):
+
+| | |
+|---|---|
+| YOLO26s @640 on the UHD 770 | FP16 28.4 fps (35 ms), INT8 37.9 fps (26 ms) but only 93.6% of FP16's vehicles -> `auto` = FP16 |
+| SigLIP 2 vision on the UHD 770 | 644 ms per crop (FP16; ~3 s per vehicle at 5 crops, after the pass) |
+| OpenVINO vs torch-CPU embeddings (50 real crops) | cosine mean 0.9995, min 0.9937; top-1 label agreement 100% |
+| A/B, 10-min daytime recording | 36 matched passes, label agreement 94% (cuda 39 rows, openvino 42). openvino: 2.9x realtime, detect 37 ms/frame, SigLIP 1.4 s/crop while detecting; cuda: 1.55x realtime, 74.5 ms/frame @1280, 67 ms/crop |
+| RTX 5070 use by the openvino worker (150 s, all engines) | 0.0% (UHD 770 mean 57%); not listed by nvidia-smi |
+| RIFE for one 10-min clip (300 -> 600 frames) | RTX 5070 61 s (RIFE 24.8 s), UHD 770 142 s (RIFE 105.5 s), both well inside the 10-minute window |
 
 | What | Where |
 |---|---|
-| Database (SQLite, WAL) | `%USERPROFILE%\CampiTimelapse\sightings\sightings.db` (table `sightings`, plus `schema_version`) |
+| Database (SQLite, WAL, schema v2) | `%USERPROFILE%\CampiTimelapse\sightings\sightings.db` (`sightings`, `cloud_queue`, `discovered_labels`, `schema_version`) |
 | Media per sighting | `...\sightings\YYYY-MM-DD\HHMMSS_<id>_<label>_crop.jpg`, `_frame.jpg`, `.mp4` (paths in the DB are relative to `sightings\`) |
-| Models | `...\sightings\models\` (YOLO), Hugging Face cache (SigLIP 2) |
-| Log | `campi logs sightings [-f]`; GPU line also in `gpu.log` |
-| Test runs | `%USERPROFILE%\CampiTimelapse\sightings-test\` (fresh each run) |
+| Models | `...\sightings\models\` (YOLO weights + OpenVINO IR, SigLIP vision IR, text embeddings, `precision.json`), Hugging Face cache (SigLIP 2) |
+| Log | `campi logs sightings [-f]`; device line also in `gpu.log` |
+| Test runs | `%USERPROFILE%\CampiTimelapse\sightings-test\<backend>\` (fresh each run) |
 
 Commands:
 ```
-campi sightings [N]                  # last N sightings (local time)
+campi sightings [N]                  # last N sightings (local time); flags U unsure, S stationary, C clip, G cloud
 campi sightings-record SECONDS       # save the raw stream (.mjpg with timestamps) to sightings\recordings\
-campi sightings-test --source FILE   # run the pipeline on a recording or any video into the test DB; prints rows
+campi sightings-test --source FILE [--backend cuda|openvino] [--cloud]
+                                     # pipeline on a recording or any video into a test DB; prints rows + timings
+campi sightings-bench [--parity]     # detection fps fp16/int8, SigLIP ms/crop, OpenVINO vs torch parity
 ```
-`campi status` shows the worker (disabled / running / CRASH-LOOPING), the last sighting and today's count.
+`campi status` shows the worker (disabled / running / paused: gaming / CRASH-LOOPING), its backend and device (or
+CPU FALLBACK), the classify queue, cloud calls today / cap, the last sighting and today's count.
 
 How it behaves:
 - Own child process of the supervisor (own venv, below-normal priority, 2 CPU threads, same Job Object). A crash
   or GPU error restarts it with backoff (10 s doubling to 10 min); a hang (no main-loop progress for 2 min) is killed.
-  Capture and renders are separate processes and never wait on it. It refuses to run without CUDA.
+  Capture and renders are separate processes and never wait on it. The cuda backend refuses to run without CUDA.
 - Reads the stream at ~30 fps (about 23 Mbit/s over the Pi's Wi-Fi), runs YOLO at `detect_fps`, uses the same Pi
   host lookup as capture (`stream.pi_mac`), pauses while the frame is darker than `[night] luma_threshold`.
 - A pass ends `max(lost_after_s, post_roll_s)` after the vehicle was last seen. Tracker ID switches on fast cars

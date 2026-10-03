@@ -40,6 +40,9 @@ struct SightingGrid: View {
     @Environment(AppModel.self) private var app
     let model: SightingsModel
     var emptyText = "No sightings."
+    /// Scrolls with the grid (e.g. a label's summary and Cardex card). With a header, the empty state goes
+    /// below it instead of covering it.
+    var header: AnyView?
 
     private let columns = [GridItem(.adaptive(minimum: 160), spacing: 12)]
 
@@ -47,6 +50,10 @@ struct SightingGrid: View {
         let visible = model.visible(app.sightings)
         let tz = visible.first?.startedAt.timeZone ?? .current
         ScrollView {
+            if let header {
+                header
+                if visible.isEmpty { emptyState.frame(minHeight: 280) }
+            }
             if let total = model.total, !visible.isEmpty {
                 Text("\(total.formatted()) sightings")
                     .font(.subheadline).foregroundStyle(.secondary)
@@ -74,17 +81,19 @@ struct SightingGrid: View {
         }
         .refreshable { await model.reload(app: app) }
         .overlay {
-            if visible.isEmpty {
-                if let error = model.error {
-                    UnreachableView(error: error, serverName: app.connection?.serverName) {
-                        Task { await model.reload(app: app) }
-                    }
-                } else if model.isLoading || !model.loadedOnce {
-                    ProgressView()
-                } else {
-                    ContentUnavailableView(emptyText, systemImage: "car.side")
-                }
+            if visible.isEmpty && header == nil { emptyState }
+        }
+    }
+
+    @ViewBuilder private var emptyState: some View {
+        if let error = model.error {
+            UnreachableView(error: error, serverName: app.connection?.serverName) {
+                Task { await model.reload(app: app) }
             }
+        } else if model.isLoading || !model.loadedOnce {
+            ProgressView()
+        } else {
+            ContentUnavailableView(emptyText, systemImage: "car.side")
         }
     }
 }

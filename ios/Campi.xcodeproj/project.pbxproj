@@ -11,6 +11,7 @@
 		0B1EF2E03E121E0E3C5803A0 /* SightingsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 553367140C77690FB7CA8169 /* SightingsView.swift */; };
 		0CE19E9A06368C38AFE93124 /* PairingView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3C8AC259857185CC4AF23A27 /* PairingView.swift */; };
 		0DC8D0A5D72DDF8E369B0893 /* LiveModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3D8F775EC74E344E3F4C12F2 /* LiveModel.swift */; };
+		1F2B064480ACA77BD83ECD27 /* CardexStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = 858FDE0B70F03FCFAF9E8ABC /* CardexStore.swift */; };
 		3069EF04174AB1E862965FE5 /* LiveView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 35E1A7B16D5E47A8E6495018 /* LiveView.swift */; };
 		3BF7C81316B30A80DC7DF0F6 /* SightingDetailView.swift in Sources */ = {isa = PBXBuildFile; fileRef = AE8C003F6CBE22F6E0AF2C61 /* SightingDetailView.swift */; };
 		3D37B4765F2F4F915814C203 /* AppModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = FB0A57E7C5F1E166B85093ED /* AppModel.swift */; };
@@ -19,6 +20,7 @@
 		52CC54D15295CA97856B04B1 /* CampiKit in Frameworks */ = {isa = PBXBuildFile; productRef = C38C3DA85464FB33EAAA3DE9 /* CampiKit */; };
 		561B6344763343687C16DA99 /* MediaSaver.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9BB631B9487AA0A678C2C25C /* MediaSaver.swift */; };
 		786C29246F9ECCE07F1BE32C /* SettingsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = DD247E2EB2267C55A4F08A5F /* SettingsView.swift */; };
+		7BABB5A13A1ED9A9CD3FA431 /* CardexCardView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1E7E88EEC07DEC39AF4827B3 /* CardexCardView.swift */; };
 		7DAFE2353591790E0671832E /* TodayModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = D57E5E87171B8F4122942817 /* TodayModel.swift */; };
 		82DF684D58ACC85F085E158C /* SightingsModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = C5F7F80899FD8B7A14D1796C /* SightingsModel.swift */; };
 		8A115BB302582CF7B3CBE309 /* RootView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 39744264472CDD72B3022907 /* RootView.swift */; };
@@ -30,6 +32,7 @@
 		B8A8BAAFCB29DFD038E2C4D0 /* HighlightsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 24686F5EFB70E6FE7EC01587 /* HighlightsView.swift */; };
 		C54A645D46F5E46FEEFE5353 /* SightingStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = F6713C58CB0D8B470730FB61 /* SightingStore.swift */; };
 		D90FC23952D39993941BC901 /* CampiApp.swift in Sources */ = {isa = PBXBuildFile; fileRef = 79182482FD527B71C6977FA5 /* CampiApp.swift */; };
+		E4824254C20BD4E57179D978 /* CardexGenerator.swift in Sources */ = {isa = PBXBuildFile; fileRef = 94DD728C33CBD10F42BAD363 /* CardexGenerator.swift */; };
 		ED13FCFD10572138D5995061 /* Formatting.swift in Sources */ = {isa = PBXBuildFile; fileRef = 251F3A9F83732407FE7E1EE8 /* Formatting.swift */; };
 		F3EA889E5D2371B75BE836A2 /* TimelapseView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 84AC9EE4BA7FE9F8F54B2BBD /* TimelapseView.swift */; };
 		F5C8C766CA78D63B516F86BE /* PlayerView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 70F09E70F330808A90E5E281 /* PlayerView.swift */; };
@@ -51,6 +54,7 @@
 		0B71C46D980691C749B7E9D7 /* StatusDetailView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = StatusDetailView.swift; sourceTree = "<group>"; };
 		0E6646DB3012F39FF40360DF /* NetworkPath.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NetworkPath.swift; sourceTree = "<group>"; };
 		11198FCA1C6DF015D1E32A14 /* RemoteImage.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RemoteImage.swift; sourceTree = "<group>"; };
+		1E7E88EEC07DEC39AF4827B3 /* CardexCardView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CardexCardView.swift; sourceTree = "<group>"; };
 		20185174CADBEE36C595822E /* CollectionView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CollectionView.swift; sourceTree = "<group>"; };
 		24686F5EFB70E6FE7EC01587 /* HighlightsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HighlightsView.swift; sourceTree = "<group>"; };
 		251F3A9F83732407FE7E1EE8 /* Formatting.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Formatting.swift; sourceTree = "<group>"; };
@@ -67,6 +71,8 @@
 		70F09E70F330808A90E5E281 /* PlayerView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PlayerView.swift; sourceTree = "<group>"; };
 		79182482FD527B71C6977FA5 /* CampiApp.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CampiApp.swift; sourceTree = "<group>"; };
 		84AC9EE4BA7FE9F8F54B2BBD /* TimelapseView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TimelapseView.swift; sourceTree = "<group>"; };
+		858FDE0B70F03FCFAF9E8ABC /* CardexStore.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CardexStore.swift; sourceTree = "<group>"; };
+		94DD728C33CBD10F42BAD363 /* CardexGenerator.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CardexGenerator.swift; sourceTree = "<group>"; };
 		9BB631B9487AA0A678C2C25C /* MediaSaver.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MediaSaver.swift; sourceTree = "<group>"; };
 		AE8C003F6CBE22F6E0AF2C61 /* SightingDetailView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SightingDetailView.swift; sourceTree = "<group>"; };
 		C5658DCF12B1BFDCC7CAFC16 /* Campi.entitlements */ = {isa = PBXFileReference; lastKnownFileType = text.plist.entitlements; path = Campi.entitlements; sourceTree = "<group>"; };
@@ -171,6 +177,7 @@
 			isa = PBXGroup;
 			children = (
 				4BAEC8F4810A3A18BE75B7AA /* App */,
+				98752E8EF33F2954B33F7690 /* Cardex */,
 				D43BC815B4261967BA481AB2 /* Collection */,
 				19A833C4434DD7FD138B26C4 /* Highlights */,
 				43066C44F3EBC52D10C906B3 /* Live */,
@@ -212,6 +219,16 @@
 				84AC9EE4BA7FE9F8F54B2BBD /* TimelapseView.swift */,
 			);
 			path = Timelapse;
+			sourceTree = "<group>";
+		};
+		98752E8EF33F2954B33F7690 /* Cardex */ = {
+			isa = PBXGroup;
+			children = (
+				1E7E88EEC07DEC39AF4827B3 /* CardexCardView.swift */,
+				94DD728C33CBD10F42BAD363 /* CardexGenerator.swift */,
+				858FDE0B70F03FCFAF9E8ABC /* CardexStore.swift */,
+			);
+			path = Cardex;
 			sourceTree = "<group>";
 		};
 		A17638718EB11E9F7649892B /* Pairing */ = {
@@ -363,6 +380,9 @@
 				3D37B4765F2F4F915814C203 /* AppModel.swift in Sources */,
 				40EE5FD23A1E386620E7D4DE /* Badges.swift in Sources */,
 				D90FC23952D39993941BC901 /* CampiApp.swift in Sources */,
+				7BABB5A13A1ED9A9CD3FA431 /* CardexCardView.swift in Sources */,
+				E4824254C20BD4E57179D978 /* CardexGenerator.swift in Sources */,
+				1F2B064480ACA77BD83ECD27 /* CardexStore.swift in Sources */,
 				AD6FB95B6E968A76C83E52FA /* CollectionView.swift in Sources */,
 				ED13FCFD10572138D5995061 /* Formatting.swift in Sources */,
 				B8A8BAAFCB29DFD038E2C4D0 /* HighlightsView.swift in Sources */,

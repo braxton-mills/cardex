@@ -234,6 +234,60 @@ final class SmokeTests: XCTestCase {
 
     /// Long-presses for the context menu and returns `item`, retrying the press once (it can miss while
     /// another animation is finishing).
+    // MARK: Cardex (M4.5)
+
+    /// Opens the first caught label's page and waits for its card to finish (generated or fallback).
+    @MainActor
+    private func openFirstCard(_ app: XCUIApplication) -> XCUIElement {
+        app.tabBars.buttons["Collection"].tap()
+        let tile = app.buttons.matching(identifier: "collection.tile").firstMatch
+        XCTAssertTrue(tile.waitForExistence(timeout: 10))
+        tile.tap()
+        let card = app.descendants(matching: .any)["cardex.card"]
+        XCTAssertTrue(card.waitForExistence(timeout: 10), "no Cardex card on the collection item page")
+        let writing = app.staticTexts["Writing card…"]
+        let done = XCTNSPredicateExpectation(predicate: NSPredicate(format: "exists == false"), object: writing)
+        XCTAssertEqual(XCTWaiter.wait(for: [done], timeout: 90), .completed, "card never finished")
+        return card
+    }
+
+    @MainActor
+    func testCardexCardsOnCollectionAndDetail() async throws {
+        let app = try await launchPaired()
+        _ = openFirstCard(app)
+        // Generated cards have rating rows ("Speed, 7 of 10"); fallback cards say why there's no text.
+        let rating = app.descendants(matching: .any).matching(NSPredicate(format: "label ENDSWITH ' of 10'")).firstMatch
+        let generated = rating.exists
+        print("Cardex: \(generated ? "generated on device" : "fallback (Apple Intelligence unavailable here)")")
+        XCTAssertTrue(generated || app.images["apple.intelligence"].exists
+                      || app.staticTexts.containing(NSPredicate(format: "label CONTAINS 'Apple Intelligence'")).firstMatch.exists)
+        attach(app, "27-cardex-collection-item")
+
+        // The same card on one of that label's sightings.
+        let sighting = app.buttons.matching(identifier: "sightings.card").firstMatch
+        XCTAssertTrue(sighting.waitForExistence(timeout: 10))
+        sighting.tap()
+        XCTAssertTrue(app.buttons["detail.timelapse"].waitForExistence(timeout: 10))
+        let detailCard = app.descendants(matching: .any)["cardex.card"]
+        XCTAssertTrue(detailCard.waitForExistence(timeout: 15), "no Cardex card on the sighting detail")
+        app.swipeUp()
+        attach(app, "28-cardex-detail")
+
+        // Regenerate from the ⋯ menu keeps a card on screen.
+        app.buttons["More"].tap()
+        app.buttons["Regenerate Card"].tap()
+        XCTAssertTrue(detailCard.waitForExistence(timeout: 5))
+    }
+
+    @MainActor
+    func testCardexFallbackWithoutAppleIntelligence() async throws {
+        let app = try await launchPaired(["-cardexFallback"])
+        _ = openFirstCard(app)
+        XCTAssertTrue(app.staticTexts["Card text is turned off for this test run."].waitForExistence(timeout: 5))
+        XCTAssertFalse(app.descendants(matching: .any).matching(NSPredicate(format: "label ENDSWITH ' of 10'")).firstMatch.exists)
+        attach(app, "29-cardex-fallback")
+    }
+
     // MARK: Live (M4)
 
     struct LiveCounters: Decodable { var state: String; var viewers: Int; var opened: Int; var closed: Int }

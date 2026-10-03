@@ -11,8 +11,8 @@ The iPhone companion to the Campi timelapse + vehicle-sightings service running 
 | M2 Sightings, detail actions, Collection, Highlights | done |
 | M3 Timelapse tab, player, Save to Photos / Share | done |
 | M4 Live (MJPEG on Wi-Fi, snapshots on cellular) | done |
-| M4.5 Cardex cards (on-device card text per label) | next |
-| M5 Push notifications + Home Screen widget | planned |
+| M4.5 Cardex cards (on-device card text per label) | done |
+| M5 Push notifications + Home Screen widget | next |
 | M6 Polish, accessibility, install on device | planned |
 
 The PC side (`campi ui` API, see `docs/api-contract.md` Appendix A) isn't built yet; the app runs against
@@ -26,6 +26,11 @@ The PC side (`campi ui` API, see `docs/api-contract.md` Appendix A) isn't built 
   hidden). Detail: crop, full frame, clip, runner-up guesses, star, hide, correct the label, and
   "View in Timelapse" (seeks the 10-minute clip, or the daily video once the clip has expired).
 - **Collection:** every label, caught or not, with counts, rarity tiers and Gemini discoveries.
+- **Cardex cards** (collection item page and sighting detail): a trading card per label, written on the phone by
+  Apple's on-device model (Foundation Models): name, type (Commuter, Work Truck, JDM, ...), three playful 1–10
+  ratings and a line of flavor text, never specs. Generated once per label and cached (SwiftData); "Regenerate
+  Card" from the card's context menu or the detail's ⋯ menu. Without Apple Intelligence it shows a plain card
+  and says why.
 - **Timelapse:** last 24 h of clips by hour (with expiry), daily videos, archive parts; save to Photos or share.
 - **Live** (from Today): MJPEG video at 10 fps on Wi-Fi, the newest saved frame every 2 s on cellular or Low Data
   Mode (or pick one). Disconnects as soon as it's off screen or the app leaves the foreground. Explains
@@ -68,6 +73,8 @@ In the simulator, pair with the mock at `http://127.0.0.1:8765` using the code t
 `curl -X POST http://127.0.0.1:8765/mock/pair-code` for a new one).
 
 Testing notes:
+- Cardex text is generated in the simulator only when this Mac has Apple Intelligence turned on; otherwise the
+  test sees the fallback card. `-cardexFallback` forces the fallback (and an in-memory cache).
 - Keep `-collect-test-diagnostics never`: without it, a failing UI test makes xcodebuild run
   `simctl diagnose` for up to 10 minutes, which looks like a hang.
 - The Timelapse UI test saves to Photos; grant the simulator permission first:

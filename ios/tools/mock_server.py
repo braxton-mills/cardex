@@ -855,6 +855,7 @@ class Handler(BaseHTTPRequestHandler):
                 return self.serve_mjpeg(q)
             with self.store.lock:
                 if path == "/mock/pair-code" and self.command == "POST":   # mock-only: fresh code for UI tests
+                    self.store.pair_attempts.clear()   # each test pairs once; don't trip the 10-per-10-min limit
                     return self.send_json(201, {"code": self.store.new_pair_code()})
                 if path == "/mock/live":   # mock-only: live viewer counters; POST {"state", "rotation"} changes them
                     if self.command == "POST":

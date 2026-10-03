@@ -158,7 +158,14 @@ struct CollectionItemView: View {
     }
 
     var body: some View {
-        VStack(spacing: 0) {
+        SightingGrid(model: model, emptyText: "No visible sightings of \(item.label).", header: AnyView(header))
+            .navigationTitle(item.label)
+            .navigationBarTitleDisplayMode(.inline)
+            .task { if !model.loadedOnce { await model.reload(app: app) } }
+    }
+
+    private var header: some View {
+        VStack(spacing: 12) {
             HStack(spacing: 14) {
                 if let cover = item.cover {
                     RemoteImage(path: cover.crop, maxPixelSize: 300)
@@ -180,11 +187,8 @@ struct CollectionItemView: View {
                 }
                 Spacer()
             }
-            .padding()
-            SightingGrid(model: model, emptyText: "No visible sightings of \(item.label).")
+            CardexCardView(item: item, showsStats: false)
         }
-        .navigationTitle(item.label)
-        .navigationBarTitleDisplayMode(.inline)
-        .task { if !model.loadedOnce { await model.reload(app: app) } }
+        .padding()
     }
 }

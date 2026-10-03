@@ -20,6 +20,8 @@ final class AppModel {
     let sightings = SightingStore()
     /// Save to Photos / Share downloads (M3).
     let saver = MediaSaver()
+    /// Cardex card text per label, generated on device and cached (M4.5).
+    let cardex = CardexStore()
     /// The label collection, shared by Collection, the label picker and the make filter.
     private(set) var collection: LabelCollection?
     /// Set when a label correction changed counts; Collection reloads on next appearance.

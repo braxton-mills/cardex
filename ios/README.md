@@ -1,7 +1,42 @@
 # Campi for iPhone
 
 The iPhone companion to the Campi timelapse + vehicle-sightings service running on the Windows PC
-(`../picam-timelapse-RIFE`).
+(`../picam-timelapse-RIFE`). Native SwiftUI, iOS 26+, no third-party dependencies.
+
+## Status
+| Milestone | State |
+|---|---|
+| M0 API contract, mock PC, compliance checker | done |
+| M1 App skeleton: pairing, Today/status, settings | done |
+| M2 Sightings, detail actions, Collection, Highlights | done |
+| M3 Timelapse tab, player, Save to Photos / Share | done |
+| M4 Live (MJPEG on Wi-Fi, snapshots on cellular) | next |
+| M5 Push notifications + Home Screen widget | planned |
+| M6 Polish, accessibility, install on device | planned |
+
+The PC side (`campi ui` API, see `docs/api-contract.md` Appendix A) isn't built yet; the app runs against
+`tools/mock_server.py` until it is.
+
+## What the app does
+- **Today:** service health (same data as `campi status`), today's counts, newest clip, latest sightings,
+  today's highlights. Refreshes every 30 s while open.
+- **Highlights:** new catches, rare labels, busiest 10-minute windows, daily videos and anything starred.
+- **Sightings:** grid by day with filters (dates, type, make, who decided the label, starred, unsure, parked,
+  hidden). Detail: crop, full frame, clip, runner-up guesses, star, hide, correct the label, and
+  "View in Timelapse" (seeks the 10-minute clip, or the daily video once the clip has expired).
+- **Collection:** every label, caught or not, with counts, rarity tiers and Gemini discoveries.
+- **Timelapse:** last 24 h of clips by hour (with expiry), daily videos, archive parts; save to Photos or share.
+
+## How the phone reaches the PC
+The PC's API stays on `127.0.0.1:8765` and is published over Tailscale (`tailscale serve`), so the app talks
+to `https://<pc>.<tailnet>.ts.net` at home or on cellular. Pair once: run `campi pair` on the PC and scan its
+QR code with the Camera app (or type the address and code). The token lives in the Keychain; media URLs are
+signed per device. Details: `docs/api-contract.md` §1 and §3.
+
+## Requirements
+- Xcode 27 (Swift 6), XcodeGen (`brew install xcodegen`), Python 3.11+, ffmpeg (for mock media)
+- Apple Developer team `""`, bundle id `com.braxtonmills.campi`
+- Installing on an iOS 27.2 beta device may need the matching Xcode beta
 
 | Path | What |
 |---|---|
@@ -14,7 +49,7 @@ The iPhone companion to the Campi timelapse + vehicle-sightings service running 
 | `tools/contract_check.py` | Compliance test. Run it against the mock now and the real PC later. |
 | `project.yml` | XcodeGen spec. `Campi.xcodeproj` is generated from it but committed as a fallback. |
 | `CampiKit/` | Swift package: contract models, API client, pairing, Keychain storage, image cache (`swift test`). |
-| `Campi/` | The SwiftUI app. |
+| `Campi/` | The SwiftUI app (Today, Highlights, Sightings, Collection, Timelapse, player, pairing, settings). |
 | `CampiUITests/` | End-to-end smoke tests against the mock (skipped when it isn't running). |
 
 ## Build and test
@@ -27,6 +62,15 @@ xcodebuild -project Campi.xcodeproj -scheme Campi \
 ```
 In the simulator, pair with the mock at `http://127.0.0.1:8765` using the code the mock prints (or
 `curl -X POST http://127.0.0.1:8765/mock/pair-code` for a new one).
+
+Testing notes:
+- Keep `-collect-test-diagnostics never`: without it, a failing UI test makes xcodebuild run
+  `simctl diagnose` for up to 10 minutes, which looks like a hang.
+- The Timelapse UI test saves to Photos; grant the simulator permission first:
+  `xcrun simctl privacy booted grant photos-add com.braxtonmills.campi`.
+- If simulator commands hang (heavy load), restart it: `xcrun simctl shutdown <udid>`, `xcrun simctl boot <udid>`,
+  `xcrun simctl bootstatus <udid> -b`.
+- `build/` (derived data, test results) is git-ignored; add `build/.metadata_never_index` to keep Spotlight out.
 
 ## Mock PC
 ```sh

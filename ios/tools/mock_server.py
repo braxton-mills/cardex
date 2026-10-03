@@ -6,6 +6,7 @@
     python3 tools/mock_server.py --sightings-off --v1
     python3 tools/mock_server.py --write-fixtures   # regenerate contract/fixtures/ (fixed clock and seed)
     python3 tools/mock_server.py --print-push new_catch > /tmp/p.apns   # for `xcrun simctl push`
+    curl -X POST http://127.0.0.1:8765/mock/pair-code                   # mock-only: issue a fresh pairing code
 
 Stdlib only (Python 3.11+). Sample media is generated once with ffmpeg into tools/mock_media/.
 Mock limitations: every clip/daily/archive/sighting file of a kind is the same sample file; /live.jpg ignores w
@@ -848,6 +849,8 @@ class Handler(BaseHTTPRequestHandler):
             if path == "/live.mjpg":
                 return self.serve_mjpeg(q)
             with self.store.lock:
+                if path == "/mock/pair-code" and self.command == "POST":   # mock-only: fresh code for UI tests
+                    return self.send_json(201, {"code": self.store.new_pair_code()})
                 if path == "/api/pair" and self.command == "POST":
                     return self.send_json(201, self.pair())
                 if not path.startswith("/api/"):
@@ -1293,6 +1296,7 @@ def main(argv=None):
     ap.add_argument("--public-url", help="base URL to put in the pairing link (default http://<host>:<port>)")
     ap.add_argument("--tz", help="IANA zone for the mock PC (default: this Mac's)")
     ap.add_argument("--seed", type=int, default=7)
+    ap.add_argument("--pair-code", help="use this pairing code (8 Crockford chars, still single-use); for UI tests")
     ap.add_argument("--sightings-off", action="store_true", help="[sightings] enabled = false (history kept)")
     ap.add_argument("--no-sightings-db", action="store_true", help="no sightings.db at all")
     ap.add_argument("--v1", action="store_true", help="schema v1 / reserved status fields null")
@@ -1320,6 +1324,11 @@ def main(argv=None):
     srv.daemon_threads = True
     base = a.public_url or f"http://{'127.0.0.1' if a.host == '0.0.0.0' else a.host}:{a.port}"
     code = store.new_pair_code()
+    if a.pair_code:
+        store.pair_codes.clear()
+        fixed = re.sub(r"[\s-]", "", a.pair_code).upper()
+        store.pair_codes[fixed] = clock.now() + 600
+        code = f"{fixed[:4]}-{fixed[4:]}"
     print(f"Campi mock PC on {base}  (tz {clock.tz.key}, {len(store.sightings)} sightings, "
           f"{len(store.clips())} clips)", file=sys.stderr)
     print(f"  dev token : {a.token}", file=sys.stderr)

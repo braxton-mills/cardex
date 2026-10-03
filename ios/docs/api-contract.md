@@ -42,7 +42,7 @@ and every URL the API returns, against it.
   *(note: this lets the phone show the same wall-clock time as the video overlays, even when the phone is
   elsewhere, without needing the PC's IANA zone, which stdlib Python on Windows can't produce.)*
 - **Days** (`date`) are PC-local calendar dates `YYYY-MM-DD`. "Today" always means the PC's local day.
-- Query parameters that take an instant accept RFC 3339 (any offset, `Z` allowed) or Unix seconds (`1759518312.345`).
+- Query parameters that take an instant accept RFC 3339 (any offset, `Z` allowed) or Unix seconds (`1791054312.345`).
 
 ### 2.3 IDs
 | Thing | ID | Example |
@@ -126,7 +126,7 @@ Codes are matched case-insensitively, ignoring `-` and spaces. `POST /api/pair` 
 ### 3.3 Signed URLs
 Every URL the API returns under `/media/...` and `/live...` is **pre-signed** for the requesting device:
 ```
-/media/sightings/2026-10-03/140512_5f0c2a9e_toyota-camry_crop.jpg?d=dev_k3j9q2m8x4c7v1bz&exp=1759561512&sig=Qm9...
+/media/sightings/2026-10-03/140512_5f0c2a9e_toyota-camry_crop.jpg?d=dev_k3j9q2m8x4c7v1bz&exp=1791097512&sig=Qm9...
 ```
 - `d` = device id, `exp` = Unix seconds, `sig` = base64url (no padding) of
   `HMAC-SHA256(server_secret, "<d>|<path>|<exp>")`. `<path>` is the URL path exactly as sent (percent-encoded),
@@ -700,8 +700,8 @@ bundle_id = "com.braxtonmills.campi"
 **A.4 Render index** (small service change; output videos unchanged): `render_clip` and `render_daily` also write
 `state\render_index\<output file stem>.json`:
 ```json
-{"output": "campi_2026-10-03_1410.mp4", "window_start_ts": 1759518600.0, "window_end_ts": 1759519200.0,
- "base_fps": 30, "interp_factor": 2, "frame_ts": [1759518601.02, 1759518603.04]}
+{"output": "campi_2026-10-03_1410.mp4", "window_start_ts": 1791054600.0, "window_end_ts": 1791055200.0,
+ "base_fps": 30, "interp_factor": 2, "frame_ts": [1791054601.02, 1791054603.04]}
 ```
 `frame_ts` = the timestamps of the frames actually encoded, in order (after unreadable frames are skipped). The
 file is written after the video is replaced, and housekeeping deletes it together with its video. This makes

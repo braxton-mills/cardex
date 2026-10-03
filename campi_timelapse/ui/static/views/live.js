@@ -1,12 +1,22 @@
-import { api, fill, h } from '../lib.js';
+import { api, fill, h, viewHead } from '../lib.js';
+
+// Camera-viewfinder overlay: corner brackets, blinking REC, a ticking clock, a scan line, center cross.
+function viewfinder(clock) {
+  return h('div', { class: 'viewfinder', 'aria-hidden': 'true' },
+    ['tl', 'tr', 'bl', 'br'].map((c) => h('i', { class: `corner ${c}` })),
+    h('span', { class: 'rec' }, h('i'), 'REC'), clock, h('span', { class: 'scan' }), h('span', { class: 'center' }));
+}
 
 // Every viewer is another full stream over the Pi's Wi-Fi, so the <img> only exists while this view is showing and
 // the window is visible; switching views, minimizing or hiding the tab drops it (the server closes the upstream).
 export async function mount(el, _params, ctx) {
   const frame = h('div', { class: 'live-frame' });
-  const state = h('span', { class: 'muted' });
-  el.append(h('header', { class: 'view-head' }, h('h1', {}, 'Live'), state), frame);
+  const state = h('span', { class: 'live-pill' }, h('i', { class: 'live-dot' }), h('span', {}, 'connecting…'));
+  const setState = (text, on = false) => { state.lastChild.textContent = text; state.classList.toggle('on', on); };
+  el.append(viewHead(state, h('span', { class: 'muted' }, 'Connected only while this view is showing')), h('div', { class: 'live-wrap' }, frame));
   let img = null;
+  const clock = h('span', { class: 'clock' });
+  let clockTimer = null;
   // Level it like the renders do ([image] rotation + level_deg, cropped so there are no black corners)
   let transform = '';
   try {
@@ -22,24 +32,29 @@ export async function mount(el, _params, ctx) {
   function start() {
     if (img) return;
     const me = h('img', { src: `/live.mjpg?t=${Date.now()}`, alt: 'live camera', style: { transform } });
-    me.addEventListener('load', () => { if (img === me) state.textContent = 'connected'; }, { once: true });
+    me.addEventListener('load', () => { if (img === me) setState('LIVE', true); }, { once: true });
     me.addEventListener('error', () => {
       if (img !== me) return; // our own abort below
-      state.textContent = '';
-      stop('The camera stream is unavailable. Switch views and back to retry.');
+      stop('The camera stream is unavailable. Switch views and back to retry.', 'unavailable');
     });
     img = me;
-    fill(frame, img);
-    state.textContent = 'connecting…';
+    const tick = () => { clock.textContent = new Date().toLocaleTimeString([], { hour12: false }); };
+    tick();
+    clearInterval(clockTimer);
+    clockTimer = setInterval(tick, 1000);
+    fill(frame, img, viewfinder(clock));
+    setState('connecting…');
   }
 
-  function stop(why = 'Paused while hidden.') {
+  function stop(why = 'Paused while hidden.', label = 'paused') {
+    clearInterval(clockTimer);
     if (!img) return;
     const old = img;
     img = null;
     old.src = 'data:,'; // aborts the multipart request
     old.remove();
     fill(frame, h('p', { class: 'muted' }, why));
+    setState(label);
   }
 
   if (!ctx.isHidden()) start(); else stop();

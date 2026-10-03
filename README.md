@@ -196,10 +196,14 @@ launching it changes nothing: only `campi ui` imports it, from its own env.
 Its own data, in `%USERPROFILE%\CampiTimelapse\ui\`: `ui.db` (your stars, hidden sightings and label
 corrections), `ui.log`, and `webview\` (the window's browser profile).
 
-Views (sidebar; dark theme). Keys: `J`/`K` next/previous, `Space` play/pause, `S` star, `Enter` open, `Esc` close.
-- **Today**: status strip (the same data as `campi status`, refreshed every 30 s: service, stream, last/next
-  clip, sightings backend and device, Gemini calls, gaming, render queue, disk), the newest 10-minute clip playing,
-  today's counts, the latest sightings and today's highlights.
+Views (side navigation; the hamburger collapses it to an icon rail, remembered per PC). Keys: `J`/`K`
+next/previous, `Space` play/pause, `S` star, `Enter` open, `Esc` close.
+- **Today**: the newest 10-minute clip as the hero (it doesn't switch away while you're watching; a "Newer" button
+  appears instead), a Collection dial (labels caught), a sightings chart (today by hour or the last 7 days, busiest
+  bar highlighted; click a bar for "Play hour" or "Open day"), the camera status card (the same data as
+  `campi status`, refreshed every 30 s: last frame, stream, last/next clip, detector device, Gemini calls, disk,
+  plus gaming / render queue / crash alerts), the latest sighting with older/newer buttons and a play button that
+  opens it in the timelapse, today's mix by class, the latest sightings and today's highlights.
 - **Highlights**, newest first, filterable: *new catches* (first-ever sighting of a label), *rare* (labels seen 3
   times or fewer), *busiest windows* (the 3 ten-minute windows per day with the most moving vehicles), each day's
   *daily video*, and anything you *starred*.
@@ -221,6 +225,11 @@ Views (sidebar; dark theme). Keys: `J`/`K` next/previous, `Space` play/pause, `S
 
 With sightings off, the sightings views say so (and still show any history already recorded).
 
+Motion: new sightings "drive by" across the Today hero in the direction the car went, a first-ever label sets off
+confetti, stars burst, numbers count up, cards tilt toward the cursor, legendary collection tiles shimmer, and Live
+looks like a camera viewfinder. All of it is off when Windows animations are off (Settings > Accessibility > Visual
+effects), via `prefers-reduced-motion`.
+
 ### API
 The window uses a plain JSON API, meant to stay stable for other clients (an iPhone app later). Interactive docs:
 `http://127.0.0.1:8765/api/docs`. Times are ISO 8601: `*_at` in UTC as stored, `*_local` with the PC's offset.
@@ -234,6 +243,7 @@ Lists are `{"items": [...], "next_cursor": ...}`; pass `cursor` (or `before` for
 | `POST /api/sightings/{id}/star`, `/hide` | body `{"value": true}`; returns the sighting |
 | `POST /api/sightings/{id}/label` | body `{"label": "Honda Civic"}` (or `null` to undo); returns the sighting |
 | `GET /api/today` | today's counts (total, by class, by label source, different labels, new catches) |
+| `GET /api/activity?days=1` | visible sightings per local hour of today (`days=1`) or per local day for the last N days: `{unit, items: [{start_at, start_local, count}]}` |
 | `GET /api/collection` | `{caught, total, discovered, items: [{label, make, model, generic, discovered, count, tier, first_seen, last_seen}]}` |
 | `GET /api/highlights?type=new_catch,rare,busy_window,daily,starred&before&limit` | highlight items `{type, types, at, title, sighting / window / daily / clip}` |
 | `GET /api/clips?hours=24`, `GET /api/clips/newest` | 10-minute clips (start, end, size, sighting count, starred, `url`) |

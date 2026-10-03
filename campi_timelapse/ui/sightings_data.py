@@ -286,6 +286,34 @@ LEFT JOIN ui.stars st ON st.kind = 'sighting' AND st.key = s.id)"""
             return out
         return self._cached("today", build)
 
+    def activity(self, days: int = 1) -> dict:
+        """Visible sightings per local hour of today (days=1) or per local day for the last `days` days."""
+        def build():
+            today = date.today()
+            if days == 1:
+                lo, hi = local_day_bounds_utc(today)
+                start = datetime.combine(today, datetime.min.time())
+                buckets = [start.replace(hour=hr) for hr in range(24)]
+                unit = "hour"
+            else:
+                lo = local_day_bounds_utc(date.fromordinal(today.toordinal() - days + 1))[0]
+                hi = local_day_bounds_utc(today)[1]
+                buckets = [datetime.combine(date.fromordinal(today.toordinal() - k), datetime.min.time())
+                           for k in range(days - 1, -1, -1)]
+                unit = "day"
+            counts = [0] * len(buckets)
+            with self._open() as (con, eff):
+                if con is not None:
+                    for (at,) in con.execute(f"WITH {eff} SELECT started_at FROM eff WHERE NOT hidden "
+                                             "AND started_at >= ? AND started_at < ?", (lo, hi)):
+                        t = datetime.fromtimestamp(to_ts(at))
+                        i = t.hour if unit == "hour" else (t.date() - buckets[0].date()).days
+                        if 0 <= i < len(counts):
+                            counts[i] += 1
+            return {"unit": unit, "items": [{"start_at": utc_iso(b.timestamp()), "start_local": local_iso(b.timestamp()),
+                                             "count": n} for b, n in zip(buckets, counts)]}
+        return self._cached(f"activity{days}", build)
+
     def highlight_items(self) -> list[dict]:
         """Sighting-based highlights: new catches, rare labels, starred sightings (one item per sighting, with every
         type that applies) and the busiest windows per day. Unsorted; app.py merges in videos and sorts."""

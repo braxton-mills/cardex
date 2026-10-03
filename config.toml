@@ -108,7 +108,7 @@ classify_crops = 5             # best crops per vehicle kept during a pass and s
 
 [sightings.cloud]
 # Gemini second opinion for unsure / close / first-ever labels. The row is written first and updated later.
-enabled = false
+enabled = true
 model = "gemini-3.1-flash-lite"
 api_key_file = "{home}\\CampiTimelapse\\secrets\\gemini.key"   # outside the repo; never logged
 cloud_margin = 0.15            # also ask when top-1 minus top-2 share is below this

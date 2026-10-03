@@ -8,18 +8,32 @@
   <link rel="stylesheet" href="/static/app.css">
 </head>
 <body>
-  <nav class="nav">
-    <div class="brand"><span class="dot"></span>Campi</div>
-    <a href="#/today" data-view="today">Today</a>
-    <a href="#/highlights" data-view="highlights">Highlights</a>
-    <a href="#/sightings" data-view="sightings">Sightings</a>
-    <a href="#/collection" data-view="collection">Collection</a>
-    <a href="#/timelapse" data-view="timelapse">Timelapse</a>
-    <a href="#/live" data-view="live">Live</a>
+  <div class="aurora" aria-hidden="true"><i></i><i></i><i></i></div>
+  <aside class="nav" aria-label="Main">
+    <div class="nav-top">
+      <button class="icon-btn hamburger" id="hamburger" title="Collapse menu" aria-label="Toggle menu"></button>
+      <div class="brand">Campi<span class="lens"></span></div>
+    </div>
+    <nav class="nav-links">
+      <span class="nav-ind" aria-hidden="true"></span>
+      <a href="#/today" data-view="today" data-icon="today" title="Today"><span>Today</span></a>
+      <a href="#/highlights" data-view="highlights" data-icon="sparkle" title="Highlights"><span>Highlights</span></a>
+      <a href="#/sightings" data-view="sightings" data-icon="car" title="Sightings"><span>Sightings</span></a>
+      <a href="#/collection" data-view="collection" data-icon="grid" title="Collection"><span>Collection</span></a>
+      <a href="#/timelapse" data-view="timelapse" data-icon="film" title="Timelapse"><span>Timelapse</span></a>
+      <a href="#/live" data-view="live" data-icon="live" title="Live"><span>Live</span></a>
+    </nav>
     <div class="grow"></div>
     <div class="keys"><kbd>J</kbd><kbd>K</kbd> next / prev<br><kbd>Space</kbd> play / pause<br><kbd>S</kbd> star · <kbd>Esc</kbd> close</div>
-  </nav>
-  <main id="main"></main>
+  </aside>
+  <div class="shell">
+    <header class="topbar">
+      <div class="titles"><h1 id="page-title">Campi</h1><div id="page-sub"></div></div>
+      <div class="grow"></div>
+      <div class="top-actions" id="top-actions"></div>
+    </header>
+    <main id="main"></main>
+  </div>
   <datalist id="label-options"></datalist>
   <div id="toast" class="toast" role="status"></div>
   <script type="module" src="/static/app.js"></script>

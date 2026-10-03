@@ -173,6 +173,11 @@ def create_app(cfg, bind_host: str = "127.0.0.1") -> FastAPI:
     def today():
         return sd.today()
 
+    @app.get("/api/activity", tags=["sightings"])
+    def activity(days: int = Query(1, ge=1, le=31, description="1 = today by hour; N = last N days by day")):
+        """Visible sightings per local hour of today, or per local day: {unit, items: [{start_at, start_local, count}]}."""
+        return sd.activity(days)
+
     # ------------------------------------------------------------ highlights
 
     @app.get("/api/highlights", tags=["highlights"])

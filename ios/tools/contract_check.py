@@ -2,10 +2,12 @@
 """Check a running Campi API against docs/api-contract.md. Stdlib only.
 
     python3 tools/contract_check.py http://127.0.0.1:8765 --token <token>
+    python3 tools/contract_check.py https://campi-pc.tail1234.ts.net --pair K3J9-Q2M8     # code from `campi pair`
     python3 tools/contract_check.py https://campi-pc.tail1234.ts.net --token <token> --skip-live
     python3 tools/contract_check.py --fixtures          # only validate contract/fixtures against schema.json
 
-Use a token from a device paired just for this check (`campi pair`): the check changes that device's push
+`--pair` pairs a device named "contract-check" with a code from `campi pair` and uses its token; revoke it afterwards
+with `campi devices revoke <id>` (the id is printed). Use a device paired just for this check: the check changes its push
 settings. Stars, hides and label corrections it makes on sightings, clips and daily videos are restored
 afterwards (use --read-only to skip them). Exit code 0 = compliant.
 """
@@ -497,10 +499,26 @@ def parse_dt(s: str) -> float:
     return datetime.fromisoformat(s).timestamp()
 
 
+def pair(base: str, code: str) -> str:
+    """POST /api/pair (api-contract §4.1) as a throwaway "contract-check" device; returns its token."""
+    body = json.dumps({"code": code, "device_name": "contract-check", "platform": "other"}).encode()
+    r = urllib.request.Request(base.rstrip("/") + "/api/pair", data=body, method="POST",
+                               headers={"Content-Type": "application/json"})
+    try:
+        with OPENER.open(r, timeout=30) as resp:
+            res = json.loads(resp.read())
+    except urllib.error.HTTPError as e:
+        sys.exit(f"pairing failed: HTTP {e.code} {e.read()[:300]!r}")
+    print(f"paired as {res['device']['id']} (contract-check) on {res['server_name']}; "
+          f"revoke it afterwards: campi devices revoke {res['device']['id']}")
+    return res["token"]
+
+
 def main(argv=None) -> int:
     ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     ap.add_argument("base", nargs="?", help="base URL, e.g. http://127.0.0.1:8765")
     ap.add_argument("--token")
+    ap.add_argument("--pair", metavar="CODE", help="pair a contract-check device with this code and use its token")
     ap.add_argument("--fixtures", action="store_true", help="only validate contract/fixtures")
     ap.add_argument("--read-only", action="store_true", help="skip checks that change state")
     ap.add_argument("--skip-live", action="store_true")
@@ -511,8 +529,12 @@ def main(argv=None) -> int:
         print("\n".join(errs) or "fixtures: all valid")
         if not a.base:
             return 1 if errs else 0
+    if a.pair and a.token:
+        ap.error("use --token or --pair, not both")
+    if a.pair:
+        a.token = pair(a.base, a.pair)
     if not a.token:
-        ap.error("--token is required")
+        ap.error("--token or --pair is required")
     return Checker(a.base, a.token, a.read_only, a.skip_live, a.verbose).run()
 
 

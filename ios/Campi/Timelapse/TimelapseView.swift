@@ -278,7 +278,7 @@ struct ClipRow: View {
         HStack(spacing: 12) {
             Poster(path: clip.media.poster)
             VStack(alignment: .leading, spacing: 3) {
-                HStack(spacing: 6) {
+                FlowLayout(spacing: 6) {
                     Text("\(clip.windowStart.timeText)–\(clip.windowEnd.timeText)").font(.subheadline.weight(.semibold))
                     if isLatest { Pill(text: "Newest", color: .green) }
                     if clip.starred { Image(systemName: "star.fill").foregroundStyle(.yellow).font(.caption) }

@@ -13,7 +13,7 @@ The iPhone companion to the Campi timelapse + vehicle-sightings service running 
 | M4 Live (MJPEG on Wi-Fi, snapshots on cellular) | done |
 | M4.5 Cardex cards (on-device card text per label) | done |
 | M5 Push notifications + Home Screen widget | done |
-| M6 Polish, accessibility, install on device | next |
+| M6 Polish, accessibility, install on device | polish done; device install next |
 
 The PC side (`campi ui` API, see `docs/api-contract.md` Appendix A) isn't built yet; the app runs against
 `tools/mock_server.py` until it is.
@@ -84,6 +84,9 @@ Testing notes:
 - The widget test adds the Campi widget to the simulator's home screen once; it stays there.
 - The push environment follows the signing (`aps-environment` in the embedded profile), not Debug/Release:
   a Release build installed from Xcode is development-signed and gets sandbox tokens.
+- Accessibility: `testAccessibilityAudit` runs Xcode's audit on every screen (contrast, hit areas, labels);
+  `testLargestTextSize` screenshots every screen at the largest accessibility text size for review.
+  `testNoSightingsDatabase` needs a second mock: `python3 tools/mock_server.py --port 8766 --no-sightings-db`.
 - Cardex text is generated in the simulator only when this Mac has Apple Intelligence turned on; otherwise the
   test sees the fallback card. `-cardexFallback` forces the fallback (and an in-memory cache).
 - Keep `-collect-test-diagnostics never`: without it, a failing UI test makes xcodebuild run
@@ -112,6 +115,22 @@ The first run uses ffmpeg (`brew install ffmpeg`) to generate sample media into 
 ```sh
 python3 tools/contract_check.py --fixtures                                  # fixtures vs schema
 python3 tools/contract_check.py http://127.0.0.1:8765 --token mock-token    # a live server
+python3 tools/contract_check.py https://<pc>.<tailnet>.ts.net --pair K3J9-Q2M8   # the real PC, code from `campi pair`
 ```
-Against the real PC, use a token from a device paired only for the check (`campi pair`). The check changes that
-device's push settings and restores the stars, hides and label corrections it touches.
+Against the real PC, `--pair` pairs a throwaway "contract-check" device with a code from `campi pair` and prints its
+id; revoke it afterwards with `campi devices revoke <id>`. The check changes that device's push settings and
+restores the stars, hides and label corrections it touches.
+
+## Install on an iPhone
+```sh
+xcodebuild -project Campi.xcodeproj -scheme Campi -configuration Release -destination 'generic/platform=iOS' \
+  -derivedDataPath build/device -allowProvisioningUpdates build
+xcrun devicectl list devices
+xcrun devicectl device install app --device <UDID> build/device/Build/Products/Release-iphoneos/Campi.app
+```
+Automatic signing creates the App IDs and profiles for the app and both extensions (App Group, Keychain sharing,
+Push). The phone needs Developer Mode on. A beta iOS may need the matching Xcode beta.
+
+## App icon
+`swift tools/make_icon.swift` draws the light, dark and tinted icons into `AppIcon.appiconset` (CoreGraphics; no
+SF Symbols, which can't be used in app icons).

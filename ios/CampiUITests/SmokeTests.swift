@@ -102,7 +102,9 @@ final class SmokeTests: XCTestCase {
         let app = XCUIApplication()
         app.launchArguments = ["-resetPairing"] + extraArguments
         app.launch()
-        XCTAssertTrue(app.textFields["pair.server"].waitForExistence(timeout: 10))
+        XCTAssertTrue(app.navigationBars["Campi"].waitForExistence(timeout: 10))
+        for _ in 0..<6 where !(app.buttons["pair.submit"].exists && app.buttons["pair.submit"].isHittable) { app.swipeUp() }   // large text sizes
+        XCTAssertTrue(app.textFields["pair.server"].waitForExistence(timeout: 5))
         app.textFields["pair.server"].tap()
         app.textFields["pair.server"].typeText(Self.mock)
         app.textFields["pair.code"].tap()
@@ -296,6 +298,129 @@ final class SmokeTests: XCTestCase {
 
     /// Long-presses for the context menu and returns `item`, retrying the press once (it can miss while
     /// another animation is finishing).
+    // MARK: Accessibility (M6)
+
+    /// Runs Xcode's accessibility audit on every main screen; logs each issue, then fails if any are left.
+    @MainActor
+    func testAccessibilityAudit() async throws {
+        let app = try await launchPaired()
+        var issues: [String] = []
+        // Not counted: Dynamic Type and text clipping (checked with screenshots at the largest size instead; these
+        // audits also flag stock Form rows, the search field and reserved second lines), "nearly passed" contrast
+        // (iOS's own secondary label color), and contrast measured through the floating tab bar or a system
+        // toolbar button.
+        func audit(_ screen: String) throws {
+            sleep(1)
+            let tabBarTop = app.tabBars.firstMatch.exists ? app.tabBars.firstMatch.frame.minY : .infinity
+            try app.performAccessibilityAudit(for: .all.subtracting([.dynamicType, .textClipped])) { issue in
+                let el = issue.element
+                if issue.auditType == .contrast {
+                    if issue.compactDescription.contains("nearly passed") { return true }
+                    guard let el else { return true }   // no element to judge: rows under the tab bar
+                    if el.frame.maxY > tabBarTop - 4 || (el.elementType == .button && el.label == "Done") { return true }
+                }
+                let line = "\(screen): \(issue.compactDescription) – \(el?.debugDescription.prefix(160) ?? "no element")"
+                print("AUDIT \(line)")
+                issues.append(line)
+                return true
+            }
+        }
+        XCTAssertTrue(app.buttons["today.status"].waitForExistence(timeout: 10))
+        try audit("Today")
+        app.buttons["today.live"].tap()
+        XCTAssertTrue(app.images["live.image"].waitForExistence(timeout: 15))
+        try audit("Live")
+        app.buttons["live.close"].tap()
+        app.buttons["Settings"].tap()
+        XCTAssertTrue(app.navigationBars["Settings"].waitForExistence(timeout: 5))
+        try audit("Settings")
+        app.navigationBars["Settings"].buttons["Done"].tap()
+        for tab in ["Highlights", "Sightings", "Collection", "Timelapse"] {
+            app.tabBars.buttons[tab].tap()
+            sleep(2)
+            try audit(tab)
+        }
+        app.tabBars.buttons["Sightings"].tap()
+        app.buttons.matching(identifier: "sightings.card").firstMatch.tap()
+        XCTAssertTrue(app.buttons["detail.timelapse"].waitForExistence(timeout: 10))
+        try audit("Detail")
+        XCTAssertTrue(issues.isEmpty, "\(issues.count) accessibility issues:\n" + issues.joined(separator: "\n"))
+    }
+
+    /// Every main screen at the largest accessibility text size (AX5), for review: nothing may overlap or vanish.
+    @MainActor
+    func testLargestTextSize() async throws {
+        let app = try await launchPaired(["-UIPreferredContentSizeCategoryName", "UICTContentSizeCategoryAccessibilityXXXL"])
+        XCTAssertTrue(app.buttons["today.status"].waitForExistence(timeout: 10))
+        sleep(2)
+        attach(app, "40-ax5-today")
+        app.swipeUp()
+        attach(app, "41-ax5-today-scrolled")
+        for (i, tab) in ["Highlights", "Sightings", "Collection", "Timelapse"].enumerated() {
+            app.tabBars.buttons[tab].tap()
+            sleep(2)
+            attach(app, "4\(i + 2)-ax5-\(tab.lowercased())")
+        }
+        app.tabBars.buttons["Sightings"].tap()
+        app.buttons.matching(identifier: "sightings.card").firstMatch.tap()
+        XCTAssertTrue(app.buttons["detail.timelapse"].waitForExistence(timeout: 10))
+        sleep(2)
+        attach(app, "46-ax5-detail")
+        app.swipeUp()
+        attach(app, "47-ax5-detail-card")
+    }
+
+    /// Every tab when the PC stops answering before it was ever loaded, and Today when it stops after.
+    @MainActor
+    func testOfflineStates() async throws {
+        try await Self.mockOffline(seconds: 0)
+        addTeardownBlock { try? await Self.mockOffline(seconds: 0) }
+        let app = try await launchPaired()
+        XCTAssertTrue(app.buttons["today.status"].waitForExistence(timeout: 10))
+        try await Self.mockOffline(seconds: 120)
+        for (i, tab) in ["Highlights", "Sightings", "Collection", "Timelapse"].enumerated() {
+            app.tabBars.buttons[tab].tap()
+            XCTAssertTrue(app.buttons["Try Again"].firstMatch.waitForExistence(timeout: 30), "\(tab) has no offline state")
+            attach(app, "5\(i)-offline-\(tab.lowercased())")
+        }
+        app.tabBars.buttons["Today"].tap()
+        app.swipeDown()   // pull to refresh: keeps the last status, marked stale
+        XCTAssertTrue(app.staticTexts.containing(NSPredicate(format: "label CONTAINS 'last known status'")).firstMatch
+            .waitForExistence(timeout: 30))
+        attach(app, "54-offline-today-stale")
+    }
+
+    /// A PC whose sightings worker never ran (no sightings.db): python3 tools/mock_server.py --port 8766 --no-sightings-db
+    @MainActor
+    func testNoSightingsDatabase() async throws {
+        let other = "http://127.0.0.1:8766"
+        var req = URLRequest(url: URL(string: other + "/mock/pair-code")!, timeoutInterval: 2)
+        req.httpMethod = "POST"
+        guard let (data, _) = try? await URLSession.shared.data(for: req),
+              let code = (try? JSONSerialization.jsonObject(with: data) as? [String: String])?["code"] else {
+            throw XCTSkip("no mock with --no-sightings-db on \(other)")
+        }
+        let app = XCUIApplication()
+        app.launchArguments = ["-resetPairing"]
+        app.launch()
+        for _ in 0..<6 where !(app.buttons["pair.submit"].exists && app.buttons["pair.submit"].isHittable) { app.swipeUp() }
+        app.textFields["pair.server"].tap()
+        app.textFields["pair.server"].typeText(other)
+        app.textFields["pair.code"].tap()
+        app.textFields["pair.code"].typeText(code)
+        app.buttons["pair.submit"].tap()
+        XCTAssertTrue(app.buttons["today.status"].waitForExistence(timeout: 15))
+        allowNotificationsIfAsked()
+        sleep(2)
+        attach(app, "55-nodb-today")
+        for (i, tab) in ["Highlights", "Sightings", "Collection"].enumerated() {
+            app.tabBars.buttons[tab].tap()
+            sleep(3)
+            XCTAssertFalse(app.buttons["Try Again"].exists, "\(tab) shows an error with no sightings.db")
+            attach(app, "5\(i + 6)-nodb-\(tab.lowercased())")
+        }
+    }
+
     // MARK: Widget (M5)
 
     static func mockOffline(seconds: Double) async throws {

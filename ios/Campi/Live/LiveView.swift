@@ -102,9 +102,10 @@ struct LiveView: View {
             }
         }
         .font(.footnote)
+        .foregroundStyle(.white)
         .padding(.horizontal, 14)
         .padding(.vertical, 8)
-        .glassEffect()
+        .background(.black.opacity(0.7), in: .capsule)   // readable over any frame
         .accessibilityElement(children: .combine)
         .accessibilityIdentifier("live.status")
     }
@@ -157,7 +158,7 @@ struct LiveTile: View {
 
     var body: some View {
         Button(action: open) {
-            HStack(spacing: 12) {
+            AdaptiveStack(spacing: 12) {
                 Image(systemName: "dot.radiowaves.left.and.right")
                     .font(.title2)
                     .foregroundStyle(live.available ? .red : .secondary)

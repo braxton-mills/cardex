@@ -7,6 +7,8 @@ struct RemoteImage: View {
     let path: MediaPath?
     var maxPixelSize = 600
     var contentMode: ContentMode = .fill
+    /// VoiceOver description ("Photo of Toyota GR86"); without one the image is left to its container.
+    var label: String?
 
     @State private var image: UIImage?
     @State private var failed = false
@@ -25,6 +27,10 @@ struct RemoteImage: View {
             }
         }
         .clipped()
+        .accessibilityElement(children: .ignore)
+        .accessibilityLabel(label ?? "")
+        .accessibilityAddTraits(label == nil ? [] : .isImage)
+        .accessibilityHidden(label == nil)
         .task(id: path?.cacheKey) { await load() }
     }
 

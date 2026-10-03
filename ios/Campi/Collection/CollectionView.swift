@@ -13,7 +13,8 @@ struct CollectionView: View {
         var caught: Bool? { self == .all ? nil : self == .caught }
     }
 
-    private let columns = [GridItem(.adaptive(minimum: 104), spacing: 12)]
+    @ScaledMetric(relativeTo: .caption) private var tileWidth: CGFloat = 104
+    private var columns: [GridItem] { [GridItem(.adaptive(minimum: min(tileWidth, 320)), spacing: 12)] }
 
     var body: some View {
         NavigationStack {
@@ -49,6 +50,7 @@ struct CollectionView: View {
                     .padding()
                 }
             }
+            .frame(maxWidth: .infinity, maxHeight: .infinity)   // an empty ScrollView has no width for the overlay
             .overlay {
                 if app.collection == nil {
                     if let error {
@@ -78,7 +80,7 @@ struct CollectionView: View {
                     .font(.headline).foregroundStyle(.tint)
             }
             ProgressView(value: c.progress)
-            HStack(spacing: 6) {
+            FlowLayout(spacing: 6) {
                 ForEach(c.tiers, id: \.tier) { t in
                     let n = c.items.filter { $0.tier == t.tier }.count
                     Pill(text: "\(n) \(t.tier.title.lowercased())", color: t.tier.color)

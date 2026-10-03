@@ -8,6 +8,7 @@ struct PairingView: View {
     @State private var code = ""
     @State private var deviceName = AppModel.defaultDeviceName
     @FocusState private var focused: Field?
+    @Environment(\.dynamicTypeSize) private var typeSize
 
     enum Field { case server, code, name }
 
@@ -18,8 +19,14 @@ struct PairingView: View {
             Form {
                 Section {
                     VStack(alignment: .leading, spacing: 12) {
-                        Label("Pair with your PC", systemImage: "desktopcomputer.and.iphone")
-                            .font(.title2.bold())
+                        // at accessibility sizes the icon goes above the title instead of squeezing it
+                        if typeSize.isAccessibilitySize {
+                            Image(systemName: "desktopcomputer.and.iphone").font(.title2).accessibilityHidden(true)
+                            Text("Pair with your PC").font(.title2.bold())
+                        } else {
+                            Label("Pair with your PC", systemImage: "desktopcomputer.and.iphone")
+                                .font(.title2.bold())
+                        }
                         Text("On the PC, run **campi pair**, then scan the QR code it shows with the Camera app.")
                         Text("Or type the address and code it prints below.")
                             .foregroundStyle(.secondary)

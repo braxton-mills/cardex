@@ -4,6 +4,7 @@ import SwiftUI
 /// A label's Cardex card: generated name, type, ratings and flavor text, plus the real catch stats from the PC.
 struct CardexCardView: View {
     @Environment(AppModel.self) private var app
+    @Environment(\.dynamicTypeSize) private var typeSize
     let item: CollectionItem
     /// Off where the page already shows the catch stats (the collection item page).
     var showsStats = true
@@ -12,10 +13,10 @@ struct CardexCardView: View {
         let card = app.cardex.card(for: item.label)
         let writing = app.cardex.generating.contains(item.label)
         VStack(alignment: .leading, spacing: 12) {
-            HStack(alignment: .firstTextBaseline, spacing: 8) {
+            AdaptiveStack(alignment: .firstTextBaseline, spacing: 8) {
                 Text(card?.text.displayName ?? item.label)
                     .font(.title3.bold())
-                    .lineLimit(2)
+                    .fixedSize(horizontal: false, vertical: true)
                 Spacer(minLength: 4)
                 if let type = card?.text.type {
                     Pill(text: type.uppercased(), color: item.tier.color)
@@ -46,13 +47,8 @@ struct CardexCardView: View {
             }
         }
         .padding()
-        .background {
-            RoundedRectangle(cornerRadius: 18)
-                .fill(LinearGradient(colors: [item.tier.color.opacity(0.18), .clear], startPoint: .topLeading,
-                                     endPoint: .bottomTrailing))
-                .background(.background.secondary, in: .rect(cornerRadius: 18))
-        }
-        .overlay { RoundedRectangle(cornerRadius: 18).strokeBorder(item.tier.color.opacity(0.5), lineWidth: 1.5) }
+        .background(.background.secondary, in: .rect(cornerRadius: 18))
+        .overlay { RoundedRectangle(cornerRadius: 18).strokeBorder(item.tier.color.opacity(0.7), lineWidth: 2) }
         .contextMenu {
             Button("Regenerate Card", systemImage: "arrow.clockwise") {
                 Task { await app.cardex.regenerate(item) }
@@ -64,18 +60,36 @@ struct CardexCardView: View {
     }
 
     private func ratings(_ ratings: [CardexText.Rating]) -> some View {
-        Grid(alignment: .leading, horizontalSpacing: 10, verticalSpacing: 6) {
-            ForEach(ratings) { r in
-                GridRow {
-                    Text(r.name).font(.subheadline)
-                    RatingBar(value: r.value, color: item.tier.color)
-                    Text("\(r.value)").font(.subheadline.bold()).monospacedDigit()
-                        .gridColumnAlignment(.trailing)
+        Group {
+            if typeSize.isAccessibilitySize {
+                // name on its own line, bar and score below: three columns don't fit
+                VStack(alignment: .leading, spacing: 10) {
+                    ForEach(ratings) { r in
+                        VStack(alignment: .leading, spacing: 4) {
+                            Text(r.name).font(.subheadline)
+                            HStack(spacing: 10) {
+                                RatingBar(value: r.value, color: item.tier.color)
+                                Text("\(r.value)").font(.subheadline.bold()).monospacedDigit()
+                            }
+                        }
+                    }
                 }
-                .accessibilityElement(children: .ignore)
-                .accessibilityLabel("\(r.name), \(r.value) of 10")
+            } else {
+                Grid(alignment: .leading, horizontalSpacing: 10, verticalSpacing: 6) {
+                    ForEach(ratings) { r in
+                        GridRow {
+                            Text(r.name).font(.subheadline)
+                            RatingBar(value: r.value, color: item.tier.color)
+                            Text("\(r.value)").font(.subheadline.bold()).monospacedDigit()
+                                .gridColumnAlignment(.trailing)
+                        }
+                    }
+                }
             }
         }
+        // one element for all ratings: "Ratings: Speed, 7 of 10; ..."
+        .accessibilityElement(children: .ignore)
+        .accessibilityLabel("Ratings: " + ratings.map { "\($0.name), \($0.value) of 10" }.joined(separator: "; "))
     }
 
     private var stats: some View {

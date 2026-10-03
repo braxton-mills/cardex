@@ -200,7 +200,7 @@ struct HighlightRow: View {
     }
 
     private func row(image: MediaPath?, title: String, subtitle: String, playable: Bool = false) -> some View {
-        HStack(spacing: 12) {
+        AdaptiveStack(spacing: 12) {
             RemoteImage(path: image, maxPixelSize: 300)
                 .frame(width: 84, height: 56)
                 .clipShape(.rect(cornerRadius: 8))
@@ -210,9 +210,9 @@ struct HighlightRow: View {
                     }
                 }
             VStack(alignment: .leading, spacing: 3) {
-                Text(title).font(.subheadline.weight(.semibold)).foregroundStyle(.primary).lineLimit(1)
-                Text(subtitle).font(.caption).foregroundStyle(.secondary).lineLimit(1)
-                HStack(spacing: 4) {
+                Text(title).font(.subheadline.weight(.semibold)).foregroundStyle(.primary).lineLimit(2)
+                Text(subtitle).font(.caption).foregroundStyle(.secondary).lineLimit(2)
+                FlowLayout {
                     ForEach(highlight.types, id: \.self) { k in Pill(text: k.title, symbol: k.symbol, color: k.color) }
                 }
             }

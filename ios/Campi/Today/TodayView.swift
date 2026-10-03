@@ -117,7 +117,7 @@ struct CountsRow: View {
     let status: Status
 
     var body: some View {
-        HStack(spacing: 12) {
+        AdaptiveStack(spacing: 12) {
             tile(value: "\(status.sightings.today)", label: "sightings today", symbol: "car.side")
             tile(value: status.sightings.lastSightingAt?.timeText ?? "–", label: "last sighting", symbol: "clock")
             tile(value: "\(status.sightings.total)", label: "all time", symbol: "sum")
@@ -127,7 +127,7 @@ struct CountsRow: View {
     private func tile(value: String, label: String, symbol: String) -> some View {
         VStack(alignment: .leading, spacing: 4) {
             Image(systemName: symbol).foregroundStyle(.tint)
-            Text(value).font(.title2.bold()).monospacedDigit().lineLimit(1).minimumScaleFactor(0.6)
+            Text(value).font(.title2.bold()).monospacedDigit()
             Text(label).font(.caption).foregroundStyle(.secondary)
         }
         .frame(maxWidth: .infinity, alignment: .leading)
@@ -168,11 +168,12 @@ struct LatestSightings: View {
 
 struct SightingCard: View {
     let sighting: Sighting
+    @ScaledMetric(relativeTo: .subheadline) private var width: CGFloat = 168
 
     var body: some View {
         VStack(alignment: .leading, spacing: 6) {
             RemoteImage(path: sighting.media.crop, maxPixelSize: 400)
-                .frame(width: 168, height: 112)
+                .frame(width: width, height: width * 2 / 3)
                 .clipShape(.rect(cornerRadius: 12))
                 .overlay(alignment: .topTrailing) {
                     if sighting.starred {
@@ -180,7 +181,7 @@ struct SightingCard: View {
                             .shadow(radius: 2)
                     }
                 }
-            Text(sighting.displayLabel).font(.subheadline.weight(.semibold)).lineLimit(1)
+            Text(sighting.displayLabel).font(.subheadline.weight(.semibold)).lineLimit(2, reservesSpace: true)
             HStack(spacing: 6) {
                 Text(sighting.startedAt.timeText)
                 if let d = sighting.direction { Image(systemName: d.symbol) }
@@ -191,7 +192,7 @@ struct SightingCard: View {
             .font(.caption)
             .foregroundStyle(.secondary)
         }
-        .frame(width: 168)
+        .frame(width: width)
         .accessibilityElement(children: .combine)
     }
 }
@@ -212,7 +213,7 @@ struct UnreachableView: View {
         } actions: {
             Button("Try Again", action: retry).buttonStyle(.borderedProminent)
         }
-        .frame(minHeight: 400)
+        .frame(maxWidth: .infinity, minHeight: 400)   // also when overlaid on an empty ScrollView
     }
 }
 
@@ -241,7 +242,7 @@ struct NewestClipCard: View {
 
     var body: some View {
         Button(action: play) {
-            HStack(spacing: 14) {
+            AdaptiveStack(spacing: 14) {
                 RemoteImage(path: clip.media.poster, maxPixelSize: 480)
                     .frame(width: 128, height: 96)
                     .clipShape(.rect(cornerRadius: 12))

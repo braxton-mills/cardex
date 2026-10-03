@@ -44,7 +44,8 @@ struct SightingGrid: View {
     /// below it instead of covering it.
     var header: AnyView?
 
-    private let columns = [GridItem(.adaptive(minimum: 160), spacing: 12)]
+    @ScaledMetric(relativeTo: .subheadline) private var cardWidth: CGFloat = 160
+    private var columns: [GridItem] { [GridItem(.adaptive(minimum: min(cardWidth, 340)), spacing: 12)] }
 
     var body: some View {
         let visible = model.visible(app.sightings)
@@ -116,14 +117,19 @@ struct SightingGridCard: View {
                 }
                 .overlay(alignment: .bottomLeading) {
                     if sighting.isAwaitingCloud {
-                        Pill(text: "Asking Gemini", symbol: "sparkle", color: .white)
-                            .background(.black.opacity(0.4), in: .capsule)
+                        Label("Asking Gemini", systemImage: "sparkle")
+                            .font(.caption2.weight(.semibold))
+                            .fixedSize()
+                            .foregroundStyle(.white)
+                            .padding(.horizontal, 7)
+                            .padding(.vertical, 3)
+                            .background(Color.black, in: .capsule)
                             .padding(6)
                     }
                 }
             Text(sighting.displayLabel)
                 .font(.subheadline.weight(.semibold))
-                .lineLimit(1)
+                .lineLimit(2)
                 .foregroundStyle(sighting.unsure && sighting.decidedBy == .siglip ? .secondary : .primary)
             HStack(spacing: 6) {
                 Text(sighting.startedAt.timeText)
@@ -133,13 +139,12 @@ struct SightingGridCard: View {
             }
             .font(.caption)
             .foregroundStyle(.secondary)
-            HStack(spacing: 4) {
+            FlowLayout {
                 DecidedByBadge(sighting: sighting)
                 if let year = sighting.yearRange { Pill(text: year) }
                 if let color = sighting.color { Pill(text: color) }
                 if sighting.stationary { Pill(text: "parked", symbol: "parkingsign") }
             }
-            .lineLimit(1)
         }
         .contentShape(.rect)
         .accessibilityElement(children: .combine)

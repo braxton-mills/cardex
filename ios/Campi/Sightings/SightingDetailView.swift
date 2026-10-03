@@ -20,7 +20,7 @@ struct SightingDetailView: View {
     var body: some View {
         ScrollView {
             VStack(alignment: .leading, spacing: 18) {
-                RemoteImage(path: s.media.crop, maxPixelSize: 1400, contentMode: .fit)
+                RemoteImage(path: s.media.crop, maxPixelSize: 1400, contentMode: .fit, label: "Photo of \(s.displayLabel)")
                     .aspectRatio(3 / 2, contentMode: .fit)
                     .clipShape(.rect(cornerRadius: 16))
                 header
@@ -119,7 +119,7 @@ struct SightingDetailView: View {
             if let make = s.make, let model = s.model {
                 Text("\(make) · \(model)").foregroundStyle(.secondary)
             }
-            HStack(spacing: 6) {
+            FlowLayout(spacing: 6) {
                 DecidedByBadge(sighting: s)
                 Pill(text: percentText(s.confidence), symbol: "gauge.with.dots.needle.33percent")
                 if s.unsure && s.decidedBy == .siglip { Pill(text: "unsure", color: .orange) }
@@ -127,7 +127,7 @@ struct SightingDetailView: View {
             }
             if s.isAwaitingCloud {
                 HStack(spacing: 8) {
-                    ProgressView().controlSize(.small)
+                    ProgressView().controlSize(.small).accessibilityHidden(true)
                     Text("Asking Gemini for a second opinion…").font(.subheadline).foregroundStyle(.secondary)
                 }
             }
@@ -146,7 +146,7 @@ struct SightingDetailView: View {
     }
 
     private var actionButtons: some View {
-        HStack(spacing: 12) {
+        AdaptiveStack(spacing: 12) {
             Button {
                 Task { await viewInTimelapse() }
             } label: {
@@ -217,7 +217,7 @@ struct SightingDetailView: View {
             VStack(alignment: .leading, spacing: 8) {
                 Text("Full frame").font(.headline)
                 Button { showFrame = true } label: {
-                    RemoteImage(path: s.media.frame, maxPixelSize: 1400, contentMode: .fit)
+                    RemoteImage(path: s.media.frame, maxPixelSize: 1400, contentMode: .fit, label: "Full camera frame")
                         .aspectRatio(4 / 3, contentMode: .fit)
                         .clipShape(.rect(cornerRadius: 14))
                 }

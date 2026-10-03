@@ -90,10 +90,10 @@ final class SmokeTests: XCTestCase {
 
     /// Launches fresh and pairs with the mock by typing a fresh code; ends on Today.
     @MainActor
-    private func launchPaired() async throws -> XCUIApplication {
+    private func launchPaired(_ extraArguments: [String] = []) async throws -> XCUIApplication {
         let pairCode = try await Self.freshCode()
         let app = XCUIApplication()
-        app.launchArguments = ["-resetPairing"]
+        app.launchArguments = ["-resetPairing"] + extraArguments
         app.launch()
         XCTAssertTrue(app.textFields["pair.server"].waitForExistence(timeout: 10))
         app.textFields["pair.server"].tap()
@@ -234,6 +234,91 @@ final class SmokeTests: XCTestCase {
 
     /// Long-presses for the context menu and returns `item`, retrying the press once (it can miss while
     /// another animation is finishing).
+    // MARK: Live (M4)
+
+    struct LiveCounters: Decodable { var state: String; var viewers: Int; var opened: Int; var closed: Int }
+
+    /// Mock-only `/mock/live`: reads the viewer counters; with `state`, changes how live answers.
+    @discardableResult
+    static func mockLive(state: String? = nil, rotation: Int? = nil) async throws -> LiveCounters {
+        var req = URLRequest(url: URL(string: mock + "/mock/live")!, timeoutInterval: 5)
+        if state != nil || rotation != nil {
+            var body: [String: Any] = [:]
+            body["state"] = state
+            body["rotation"] = rotation
+            req.httpMethod = "POST"
+            req.httpBody = try JSONSerialization.data(withJSONObject: body)
+        }
+        let (data, _) = try await URLSession.shared.data(for: req)
+        return try JSONDecoder().decode(LiveCounters.self, from: data)
+    }
+
+    /// Polls the mock until `check` holds for its live counters.
+    @MainActor
+    func waitForLive(_ what: String, timeout: TimeInterval = 10,
+                     _ check: @Sendable (LiveCounters) -> Bool) async throws {
+        let end = Date().addingTimeInterval(timeout)
+        while Date() < end {
+            if check(try await Self.mockLive()) { return }
+            try await Task.sleep(for: .milliseconds(250))
+        }
+        XCTFail("mock live counters never showed: \(what) (now \(try await Self.mockLive()))")
+    }
+
+    @MainActor
+    func testLiveVideoSnapshotsErrorsAndDisconnect() async throws {
+        try await Self.mockLive(state: "ok", rotation: 90)
+        addTeardownBlock { _ = try? await Self.mockLive(state: "ok", rotation: 0) }
+        let app = try await launchPaired()
+
+        let tile = app.buttons["today.live"]
+        XCTAssertTrue(tile.waitForExistence(timeout: 10))
+        tile.tap()
+        let image = app.images["live.image"]
+        XCTAssertTrue(image.waitForExistence(timeout: 15), "no live frame")
+        try await waitForLive("one viewer") { $0.viewers == 1 }
+        sleep(1)
+        // rotation 90: the landscape MJPEG frames are shown portrait
+        XCTAssertGreaterThan(image.frame.height, image.frame.width, "video frame not rotated")
+        attach(app, "23-live-video")
+
+        // Leaving the foreground closes the stream (and the PC's upstream); coming back reopens it.
+        let before = try await Self.mockLive()
+        XCUIDevice.shared.press(.home)
+        try await waitForLive("stream closed after backgrounding", timeout: 6) { $0.viewers == 0 && $0.closed > before.closed }
+        app.activate()
+        try await waitForLive("stream reopened", timeout: 15) { $0.viewers == 1 }
+
+        // Snapshots: no MJPEG viewer, a frame time instead of fps.
+        app.buttons["Snapshots"].tap()
+        try await waitForLive("video closed for snapshots") { $0.viewers == 0 }
+        let status = app.descendants(matching: .any)["live.status"]
+        XCTAssertTrue(waitForAny([app.staticTexts.containing(NSPredicate(format: "label BEGINSWITH 'Frame from'")).firstMatch],
+                                 timeout: 10), "snapshot frame time never shown")
+        XCTAssertTrue(status.exists)
+        attach(app, "24-live-snapshots")
+
+        // 503 live_busy, then "Show Snapshots Instead".
+        try await Self.mockLive(state: "busy")
+        app.buttons["Video"].tap()
+        XCTAssertTrue(app.staticTexts["Live is busy"].waitForExistence(timeout: 10))
+        attach(app, "25-live-busy")
+        app.buttons["Show Snapshots Instead"].tap()
+        XCTAssertTrue(waitForAny([app.staticTexts.containing(NSPredicate(format: "label BEGINSWITH 'Frame from'")).firstMatch],
+                                 timeout: 10))
+
+        // 502 pi_unreachable.
+        try await Self.mockLive(state: "unreachable")
+        app.buttons["Video"].tap()
+        XCTAssertTrue(app.staticTexts["The camera isn't answering"].waitForExistence(timeout: 10))
+        attach(app, "26-live-pi-unreachable")
+
+        try await Self.mockLive(state: "ok")
+        app.buttons["live.close"].tap()
+        try await waitForLive("stream closed on dismiss") { $0.viewers == 0 }
+        XCTAssertTrue(tile.waitForExistence(timeout: 5))
+    }
+
     @MainActor
     private func openMenu(on el: XCUIElement, item: String, in app: XCUIApplication) -> XCUIElement {
         for _ in 0..<2 {

@@ -7,6 +7,7 @@ struct TodayView: View {
     @State private var model = TodayModel()
     @State private var showStatus = false
     @State private var showSettings = false
+    @State private var showLive = false
     @State private var video: VideoTarget?
 
     var body: some View {
@@ -24,6 +25,7 @@ struct TodayView: View {
                         .buttonStyle(.plain)
                         .accessibilityIdentifier("today.status")
                         CountsRow(status: status)
+                        LiveTile(live: status.live) { showLive = true }
                         if let clip = model.newestClip {
                             NewestClipCard(clip: clip) {
                                 if let url = app.client?.url(for: clip.media.video) {
@@ -52,6 +54,7 @@ struct TodayView: View {
                 if let status = model.status { StatusDetailView(status: status) }
             }
             .sheet(isPresented: $showSettings) { SettingsView(status: model.status) }
+            .fullScreenCover(isPresented: $showLive) { LiveView() }
             .sightingDestinations()
             .videoPlayer($video)
         }

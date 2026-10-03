@@ -353,7 +353,7 @@ signed (§3.3). `?` = nullable.
 | `available` | bool | Pi host known and the API can reach it (best effort, cached ≤ 30 s) |
 | `mjpeg` | url? | signed `/live.mjpg` |
 | `snapshot` | url? | signed `/live.jpg` |
-| `rotation` | int | `[image] rotation`, `/live.mjpg` is not rotated, `/live.jpg` already is |
+| `rotation` | int | `[image] rotation` in degrees clockwise (0, 90, 180, 270); `/live.mjpg` is not rotated, `/live.jpg` already is |
 | `max_viewers` | int | |
 
 ### 5.2 `Sighting`
@@ -658,6 +658,7 @@ Service alerts (`campi.alert`):
 
 ## 10. Changelog
 - **v1** (2026-10-03): initial contract.
+- **v1** (2026-10-03): clarified that `LiveStatus.rotation` is clockwise (as `imageproc.ROTATE`). No wire change.
 
 ---
 

@@ -10,7 +10,8 @@ The iPhone companion to the Campi timelapse + vehicle-sightings service running 
 | M1 App skeleton: pairing, Today/status, settings | done |
 | M2 Sightings, detail actions, Collection, Highlights | done |
 | M3 Timelapse tab, player, Save to Photos / Share | done |
-| M4 Live (MJPEG on Wi-Fi, snapshots on cellular) | next |
+| M4 Live (MJPEG on Wi-Fi, snapshots on cellular) | done |
+| M4.5 Cardex cards (on-device card text per label) | next |
 | M5 Push notifications + Home Screen widget | planned |
 | M6 Polish, accessibility, install on device | planned |
 
@@ -26,6 +27,9 @@ The PC side (`campi ui` API, see `docs/api-contract.md` Appendix A) isn't built 
   "View in Timelapse" (seeks the 10-minute clip, or the daily video once the clip has expired).
 - **Collection:** every label, caught or not, with counts, rarity tiers and Gemini discoveries.
 - **Timelapse:** last 24 h of clips by hour (with expiry), daily videos, archive parts; save to Photos or share.
+- **Live** (from Today): MJPEG video at 10 fps on Wi-Fi, the newest saved frame every 2 s on cellular or Low Data
+  Mode (or pick one). Disconnects as soon as it's off screen or the app leaves the foreground. Explains
+  `live_busy`, an unreachable Pi and "no recent frame", and offers snapshots when video isn't possible.
 
 ## How the phone reaches the PC
 The PC's API stays on `127.0.0.1:8765` and is published over Tailscale (`tailscale serve`), so the app talks
@@ -77,6 +81,8 @@ Testing notes:
 python3 tools/mock_server.py               # http://127.0.0.1:8765, bearer token "mock-token"; prints a pairing link
 python3 tools/mock_server.py --v1 --sightings-off   # today's service: schema v1, reserved fields null
 python3 tools/mock_server.py --write-fixtures       # regenerate contract/fixtures (fixed clock + seed)
+python3 tools/mock_server.py --live busy --rotation 90   # Live: ok | busy | unreachable | unavailable
+curl -X POST -d '{"state":"unreachable"}' http://127.0.0.1:8765/mock/live   # change it while running
 python3 tools/mock_server.py --print-push new_catch > /tmp/p.apns && xcrun simctl push booted com.braxtonmills.campi /tmp/p.apns
 ```
 The first run uses ffmpeg (`brew install ffmpeg`) to generate sample media into `tools/mock_media/`

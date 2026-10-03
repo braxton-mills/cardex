@@ -7,6 +7,8 @@
     python3 tools/mock_server.py --write-fixtures   # regenerate contract/fixtures/ (fixed clock and seed)
     python3 tools/mock_server.py --print-push new_catch > /tmp/p.apns   # for `xcrun simctl push`
     curl -X POST http://127.0.0.1:8765/mock/pair-code                   # mock-only: issue a fresh pairing code
+    python3 tools/mock_server.py --live busy --rotation 90               # exercise Live's error states / rotation
+    curl -X POST -d '{"state":"unreachable"}' http://127.0.0.1:8765/mock/live   # mock-only: change it at runtime
 
 Stdlib only (Python 3.11+). Sample media is generated once with ffmpeg into tools/mock_media/.
 Mock limitations: every clip/daily/archive/sighting file of a kind is the same sample file; /live.jpg ignores w
@@ -234,6 +236,9 @@ class Store:
         self.pair_codes: dict[str, float] = {}
         self.pair_attempts: list[float] = []
         self.live_viewers = 0
+        self.live_opened = self.live_closed = 0         # for /mock/live (UI tests check disconnects)
+        self.live_state = "ok"                           # ok | busy | unreachable | unavailable
+        self.rotation = 0
         self.live_jpg_times: list[float] = []
         self._seed_ui_state()
         self.add_device("Mock dev token", "other", token=dev_token, device_id="dev_mockdevicetoken00")
@@ -546,8 +551,8 @@ class Views:
                        "renders_deferred": False} if reserved else None,
             "disk": {"free_gb": 412.7, "drive": "C:"},
             "latest_clip_id": clips[0]["id"] if clips else None,
-            "live": {"available": True, "mjpeg": st.sign("/live.mjpg", dev), "snapshot": st.sign("/live.jpg", dev),
-                     "rotation": 0, "max_viewers": MAX_LIVE_VIEWERS},
+            "live": {"available": st.live_state != "unavailable", "mjpeg": st.sign("/live.mjpg", dev),
+                     "snapshot": st.sign("/live.jpg", dev), "rotation": st.rotation, "max_viewers": MAX_LIVE_VIEWERS},
         }
 
     def collection(self, dev: str) -> dict:
@@ -851,6 +856,17 @@ class Handler(BaseHTTPRequestHandler):
             with self.store.lock:
                 if path == "/mock/pair-code" and self.command == "POST":   # mock-only: fresh code for UI tests
                     return self.send_json(201, {"code": self.store.new_pair_code()})
+                if path == "/mock/live":   # mock-only: live viewer counters; POST {"state", "rotation"} changes them
+                    if self.command == "POST":
+                        b = self.body_json()
+                        if b.get("state") not in (None, "ok", "busy", "unreachable", "unavailable"):
+                            raise ApiError(400, "invalid_param", "state: ok | busy | unreachable | unavailable")
+                        self.store.live_state = b.get("state") or self.store.live_state
+                        self.store.rotation = int(b.get("rotation", self.store.rotation))
+                    st = self.store
+                    return self.send_json(200, {"state": st.live_state, "rotation": st.rotation,
+                                                "viewers": st.live_viewers, "opened": st.live_opened,
+                                                "closed": st.live_closed})
                 if path == "/api/pair" and self.command == "POST":
                     return self.send_json(201, self.pair())
                 if not path.startswith("/api/"):
@@ -1153,6 +1169,8 @@ class Handler(BaseHTTPRequestHandler):
         st.live_jpg_times = [t for t in st.live_jpg_times if t > now - 1] + [now]
         if len(st.live_jpg_times) > 4:
             raise ApiError(429, "rate_limited", "at most 4 /live.jpg per second")
+        if st.live_state == "unavailable":
+            raise ApiError(404, "not_found", "no frame in the last 10 minutes")
         f = st.media["live"][int(now / CAPTURE_INTERVAL_S) % len(st.media["live"])]
         if "w=" in (urlsplit(self.path).query or ""):
             f = st.media["live_1080.jpg"]
@@ -1169,10 +1187,14 @@ class Handler(BaseHTTPRequestHandler):
     def serve_mjpeg(self, q: dict):
         st = self.store
         max_fps = int_param(q, "max_fps", 30, 1, 30)
+        if st.live_state in ("unreachable", "unavailable"):
+            time.sleep(1)   # [stream] timeout_s, shortened
+            raise ApiError(502, "pi_unreachable", "the Pi didn't answer")
         with st.lock:
-            if st.live_viewers >= MAX_LIVE_VIEWERS:
+            if st.live_viewers >= MAX_LIVE_VIEWERS or st.live_state == "busy":
                 raise ApiError(503, "live_busy", f"{MAX_LIVE_VIEWERS} viewers already watching")
             st.live_viewers += 1
+            st.live_opened += 1
         print(f"live viewer connected ({st.live_viewers}), max_fps={max_fps}", file=sys.stderr)
         frames = [p.read_bytes() for p in st.media["live"]]
         try:
@@ -1196,6 +1218,7 @@ class Handler(BaseHTTPRequestHandler):
         finally:
             with st.lock:
                 st.live_viewers -= 1
+                st.live_closed += 1
             print(f"live viewer disconnected ({st.live_viewers} left); upstream closed", file=sys.stderr)
 
 
@@ -1301,6 +1324,10 @@ def main(argv=None):
     ap.add_argument("--no-sightings-db", action="store_true", help="no sightings.db at all")
     ap.add_argument("--v1", action="store_true", help="schema v1 / reserved status fields null")
     ap.add_argument("--latency", type=float, default=0.0, help="seconds added to every response")
+    ap.add_argument("--live", choices=["ok", "busy", "unreachable", "unavailable"], default="ok",
+                    help="live stream state: busy = 503 live_busy, unreachable = 502 pi_unreachable, "
+                         "unavailable = status.live.available false and no recent frame")
+    ap.add_argument("--rotation", type=int, choices=[0, 90, 180, 270], default=0, help="status.live.rotation")
     ap.add_argument("--quiet", action="store_true")
     ap.add_argument("--write-fixtures", action="store_true")
     ap.add_argument("--print-push", choices=["new_catch", "rare", "discovered", "service"])
@@ -1318,6 +1345,7 @@ def main(argv=None):
         payload["Simulator Target Bundle"] = a.bundle_id
         print(json.dumps(payload, indent=2, ensure_ascii=False))
         return
+    store.live_state, store.rotation = a.live, a.rotation
     Handler.store, Handler.views = store, Views(store)
     Handler.latency, Handler.quiet = a.latency, a.quiet
     srv = ThreadingHTTPServer((a.host, a.port), Handler)

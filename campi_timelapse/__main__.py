@@ -40,11 +40,52 @@ def cmd_status(cfg) -> int:
     if daily:
         print(f"last daily   : {daily.get('status')} {daily.get('day', '')}: "
               f"{daily.get('out') or daily.get('reason') or daily.get('error')}")
+    print(f"sightings    : {sightings_status(cfg, st if alive else {}, now)}")
     print(f"disk free    : {shutil.disk_usage(cfg.paths.frames).free / 1e9:.1f} GB ({cfg.paths.frames.drive})")
     print(f"frames       : {cfg.paths.frames}")
     print(f"clips        : {cfg.paths.out}")
     print(f"logs         : {cfg.paths.logs}")
     return 0 if alive else 3
+
+
+def sightings_status(cfg, st: dict, now: float) -> str:
+    """One-line state of the optional sightings worker (stdlib only: no torch import here)."""
+    if not cfg.sightings.enabled:
+        return "disabled"
+    if not cfg.paths.sightings_python.exists():
+        return "NOT INSTALLED (run install.ps1 -Sightings)"
+    from . import sightings_db
+    ws = read_json(cfg.paths.state / "sightings.json", {}) or {}
+    pid = st.get("sightings_pid")
+    if st.get("sightings_crash_looping"):
+        nxt = st.get("sightings_next_start") or now
+        line = (f"CRASH-LOOPING ({st.get('sightings_recent_exits')} exits in 15 min; "
+                f"next try in {max(0, nxt - now):.0f}s; last error: {ws.get('last_error') or 'see campi logs sightings'})")
+    elif pid and pid in (ws.get("pid"), ws.get("ppid")):
+        line = f"running (pid {pid}, {ws.get('phase')}, restarts {st.get('sightings_restarts', 0)})"
+    elif pid:
+        line = f"starting (pid {pid})"
+    else:
+        line = "not running" if st else "service stopped"
+    summ = sightings_db.summary(cfg.paths.sightings)
+    if summ:
+        last = summ["last"]
+        line += (f"; last sighting {sightings_db.local_str(last) if last else 'never'}, "
+                 f"today {summ['today']}, total {summ['total']}")
+    return line
+
+
+def cmd_sightings(cfg, n: int) -> int:
+    from . import sightings_db
+    con = sightings_db.connect_ro(cfg.paths.sightings)
+    if con is None:
+        print(f"no sightings database yet ({sightings_db.db_path(cfg.paths.sightings)})")
+        return 1
+    rows = sightings_db.recent(con, n)[::-1]
+    con.close()
+    print(sightings_db.format_rows(rows))
+    print(f"media: {cfg.paths.sightings}")
+    return 0
 
 
 def cmd_samples(cfg) -> int:
@@ -91,6 +132,15 @@ def main(argv=None) -> int:
     sub.add_parser("archive", help="append any clips not yet in the long archive video (also backfills)")
     sub.add_parser("status")
     sub.add_parser("samples", help="save before/after rotation samples from the live stream")
+    sl = sub.add_parser("sightings", help="list the last N vehicle sightings")
+    sl.add_argument("n", nargs="?", type=int, default=20)
+    sw = sub.add_parser("sightings-worker", help="vehicle sightings worker (run by the supervisor; sightings venv)")
+    sw.add_argument("--check", action="store_true", help="load models, report the GPU, exit")
+    sr = sub.add_parser("sightings-record", help="save the raw stream to a file for sightings-test")
+    sr.add_argument("seconds", type=float)
+    sr.add_argument("--out")
+    stt = sub.add_parser("sightings-test", help="run the sightings pipeline on a file into a separate test DB")
+    stt.add_argument("--source", required=True)
     args = ap.parse_args(argv)
 
     cfg = load_config(args.config)
@@ -98,8 +148,11 @@ def main(argv=None) -> int:
         return cmd_status(cfg)
     if args.cmd == "samples":
         return cmd_samples(cfg)
+    if args.cmd == "sightings":
+        return cmd_sightings(cfg, args.n)
 
-    log_name = {"run": "supervisor", "render-clip": "render", "render-daily": "daily"}.get(args.cmd, args.cmd)
+    log_name = {"run": "supervisor", "render-clip": "render", "render-daily": "daily",
+                "sightings-worker": "sightings"}.get(args.cmd, args.cmd)
     log = setup_logging(cfg, log_name)
     side_log(cfg, "gaps")
     try:
@@ -119,6 +172,23 @@ def main(argv=None) -> int:
         elif args.cmd == "archive":
             from .archive import append_pending
             res = append_pending(cfg)
+        elif args.cmd == "sightings-worker":
+            from .sightings import run_worker
+            return run_worker(cfg, check_only=args.check)
+        elif args.cmd == "sightings-record":
+            from pathlib import Path
+            from .sightings import record
+            res = record(cfg, args.seconds, Path(args.out) if args.out else None)
+        elif args.cmd == "sightings-test":
+            from pathlib import Path
+            from . import sightings_db
+            from .sightings import run_test
+            rows = run_test(cfg, Path(args.source))
+            print(sightings_db.format_rows(rows))
+            for r in rows:
+                print(json.dumps(dict(r)))
+            print(f"test db + media: {cfg.paths.data / 'sightings-test'}")
+            return 0
         elif args.cmd == "housekeep":
             from . import housekeeping
             housekeeping.run(cfg)

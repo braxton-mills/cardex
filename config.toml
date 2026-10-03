@@ -77,3 +77,24 @@ ffprobe = "{localappdata}\\Microsoft\\WinGet\\Packages\\Gyan.FFmpeg_Microsoft.Wi
 rife = "{project}\\tools\\rife-ncnn-vulkan\\rife-ncnn-vulkan.exe"
 rife_model = "rife-v4.6"     # folder next to the rife exe
 rife_gpu = "NVIDIA"         # Vulkan device: name substring (preferred; index order differs with no one logged on) or index
+
+[sightings]
+# Optional vehicle "sightings": YOLO11m + ByteTrack on /stream.mjpg, SigLIP 2 make/model guess, one row per
+# vehicle pass in CampiTimelapse\sightings\sightings.db. Needs `install.ps1 -Sightings` first.
+enabled = true
+detect_fps = 10              # stream frames per second fed to YOLO (the rest are dropped)
+yolo_weights = "yolo11m.pt"  # bare name = CampiTimelapse\sightings\models\ (downloaded on first use)
+yolo_imgsz = 1280            # larger input helps with far-away vehicles
+clip_model = "ViT-SO400M-16-SigLIP2-384"
+labels_file = "sightings_labels.txt"   # make/model list, one per line (relative = project folder)
+min_crop_px = 64             # skip boxes narrower than this for make/model scoring
+min_samples = 3              # need this many scored crops to record a vehicle
+lost_after_s = 2.0           # a vehicle's pass ends once it has been out of view this long
+unsure_below = 0.30          # top guess below this share is flagged unsure
+stationary_px = 40           # box center moved less than this over the whole pass = stationary (logged once per spot)
+roi = []                     # optional polygon, normalized 0-1, e.g. [[0,0.4],[1,0.4],[1,1],[0,1]]; only tracks whose center enters count
+pause_at_night = true        # pause while the frame is darker than [night] luma_threshold (same check as renders)
+save_clips = true
+pre_roll_s = 2               # clip starts this long before the vehicle is first seen ...
+post_roll_s = 3              # ... and ends this long after it was last seen (max 60 s)
+keep_clips_days = 30         # crops, frames, and rows are kept forever

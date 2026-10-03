@@ -24,6 +24,7 @@ campi test          # render the last 1 minute
 campi daily [YYYY-MM-DD]
 campi samples       # before/after rotation samples from the live stream
 campi archive       # append any clips not yet in the archive (runs automatically after every clip)
+campi sightings [N] # optional vehicle sightings (see Sightings below)
 ```
 
 Archive notes: appending is a stream copy (no re-encode), but MP4 can't grow in place, so each append rewrites
@@ -58,3 +59,46 @@ Setup from scratch: `powershell -ExecutionPolicy Bypass -File install.ps1`.
   `state\pi_host.json`. `campi status` shows the host in use.
 - If the server is replaced by one without `/snapshot.jpg`, capture falls back to the MJPEG stream automatically.
 - `pi/setup_campi_stream.sh` patches a stock server script and installs the service.
+
+## Sightings (optional)
+A separate worker that logs vehicles passing the camera: YOLO11m + ByteTrack on `/stream.mjpg`, SigLIP 2 zero-shot
+make/model guess averaged over each vehicle's pass, **one row per pass**. Off by default; with
+`[sightings] enabled = false` nothing starts and nothing extra is imported.
+
+Enable:
+1. `powershell -ExecutionPolicy Bypass -File install.ps1 -Sightings` creates its own env
+   (`%USERPROFILE%\CampiTimelapse\venv-sightings`: CUDA 12.8 torch, ultralytics, open_clip, transformers), downloads
+   the YOLO + SigLIP 2 weights (a few GB) and checks the GPU. The timelapse env is untouched.
+2. Set `enabled = true` under `[sightings]` in `config.toml`, then `campi restart`.
+
+| What | Where |
+|---|---|
+| Database (SQLite, WAL) | `%USERPROFILE%\CampiTimelapse\sightings\sightings.db` (table `sightings`, plus `schema_version`) |
+| Media per sighting | `...\sightings\YYYY-MM-DD\HHMMSS_<id>_<label>_crop.jpg`, `_frame.jpg`, `.mp4` (paths in the DB are relative to `sightings\`) |
+| Models | `...\sightings\models\` (YOLO), Hugging Face cache (SigLIP 2) |
+| Log | `campi logs sightings [-f]`; GPU line also in `gpu.log` |
+| Test runs | `%USERPROFILE%\CampiTimelapse\sightings-test\` (fresh each run) |
+
+Commands:
+```
+campi sightings [N]                  # last N sightings (local time)
+campi sightings-record SECONDS       # save the raw stream (.mjpg with timestamps) to sightings\recordings\
+campi sightings-test --source FILE   # run the pipeline on a recording or any video into the test DB; prints rows
+```
+`campi status` shows the worker (disabled / running / CRASH-LOOPING), the last sighting and today's count.
+
+How it behaves:
+- Own child process of the supervisor (own venv, below-normal priority, 2 CPU threads, same Job Object). A crash
+  or GPU error restarts it with backoff (10 s doubling to 10 min); a hang (no main-loop progress for 2 min) is killed.
+  Capture and renders are separate processes and never wait on it. It refuses to run without CUDA.
+- Reads the stream at ~30 fps (about 23 Mbit/s over the Pi's Wi-Fi), runs YOLO at `detect_fps`, uses the same Pi
+  host lookup as capture (`stream.pi_mac`), pauses while the frame is darker than `[night] luma_threshold`.
+- A pass ends `max(lost_after_s, post_roll_s)` after the vehicle was last seen. Tracker ID switches on fast cars
+  are stitched back into one pass by position and velocity. Optional `roi` polygon: only vehicles whose center
+  enters it count.
+- Stationary vehicles (center moved < `stationary_px`) are logged once per spot, then not again until the spot has
+  been empty for 10 minutes. Clips are capped at 60 s.
+- Media is written before the row, so a row never points at a missing file. Housekeeping deletes clips older than
+  `keep_clips_days` (and clears `clip_path`); crops, frames and rows are kept forever.
+- Labels: `sightings_labels.txt` (`Make | Model` or a generic type per line). `car_id.py` is the original
+  standalone script, kept for reference.

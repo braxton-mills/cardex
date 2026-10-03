@@ -1,0 +1,178 @@
+# Vehicle labels for the sightings worker (SigLIP 2 zero-shot). One per line; edit freely, then campi restart.
+#   Make | Model     -> stored as make + model; label is "Make Model" (or just Model if it already starts with Make)
+#   plain text       -> generic vehicle type: no make/model
+
+Toyota | Camry
+Toyota | Corolla
+Toyota | RAV4
+Toyota | Highlander
+Toyota | Grand Highlander
+Toyota | 4Runner
+Toyota | Tacoma
+Toyota | Tundra
+Toyota | Sequoia
+Toyota | Sienna
+Toyota | Prius
+Toyota | Crown
+Honda | Civic
+Honda | Accord
+Honda | CR-V
+Honda | HR-V
+Honda | Pilot
+Honda | Passport
+Honda | Odyssey
+Honda | Ridgeline
+Ford | F-150
+Ford | F-250 Super Duty
+Ford | Ranger
+Ford | Maverick
+Ford | Explorer
+Ford | Expedition
+Ford | Escape
+Ford | Bronco
+Ford | Bronco Sport
+Ford | Mustang
+Ford | Mustang Mach-E
+Ford | Transit van
+Chevrolet | Silverado 1500
+Chevrolet | Silverado 2500HD
+Chevrolet | Colorado
+Chevrolet | Tahoe
+Chevrolet | Suburban
+Chevrolet | Equinox
+Chevrolet | Traverse
+Chevrolet | Blazer
+Chevrolet | Trax
+Chevrolet | Trailblazer
+Chevrolet | Malibu
+Chevrolet | Camaro
+Chevrolet | Corvette
+Chevrolet | Express van
+GMC | Sierra 1500
+GMC | Sierra 2500HD
+GMC | Canyon
+GMC | Yukon
+GMC | Acadia
+GMC | Terrain
+Ram | 1500
+Ram | 2500
+Ram | ProMaster van
+Jeep | Wrangler
+Jeep | Gladiator
+Jeep | Grand Cherokee
+Jeep | Cherokee
+Jeep | Compass
+Dodge | Charger
+Dodge | Challenger
+Dodge | Durango
+Chrysler | Pacifica
+Nissan | Altima
+Nissan | Sentra
+Nissan | Versa
+Nissan | Rogue
+Nissan | Kicks
+Nissan | Murano
+Nissan | Pathfinder
+Nissan | Armada
+Nissan | Frontier
+Nissan | Titan
+Hyundai | Elantra
+Hyundai | Sonata
+Hyundai | Tucson
+Hyundai | Santa Fe
+Hyundai | Palisade
+Hyundai | Kona
+Hyundai | Venue
+Hyundai | Ioniq 5
+Hyundai | Santa Cruz
+Kia | Forte
+Kia | K5
+Kia | Soul
+Kia | Seltos
+Kia | Sportage
+Kia | Sorento
+Kia | Telluride
+Kia | Carnival
+Kia | EV6
+Subaru | Outback
+Subaru | Forester
+Subaru | Crosstrek
+Subaru | Ascent
+Subaru | Impreza
+Subaru | WRX
+Mazda | Mazda3
+Mazda | CX-30
+Mazda | CX-5
+Mazda | CX-50
+Mazda | CX-90
+Mazda | MX-5 Miata
+Volkswagen | Jetta
+Volkswagen | Golf GTI
+Volkswagen | Tiguan
+Volkswagen | Atlas
+Volkswagen | ID.4
+Tesla | Model 3
+Tesla | Model Y
+Tesla | Model S
+Tesla | Model X
+Tesla | Cybertruck
+BMW | 3 Series
+BMW | 5 Series
+BMW | X3
+BMW | X5
+BMW | X7
+Mercedes-Benz | C-Class
+Mercedes-Benz | E-Class
+Mercedes-Benz | GLC
+Mercedes-Benz | GLE
+Mercedes-Benz | G-Class
+Mercedes-Benz | Sprinter van
+Audi | A4
+Audi | A6
+Audi | Q5
+Audi | Q7
+Lexus | ES
+Lexus | IS
+Lexus | RX
+Lexus | NX
+Lexus | GX
+Lexus | TX
+Acura | Integra
+Acura | TLX
+Acura | RDX
+Acura | MDX
+Cadillac | Escalade
+Cadillac | XT5
+Cadillac | Lyriq
+Lincoln | Navigator
+Lincoln | Aviator
+Lincoln | Nautilus
+Buick | Enclave
+Buick | Envista
+Buick | Encore GX
+Infiniti | Q50
+Infiniti | QX60
+Volvo | XC60
+Volvo | XC90
+Porsche | 911
+Porsche | Cayenne
+Porsche | Macan
+Mitsubishi | Outlander
+Mitsubishi | Mirage
+Rivian | R1T
+Rivian | R1S
+
+# Work and construction vehicles, so they don't get forced into a car label
+dump truck
+concrete mixer truck
+semi truck
+box truck
+flatbed truck
+garbage truck
+tow truck
+school bus
+city bus
+excavator
+wheel loader
+skid steer loader
+motorcycle

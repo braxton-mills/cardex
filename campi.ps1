@@ -5,12 +5,15 @@
     campi stop            stop everything; stays stopped until `campi start`
     campi restart
     campi run             run in this window with live logs (Ctrl+C stops); needs `campi stop` first
-    campi logs [name] [-f]  name: supervisor|capture|render|daily|housekeep|gaps|gpu (default: summary)
+    campi logs [name] [-f]  name: supervisor|capture|render|daily|housekeep|gaps|gpu|sightings (default: summary)
     campi render-now      render the last 10 minutes right now
     campi test            render the last 1 minute
     campi daily [date]    render a daily video (default: yesterday)
     campi samples         save before/after rotation samples from the live stream
     campi archive         append any clips not yet in the long archive video
+    campi sightings [N]   last N vehicle sightings (optional worker; see README)
+    campi sightings-record SECONDS   save the raw stream to a file for testing
+    campi sightings-test --source FILE   run the sightings pipeline on a file into a separate test DB
 #>
 param([Parameter(Position = 0)][string]$Command = 'status',
       [Parameter(Position = 1, ValueFromRemainingArguments = $true)][string[]]$Rest)
@@ -18,6 +21,7 @@ param([Parameter(Position = 0)][string]$Command = 'status',
 $Project = $PSScriptRoot
 $Py = Join-Path $Project '.venv-service\Scripts\python.exe'
 $PyW = Join-Path $Project '.venv-service\Scripts\pythonw.exe'
+$PySightings = Join-Path $env:USERPROFILE 'CampiTimelapse\venv-sightings\Scripts\python.exe'
 $TaskName = 'CampiTimelapse'
 Set-Location $Project
 
@@ -77,7 +81,7 @@ switch ($Command) {
             $f = Join-Path $Logs "$name.log"
             if ($follow) { Get-Content $f -Tail 40 -Wait } else { Get-Content $f -Tail 60 }
         } else {
-            foreach ($n in 'supervisor', 'capture', 'render', 'gaps', 'gpu') {
+            foreach ($n in 'supervisor', 'capture', 'render', 'gaps', 'gpu', 'sightings') {
                 $f = Join-Path $Logs "$n.log"
                 if (Test-Path $f) { Write-Host "== $n ==" -ForegroundColor Cyan; Get-Content $f -Tail 8 }
             }
@@ -88,5 +92,10 @@ switch ($Command) {
     'daily' { if ($Rest) { & $Py -m campi_timelapse render-daily --date $Rest[0] } else { & $Py -m campi_timelapse render-daily } }
     'samples' { & $Py -m campi_timelapse samples }
     'archive' { & $Py -m campi_timelapse archive }
+    'sightings' { & $Py -m campi_timelapse sightings @Rest }
+    { $_ -in 'sightings-record', 'sightings-test' } {
+        if (-not (Test-Path $PySightings)) { Write-Host 'sightings env not installed: run install.ps1 -Sightings'; exit 1 }
+        & $PySightings -m campi_timelapse $Command @Rest
+    }
     default { Get-Help $PSCommandPath; exit 2 }
 }

@@ -67,13 +67,21 @@ class Supervisor:
         self.daily = None
         self.housekeep = None
         self.daily_queue: list[date] = []
+        # optional sightings worker (only touched when [sightings] enabled)
+        self.sightings = None
+        self.sightings_restarts = 0
+        self.sightings_backoff = 10.0
+        self.sightings_next_start = 0.0
+        self.sightings_started = 0.0
+        self.sightings_exits: list[float] = []
+        self.sightings_missing_logged = False
         self.stop_file = cfg.paths.state / "stop.request"
         self.status_path = cfg.paths.state / "status.json"
         self.started = time.time()
 
     # -- children ---------------------------------------------------------
-    def spawn(self, *args: str, low_priority=False) -> subprocess.Popen:
-        exe = sys.executable  # pythonw.exe under Task Scheduler, so children get no console either
+    def spawn(self, *args: str, low_priority=False, exe: str | None = None) -> subprocess.Popen:
+        exe = exe or sys.executable  # pythonw.exe under Task Scheduler, so children get no console either
         flags = NO_WINDOW | (BELOW_NORMAL if low_priority else 0)
         p = subprocess.Popen([exe, "-m", "campi_timelapse", "--config", str(self.cfg.config_path), *args],
                              cwd=str(PROJECT), creationflags=flags, stdin=subprocess.DEVNULL,
@@ -96,6 +104,49 @@ class Supervisor:
             self.capture = self.spawn("capture")
             self.capture_started = now
             log.info("capture started (pid %d)", self.capture.pid)
+
+    def check_sightings(self, now: float) -> None:
+        """Keep the optional sightings worker alive (own venv, below-normal priority, same Job Object).
+        Restarts with backoff (10 s doubling to 10 min) and kills it if its heartbeat shows a hang."""
+        p = self.sightings
+        if p and p.poll() is None:
+            ws = read_json(self.cfg.paths.state / "sightings.json", {}) or {}
+            if p.pid in (ws.get("pid"), ws.get("ppid")) and ws.get("phase") != "loading":
+                hung = now - (ws.get("loop_ts") or 0) > 120
+            else:  # loading models (first run downloads several GB) or no heartbeat yet
+                hung = now - self.sightings_started > 900
+            if hung:
+                log.error("sightings worker (pid %d) is not responding; killing it", p.pid)
+                subprocess.run(["taskkill", "/T", "/F", "/PID", str(p.pid)], capture_output=True,
+                               creationflags=NO_WINDOW)
+                try:
+                    p.wait(10)
+                except subprocess.TimeoutExpired:
+                    pass
+            elif now - self.sightings_started > 600:
+                self.sightings_backoff = 10.0
+            return
+        if p:
+            rc = p.returncode
+            self.sightings = None
+            self.sightings_restarts += 1
+            self.sightings_exits = [t for t in self.sightings_exits if now - t < 900] + [now]
+            self.sightings_next_start = now + self.sightings_backoff
+            log.error("sightings worker exited with %s; restarting in %.0fs (see sightings.log)", rc,
+                      self.sightings_backoff)
+            self.sightings_backoff = min(self.sightings_backoff * 2, 600)
+            return
+        if now < self.sightings_next_start:
+            return
+        exe = self.cfg.paths.sightings_python
+        if not exe.exists():
+            if not self.sightings_missing_logged:
+                log.error("sightings enabled but %s is missing; run install.ps1 -Sightings", exe)
+                self.sightings_missing_logged = True
+            return
+        self.sightings = self.spawn("sightings-worker", low_priority=True, exe=str(exe))
+        self.sightings_started = now
+        log.info("sightings worker started (pid %d)", self.sightings.pid)
 
     def reset_backoff(self, now: float) -> None:
         """Forget earlier crashes once capture has stayed up for 5 minutes."""
@@ -147,7 +198,18 @@ class Supervisor:
             "clip_running": bool(self.clip), "daily_running": bool(self.daily),
             "next_clip": datetime.fromtimestamp(next_clip).isoformat(timespec="seconds"),
             "free_gb": round(free, 1), "output_dir": str(self.cfg.paths.out),
+            **(self.sightings_status(now) if self.cfg.sightings.enabled else {}),
         })
+
+    def sightings_status(self, now: float) -> dict:
+        recent = [t for t in self.sightings_exits if now - t < 900]
+        return {
+            "sightings_pid": self.sightings.pid if self.sightings and self.sightings.poll() is None else None,
+            "sightings_restarts": self.sightings_restarts,
+            "sightings_recent_exits": len(recent),
+            "sightings_crash_looping": len(recent) >= 3,
+            "sightings_next_start": self.sightings_next_start if not self.sightings else None,
+        }
 
     def run(self, foreground: bool = False) -> int:
         # `disabled` is set by `campi stop` and cleared by `campi start`; it only blocks background launches.
@@ -181,6 +243,8 @@ class Supervisor:
                     break
                 self.check_capture(now)
                 self.reset_backoff(now)
+                if cfg.sightings.enabled:
+                    self.check_sightings(now)
 
                 if now >= next_clip + cfg.render.delay_s:
                     boundary = next_clip
@@ -218,6 +282,9 @@ class Supervisor:
         finally:
             if self.capture and self.capture.poll() is None:
                 self.capture.terminate()
+            if self.sightings and self.sightings.poll() is None:
+                subprocess.run(["taskkill", "/T", "/F", "/PID", str(self.sightings.pid)], capture_output=True,
+                               creationflags=NO_WINDOW)
             for slot in ("clip", "daily", "housekeep"):
                 cur = getattr(self, slot)
                 if cur and cur[0].poll() is None:

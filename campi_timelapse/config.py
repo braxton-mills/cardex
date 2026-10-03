@@ -21,6 +21,14 @@ DEFAULT_CONFIG = PROJECT / "config.toml"
 NO_WINDOW = subprocess.CREATE_NO_WINDOW if os.name == "nt" else 0
 BELOW_NORMAL = subprocess.BELOW_NORMAL_PRIORITY_CLASS if os.name == "nt" else 0
 
+# [sightings] defaults, so a config.toml without the section still loads (worker stays off).
+SIGHTINGS_DEFAULTS = {
+    "enabled": False, "detect_fps": 10, "yolo_weights": "yolo11m.pt", "yolo_imgsz": 1280,
+    "clip_model": "ViT-SO400M-16-SigLIP2-384", "labels_file": "sightings_labels.txt", "min_crop_px": 64,
+    "min_samples": 3, "lost_after_s": 2.0, "unsure_below": 0.30, "stationary_px": 40, "roi": [],
+    "pause_at_night": True, "save_clips": True, "pre_roll_s": 2, "post_roll_s": 3, "keep_clips_days": 30,
+}
+
 FOLDERID_DOWNLOADS = "{374DE290-123F-4565-9164-39C4925E467B}"
 
 
@@ -68,7 +76,9 @@ def _tool(path: str, name: str) -> str:
 def load_config(path: Path | None = None) -> SimpleNamespace:
     path = Path(path or os.environ.get("CAMPI_CONFIG") or DEFAULT_CONFIG)
     with open(path, "rb") as f:
-        cfg = _ns(tomllib.load(f))
+        raw = tomllib.load(f)
+    raw["sightings"] = {**SIGHTINGS_DEFAULTS, **raw.get("sightings", {})}
+    cfg = _ns(raw)
     cfg.config_path = path
 
     if cfg.image.rotation not in (0, 90, 180, 270):
@@ -92,6 +102,9 @@ def load_config(path: Path | None = None) -> SimpleNamespace:
     cfg.paths.archive = cfg.paths.out / "archive"
     for p in vars(cfg.paths).values():
         p.mkdir(parents=True, exist_ok=True)
+    # Optional sightings worker: not created here, so nothing new appears on disk while it is disabled.
+    cfg.paths.sightings = data / "sightings"
+    cfg.paths.sightings_python = data / "venv-sightings" / "Scripts" / "pythonw.exe"
 
     cfg.tools.ffmpeg = _tool(cfg.tools.ffmpeg, "ffmpeg")
     cfg.tools.ffprobe = _tool(cfg.tools.ffprobe, "ffprobe")

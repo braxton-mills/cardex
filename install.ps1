@@ -5,7 +5,11 @@
    - Task Scheduler task "CampiTimelapse" (install-task.ps1, admin prompt): runs without logon,
      at startup + logon + 5-minute watchdog, no console window
    - `campi` command in %USERPROFILE%\.local\bin
+   - with -Sightings: the optional vehicle sightings worker's own venv
+     (%USERPROFILE%\CampiTimelapse\venv-sightings: CUDA torch, ultralytics, open_clip, transformers) and its
+     model weights (several GB). Then set [sightings] enabled = true in config.toml and run `campi restart`.
 #>
+param([switch]$Sightings)
 $ErrorActionPreference = 'Stop'
 $Project = $PSScriptRoot
 Set-Location $Project
@@ -22,6 +26,22 @@ if (-not (Test-Path 'tools\rife-ncnn-vulkan\rife-ncnn-vulkan.exe')) {
     Expand-Archive tools\rife.zip -DestinationPath tools -Force
     Rename-Item tools\rife-ncnn-vulkan-20221029-windows rife-ncnn-vulkan
     Remove-Item tools\rife.zip
+}
+
+if ($Sightings) {
+    # Separate env so the timelapse env never changes. torch first, from the CUDA 12.8 index (RTX 50-series
+    # needs cu128+); the later install then sees torch as satisfied instead of pulling the CPU build from PyPI.
+    $sv = Join-Path $env:USERPROFILE 'CampiTimelapse\venv-sightings'
+    $spy = Join-Path $sv 'Scripts\python.exe'
+    if (-not (Test-Path $spy)) { uv venv $sv --python 3.12 }
+    uv pip install --python $spy torch torchvision --index-url https://download.pytorch.org/whl/cu128
+    uv pip install --python $spy ultralytics lap open_clip_torch 'transformers[sentencepiece]' opencv-python-headless
+    # ultralytics depends on opencv-python, which clashes with the headless build (same cv2 module)
+    uv pip uninstall --python $spy opencv-python
+    uv pip install --python $spy --reinstall opencv-python-headless
+    # Download the YOLO + SigLIP 2 weights now and confirm CUDA (prints the GPU and free VRAM)
+    & $spy -m campi_timelapse sightings-worker --check
+    if ($LASTEXITCODE -ne 0) { throw 'sightings check failed (see above)' }
 }
 
 # The task runs whether or not you are logged on, which needs admin rights to register.

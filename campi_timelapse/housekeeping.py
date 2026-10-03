@@ -131,3 +131,16 @@ def run(cfg) -> None:
     free = disk_guard(cfg)
     used = sum(f.stat().st_size for f in cfg.paths.frames.rglob("*.jpg")) / 1e9
     log.info("housekeeping done: frames use %.1f GB, %.1f GB free", used, free)
+    expire_sighting_clips(cfg, now)
+
+
+def expire_sighting_clips(cfg, now: float) -> None:
+    """Optional sightings: delete clips older than keep_clips_days (crops, frames and rows are kept).
+    Only runs if the sightings database exists; a problem here never fails the rest of housekeeping."""
+    from . import sightings_db
+    if not sightings_db.db_path(cfg.paths.sightings).exists():
+        return
+    try:
+        sightings_db.expire_clips(cfg.paths.sightings, cfg.sightings.keep_clips_days, now)
+    except Exception:
+        log.exception("sightings clip expiry failed")

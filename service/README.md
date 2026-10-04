@@ -1,7 +1,8 @@
 # Campi timelapse
 
 Turns the Pi camera stream (`http://campi.local:8000/stream.mjpg`) into a 60 fps timelapse clip every 10 minutes
-and one ~60 s video per day. All settings are in `config.toml`; after editing it, run `campi restart`.
+and one ~60 s video per day. All settings are in `config.toml` (copy `config.example.toml` to start; it is not
+tracked by git); after editing it, run `campi restart`.
 
 | What | Where |
 |---|---|
@@ -72,7 +73,8 @@ scale to 1440x1080 -> night temporal denoise (`[night] denoise_frames`, a 3-fram
 RIFE 2x on the RTX 5070 (rife-ncnn-vulkan, Vulkan) per segment -> timestamp ->
 h264_nvenc CQ 19, yuv420p, bt709, +faststart.
 
-Setup from scratch: `powershell -ExecutionPolicy Bypass -File install.ps1`.
+Setup from scratch: `powershell -ExecutionPolicy Bypass -File install.ps1` (creates `config.toml` from
+`config.example.toml` if it is missing).
 
 ## Pi side (campi)
 - `~/timelapse/mjpeg_server_2.py` (source: `pi/mjpeg_server_2.py`): 1920x1440 from the full-view 2028x1520 sensor

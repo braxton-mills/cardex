@@ -95,6 +95,10 @@ def _tool(path: str, name: str) -> str:
 
 def load_config(path: Path | None = None) -> SimpleNamespace:
     path = Path(path or os.environ.get("CAMPI_CONFIG") or DEFAULT_CONFIG)
+    if not path.is_file():
+        hint = (f"copy {PROJECT / 'config.example.toml'} to {DEFAULT_CONFIG} and edit it" if path == DEFAULT_CONFIG
+                else "check CAMPI_CONFIG or the path you passed")
+        raise FileNotFoundError(f"config not found: {path} ({hint})")
     with open(path, "rb") as f:
         raw = tomllib.load(f)
     raw["sightings"] = {**SIGHTINGS_DEFAULTS, **raw.get("sightings", {})}

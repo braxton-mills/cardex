@@ -1,5 +1,6 @@
 <#
   One-time setup for the Campi timelapse service:
+   - config.toml copied from config.example.toml if missing (edit it afterwards)
    - service venv (.venv-service) with opencv-python-headless, numpy, psutil
    - rife-ncnn-vulkan in tools\ (if missing)
    - Task Scheduler task "CampiTimelapse" (install-task.ps1, admin prompt): runs without logon,
@@ -20,6 +21,11 @@ param([switch]$Sightings, [switch]$UI, [switch]$Meshes)
 $ErrorActionPreference = 'Stop'
 $Project = $PSScriptRoot
 Set-Location $Project
+
+if (-not (Test-Path 'config.toml')) {
+    Copy-Item 'config.example.toml' 'config.toml'
+    Write-Warning "created config.toml from config.example.toml: edit it (stream URL, folders), then run campi restart"
+}
 
 if (-not (Test-Path '.venv-service\Scripts\python.exe')) {
     uv venv .venv-service --python 3.12

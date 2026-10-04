@@ -1,0 +1,20 @@
+{
+  "aps": {
+    "alert": {
+      "title": "Campi: stream lost",
+      "body": "No frame saved for 10 minutes."
+    },
+    "sound": "default",
+    "mutable-content": 1,
+    "thread-id": "service",
+    "category": "SERVICE"
+  },
+  "campi": {
+    "type": "service",
+    "sighting_id": null,
+    "label": null,
+    "day": null,
+    "crop": null,
+    "alert": "capture_disconnected"
+  }
+}

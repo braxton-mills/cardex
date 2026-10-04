@@ -1,0 +1,17 @@
+{
+  "id": "dev_k3j9q2m8x4c7v1bz",
+  "name": "Braxton's iPhone",
+  "platform": "ios",
+  "created_at": "2026-10-02T14:30:00.000-05:00",
+  "last_seen_at": "2026-10-03T14:29:30.000-05:00",
+  "push": {
+    "enabled": true,
+    "environment": "sandbox",
+    "prefs": {
+      "new_catch": true,
+      "rare": false,
+      "discovered": true,
+      "service_alerts": true
+    }
+  }
+}

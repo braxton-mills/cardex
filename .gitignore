@@ -5,7 +5,10 @@ __pycache__/
 .venv-service/
 
 # Downloaded by install.ps1 (rife-ncnn-vulkan binary + models)
-tools/
+service/tools/
 
 # Model weights (ultralytics downloads yolo11n.pt on first run)
 *.pt
+
+# Local settings (copy service/config.example.toml); never committed
+service/config.toml

@@ -1,0 +1,990 @@
+// !$*UTF8*$!
+{
+	archiveVersion = 1;
+	classes = {
+	};
+	objectVersion = 77;
+	objects = {
+
+/* Begin PBXBuildFile section */
+		04828B348F05CECD58F81D59 /* StatusDetailView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0B71C46D980691C749B7E9D7 /* StatusDetailView.swift */; };
+		0B1EF2E03E121E0E3C5803A0 /* SightingsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 553367140C77690FB7CA8169 /* SightingsView.swift */; };
+		0CE19E9A06368C38AFE93124 /* PairingView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3C8AC259857185CC4AF23A27 /* PairingView.swift */; };
+		0DC8D0A5D72DDF8E369B0893 /* LiveModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3D8F775EC74E344E3F4C12F2 /* LiveModel.swift */; };
+		16E11C816B8C0BC2DF73447E /* CampiWidget.appex in Embed Foundation Extensions */ = {isa = PBXBuildFile; fileRef = 2463A50A51756C74284D16F7 /* CampiWidget.appex */; settings = {ATTRIBUTES = (RemoveHeadersOnCopy, ); }; };
+		1F2B064480ACA77BD83ECD27 /* CardexStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = 858FDE0B70F03FCFAF9E8ABC /* CardexStore.swift */; };
+		28F04A3116EA73C865A55FEA /* CampiWidget.swift in Sources */ = {isa = PBXBuildFile; fileRef = CA867C174B2E065EEE91E4BE /* CampiWidget.swift */; };
+		2A605CC3EDA9C80F50D738D5 /* CampiNotificationService.appex in Embed Foundation Extensions */ = {isa = PBXBuildFile; fileRef = 494F2BCD7F0E1E06F95ABFD0 /* CampiNotificationService.appex */; settings = {ATTRIBUTES = (RemoveHeadersOnCopy, ); }; };
+		2DC8F484631FF0174A2AC86A /* CarScene.swift in Sources */ = {isa = PBXBuildFile; fileRef = E3B1D71F251A423C5BA8CB7A /* CarScene.swift */; };
+		2EADDC0CA13ABFA6B18A273C /* WidgetKit.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 1514A3EAB16B360FC891331E /* WidgetKit.framework */; };
+		3069EF04174AB1E862965FE5 /* LiveView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 35E1A7B16D5E47A8E6495018 /* LiveView.swift */; };
+		3BF7C81316B30A80DC7DF0F6 /* SightingDetailView.swift in Sources */ = {isa = PBXBuildFile; fileRef = AE8C003F6CBE22F6E0AF2C61 /* SightingDetailView.swift */; };
+		3D37B4765F2F4F915814C203 /* AppModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = FB0A57E7C5F1E166B85093ED /* AppModel.swift */; };
+		40EE5FD23A1E386620E7D4DE /* Badges.swift in Sources */ = {isa = PBXBuildFile; fileRef = 57FA544A415D300B8E119BF3 /* Badges.swift */; };
+		42B1569E6CA9128E19EC52E2 /* PushManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = DCAD2BCABB4E94784A7C9960 /* PushManager.swift */; };
+		45FD47A0EC2628DE07F6D9D1 /* LabelPickerView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 303A36E5C88D9218DF1F93B0 /* LabelPickerView.swift */; };
+		52CC54D15295CA97856B04B1 /* CampiKit in Frameworks */ = {isa = PBXBuildFile; productRef = C38C3DA85464FB33EAAA3DE9 /* CampiKit */; };
+		561B6344763343687C16DA99 /* MediaSaver.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9BB631B9487AA0A678C2C25C /* MediaSaver.swift */; };
+		5BF3C2760301C196E28598C4 /* SwiftUI.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 2BB84B7A7B94D2AD25C47042 /* SwiftUI.framework */; };
+		786C29246F9ECCE07F1BE32C /* SettingsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = DD247E2EB2267C55A4F08A5F /* SettingsView.swift */; };
+		7BABB5A13A1ED9A9CD3FA431 /* CardexCardView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1E7E88EEC07DEC39AF4827B3 /* CardexCardView.swift */; };
+		7DAFE2353591790E0671832E /* TodayModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = D57E5E87171B8F4122942817 /* TodayModel.swift */; };
+		81ECA413323E62F22EF2802D /* TradingCardView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9004C3BF6DCBFFE6D6465D03 /* TradingCardView.swift */; };
+		82DF684D58ACC85F085E158C /* SightingsModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = C5F7F80899FD8B7A14D1796C /* SightingsModel.swift */; };
+		8A115BB302582CF7B3CBE309 /* RootView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 39744264472CDD72B3022907 /* RootView.swift */; };
+		95F7899A246D2576115E9961 /* CardInspectorView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3213CB18509E726F85F046D5 /* CardInspectorView.swift */; };
+		9E35A0D9AC6D5CE5D6F0C6DA /* Foil.metal in Sources */ = {isa = PBXBuildFile; fileRef = 4B67C39AA7E5B0B7B61D62FD /* Foil.metal */; };
+		A21334EB14B037BB6AF4231A /* AppDelegate.swift in Sources */ = {isa = PBXBuildFile; fileRef = CAC61D410BB19D85ED354ADF /* AppDelegate.swift */; };
+		A932689EA4D6DAB637FF4FB1 /* SmokeTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = ECF6EAC467FC4E523FCE0A8A /* SmokeTests.swift */; };
+		AA9C17E25599BE6A53C0FF4E /* TodayView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5711821ADE4404E23CC9A802 /* TodayView.swift */; };
+		AD6FB95B6E968A76C83E52FA /* CollectionView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 20185174CADBEE36C595822E /* CollectionView.swift */; };
+		B2400B54CDFFE4995A6524E0 /* CardScenes.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5215A421DB9F0774F90A3F7D /* CardScenes.swift */; };
+		B6207662BEDAE6CF8D5B45C2 /* NetworkPath.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0E6646DB3012F39FF40360DF /* NetworkPath.swift */; };
+		B719E9D380BBAD5667966C09 /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = 5A2AF8456A878CD732AB84DA /* Assets.xcassets */; };
+		B8A8BAAFCB29DFD038E2C4D0 /* HighlightsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 24686F5EFB70E6FE7EC01587 /* HighlightsView.swift */; };
+		C54A645D46F5E46FEEFE5353 /* SightingStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = F6713C58CB0D8B470730FB61 /* SightingStore.swift */; };
+		C5CFF9414CA2B603A06695FF /* CardexGalleryView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 324CD3FEB2779E86910C02B8 /* CardexGalleryView.swift */; };
+		D90FC23952D39993941BC901 /* CampiApp.swift in Sources */ = {isa = PBXBuildFile; fileRef = 79182482FD527B71C6977FA5 /* CampiApp.swift */; };
+		E0E13CA699A8AD7BE1F980A0 /* NotificationService.swift in Sources */ = {isa = PBXBuildFile; fileRef = 28FCA63A48CB6F32B7C0C197 /* NotificationService.swift */; };
+		E4824254C20BD4E57179D978 /* CardexGenerator.swift in Sources */ = {isa = PBXBuildFile; fileRef = 94DD728C33CBD10F42BAD363 /* CardexGenerator.swift */; };
+		EC1AC9138CD5C4C68A34869A /* CampiKit in Frameworks */ = {isa = PBXBuildFile; productRef = 1D9AA4B473CCB75BD080B9B0 /* CampiKit */; };
+		EC9607EF1F421C01101BF52B /* CampiKit in Frameworks */ = {isa = PBXBuildFile; productRef = 524286BA4647F69B7244D7C9 /* CampiKit */; };
+		ED13FCFD10572138D5995061 /* Formatting.swift in Sources */ = {isa = PBXBuildFile; fileRef = 251F3A9F83732407FE7E1EE8 /* Formatting.swift */; };
+		F3EA889E5D2371B75BE836A2 /* TimelapseView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 84AC9EE4BA7FE9F8F54B2BBD /* TimelapseView.swift */; };
+		F5C8C766CA78D63B516F86BE /* PlayerView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 70F09E70F330808A90E5E281 /* PlayerView.swift */; };
+		F9AD438088856016D7AC0C1D /* RemoteImage.swift in Sources */ = {isa = PBXBuildFile; fileRef = 11198FCA1C6DF015D1E32A14 /* RemoteImage.swift */; };
+		FDA4717F4D00BE6C21050A75 /* SightingFilterView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3796895C830058CD2D5A3B22 /* SightingFilterView.swift */; };
+/* End PBXBuildFile section */
+
+/* Begin PBXContainerItemProxy section */
+		11F47CE2D3A46457B2EAC14E /* PBXContainerItemProxy */ = {
+			isa = PBXContainerItemProxy;
+			containerPortal = 2842DB7A802795B1D547194B /* Project object */;
+			proxyType = 1;
+			remoteGlobalIDString = D4CE5B732EBD19386A232095;
+			remoteInfo = CampiNotificationService;
+		};
+		3698A07C019FAF44176BB277 /* PBXContainerItemProxy */ = {
+			isa = PBXContainerItemProxy;
+			containerPortal = 2842DB7A802795B1D547194B /* Project object */;
+			proxyType = 1;
+			remoteGlobalIDString = A4D1DBCBB3527D5CB1FD88A4;
+			remoteInfo = CampiWidget;
+		};
+		DF8BB994E8E75FDFC53D5F9F /* PBXContainerItemProxy */ = {
+			isa = PBXContainerItemProxy;
+			containerPortal = 2842DB7A802795B1D547194B /* Project object */;
+			proxyType = 1;
+			remoteGlobalIDString = 8569B00B7134FEC3B64223DA;
+			remoteInfo = Campi;
+		};
+/* End PBXContainerItemProxy section */
+
+/* Begin PBXCopyFilesBuildPhase section */
+		4561EE51048EF3E19FF597C0 /* Embed Foundation Extensions */ = {
+			isa = PBXCopyFilesBuildPhase;
+			buildActionMask = 2147483647;
+			dstPath = "";
+			dstSubfolderSpec = 13;
+			files = (
+				2A605CC3EDA9C80F50D738D5 /* CampiNotificationService.appex in Embed Foundation Extensions */,
+				16E11C816B8C0BC2DF73447E /* CampiWidget.appex in Embed Foundation Extensions */,
+			);
+			name = "Embed Foundation Extensions";
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+/* End PBXCopyFilesBuildPhase section */
+
+/* Begin PBXFileReference section */
+		0B71C46D980691C749B7E9D7 /* StatusDetailView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = StatusDetailView.swift; sourceTree = "<group>"; };
+		0B8886547ACE5F7436B6D2DC /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist; path = Info.plist; sourceTree = "<group>"; };
+		0E6646DB3012F39FF40360DF /* NetworkPath.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NetworkPath.swift; sourceTree = "<group>"; };
+		11198FCA1C6DF015D1E32A14 /* RemoteImage.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RemoteImage.swift; sourceTree = "<group>"; };
+		1514A3EAB16B360FC891331E /* WidgetKit.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = WidgetKit.framework; path = System/Library/Frameworks/WidgetKit.framework; sourceTree = SDKROOT; };
+		1E7E88EEC07DEC39AF4827B3 /* CardexCardView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CardexCardView.swift; sourceTree = "<group>"; };
+		20185174CADBEE36C595822E /* CollectionView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CollectionView.swift; sourceTree = "<group>"; };
+		2463A50A51756C74284D16F7 /* CampiWidget.appex */ = {isa = PBXFileReference; includeInIndex = 0; lastKnownFileType = "wrapper.app-extension"; path = CampiWidget.appex; sourceTree = BUILT_PRODUCTS_DIR; };
+		24686F5EFB70E6FE7EC01587 /* HighlightsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HighlightsView.swift; sourceTree = "<group>"; };
+		251F3A9F83732407FE7E1EE8 /* Formatting.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Formatting.swift; sourceTree = "<group>"; };
+		28FCA63A48CB6F32B7C0C197 /* NotificationService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NotificationService.swift; sourceTree = "<group>"; };
+		2BB84B7A7B94D2AD25C47042 /* SwiftUI.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = SwiftUI.framework; path = System/Library/Frameworks/SwiftUI.framework; sourceTree = SDKROOT; };
+		303A36E5C88D9218DF1F93B0 /* LabelPickerView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LabelPickerView.swift; sourceTree = "<group>"; };
+		3213CB18509E726F85F046D5 /* CardInspectorView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CardInspectorView.swift; sourceTree = "<group>"; };
+		324CD3FEB2779E86910C02B8 /* CardexGalleryView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CardexGalleryView.swift; sourceTree = "<group>"; };
+		35E1A7B16D5E47A8E6495018 /* LiveView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LiveView.swift; sourceTree = "<group>"; };
+		3796895C830058CD2D5A3B22 /* SightingFilterView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SightingFilterView.swift; sourceTree = "<group>"; };
+		39744264472CDD72B3022907 /* RootView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RootView.swift; sourceTree = "<group>"; };
+		3C8AC259857185CC4AF23A27 /* PairingView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PairingView.swift; sourceTree = "<group>"; };
+		3D8F775EC74E344E3F4C12F2 /* LiveModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LiveModel.swift; sourceTree = "<group>"; };
+		43B7A7B8A672A00356D5494E /* CampiWidget.entitlements */ = {isa = PBXFileReference; lastKnownFileType = text.plist.entitlements; path = CampiWidget.entitlements; sourceTree = "<group>"; };
+		494F2BCD7F0E1E06F95ABFD0 /* CampiNotificationService.appex */ = {isa = PBXFileReference; includeInIndex = 0; lastKnownFileType = "wrapper.app-extension"; path = CampiNotificationService.appex; sourceTree = BUILT_PRODUCTS_DIR; };
+		4B67C39AA7E5B0B7B61D62FD /* Foil.metal */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.metal; path = Foil.metal; sourceTree = "<group>"; };
+		5215A421DB9F0774F90A3F7D /* CardScenes.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CardScenes.swift; sourceTree = "<group>"; };
+		553367140C77690FB7CA8169 /* SightingsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SightingsView.swift; sourceTree = "<group>"; };
+		5711821ADE4404E23CC9A802 /* TodayView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TodayView.swift; sourceTree = "<group>"; };
+		57FA544A415D300B8E119BF3 /* Badges.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Badges.swift; sourceTree = "<group>"; };
+		5A2AF8456A878CD732AB84DA /* Assets.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; path = Assets.xcassets; sourceTree = "<group>"; };
+		68B1D06F9D691732589AFEDD /* CampiNotificationService.entitlements */ = {isa = PBXFileReference; lastKnownFileType = text.plist.entitlements; path = CampiNotificationService.entitlements; sourceTree = "<group>"; };
+		70F09E70F330808A90E5E281 /* PlayerView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PlayerView.swift; sourceTree = "<group>"; };
+		79182482FD527B71C6977FA5 /* CampiApp.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CampiApp.swift; sourceTree = "<group>"; };
+		84AC9EE4BA7FE9F8F54B2BBD /* TimelapseView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TimelapseView.swift; sourceTree = "<group>"; };
+		858FDE0B70F03FCFAF9E8ABC /* CardexStore.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CardexStore.swift; sourceTree = "<group>"; };
+		9004C3BF6DCBFFE6D6465D03 /* TradingCardView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TradingCardView.swift; sourceTree = "<group>"; };
+		94DD728C33CBD10F42BAD363 /* CardexGenerator.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CardexGenerator.swift; sourceTree = "<group>"; };
+		9BB631B9487AA0A678C2C25C /* MediaSaver.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MediaSaver.swift; sourceTree = "<group>"; };
+		AE8C003F6CBE22F6E0AF2C61 /* SightingDetailView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SightingDetailView.swift; sourceTree = "<group>"; };
+		C5658DCF12B1BFDCC7CAFC16 /* Campi.entitlements */ = {isa = PBXFileReference; lastKnownFileType = text.plist.entitlements; path = Campi.entitlements; sourceTree = "<group>"; };
+		C5F7F80899FD8B7A14D1796C /* SightingsModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SightingsModel.swift; sourceTree = "<group>"; };
+		CA867C174B2E065EEE91E4BE /* CampiWidget.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CampiWidget.swift; sourceTree = "<group>"; };
+		CAC61D410BB19D85ED354ADF /* AppDelegate.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppDelegate.swift; sourceTree = "<group>"; };
+		D57E5E87171B8F4122942817 /* TodayModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TodayModel.swift; sourceTree = "<group>"; };
+		D82A1FDC6C0B611D29F8EB0B /* CampiUITests.xctest */ = {isa = PBXFileReference; includeInIndex = 0; lastKnownFileType = wrapper.cfbundle; path = CampiUITests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
+		DCAD2BCABB4E94784A7C9960 /* PushManager.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PushManager.swift; sourceTree = "<group>"; };
+		DD247E2EB2267C55A4F08A5F /* SettingsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SettingsView.swift; sourceTree = "<group>"; };
+		E30B01F57AB65FBADF03D7E2 /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist; path = Info.plist; sourceTree = "<group>"; };
+		E314793F7245A404662086F9 /* Campi.app */ = {isa = PBXFileReference; includeInIndex = 0; lastKnownFileType = wrapper.application; path = Campi.app; sourceTree = BUILT_PRODUCTS_DIR; };
+		E3B1D71F251A423C5BA8CB7A /* CarScene.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CarScene.swift; sourceTree = "<group>"; };
+		ECF6EAC467FC4E523FCE0A8A /* SmokeTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SmokeTests.swift; sourceTree = "<group>"; };
+		F6713C58CB0D8B470730FB61 /* SightingStore.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SightingStore.swift; sourceTree = "<group>"; };
+		F7671C44D83AD560AEE21700 /* CampiKit */ = {isa = PBXFileReference; lastKnownFileType = folder; name = CampiKit; path = CampiKit; sourceTree = SOURCE_ROOT; };
+		F7F3A236A03C0059E6C0CB95 /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist; path = Info.plist; sourceTree = "<group>"; };
+		FB0A57E7C5F1E166B85093ED /* AppModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppModel.swift; sourceTree = "<group>"; };
+/* End PBXFileReference section */
+
+/* Begin PBXFrameworksBuildPhase section */
+		3E5A60EB83D68C53CEB8A7DC /* Frameworks */ = {
+			isa = PBXFrameworksBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				EC1AC9138CD5C4C68A34869A /* CampiKit in Frameworks */,
+				2EADDC0CA13ABFA6B18A273C /* WidgetKit.framework in Frameworks */,
+				5BF3C2760301C196E28598C4 /* SwiftUI.framework in Frameworks */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		533CAF3445CE9A029F313ABA /* Frameworks */ = {
+			isa = PBXFrameworksBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				52CC54D15295CA97856B04B1 /* CampiKit in Frameworks */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		A691721178D7E9DBD340922E /* Frameworks */ = {
+			isa = PBXFrameworksBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				EC9607EF1F421C01101BF52B /* CampiKit in Frameworks */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+/* End PBXFrameworksBuildPhase section */
+
+/* Begin PBXGroup section */
+		19A833C4434DD7FD138B26C4 /* Highlights */ = {
+			isa = PBXGroup;
+			children = (
+				24686F5EFB70E6FE7EC01587 /* HighlightsView.swift */,
+			);
+			path = Highlights;
+			sourceTree = "<group>";
+		};
+		2683DCA8C8A8DF857D333AFE /* Player */ = {
+			isa = PBXGroup;
+			children = (
+				70F09E70F330808A90E5E281 /* PlayerView.swift */,
+			);
+			path = Player;
+			sourceTree = "<group>";
+		};
+		28E05330C50EA05ECDA01BDA /* Frameworks */ = {
+			isa = PBXGroup;
+			children = (
+				2BB84B7A7B94D2AD25C47042 /* SwiftUI.framework */,
+				1514A3EAB16B360FC891331E /* WidgetKit.framework */,
+			);
+			name = Frameworks;
+			sourceTree = "<group>";
+		};
+		2BD9699749AF3099FD8DF2EB /* Resources */ = {
+			isa = PBXGroup;
+			children = (
+				5A2AF8456A878CD732AB84DA /* Assets.xcassets */,
+			);
+			path = Resources;
+			sourceTree = "<group>";
+		};
+		31491E236A15B0C5E598B0F3 /* Products */ = {
+			isa = PBXGroup;
+			children = (
+				E314793F7245A404662086F9 /* Campi.app */,
+				494F2BCD7F0E1E06F95ABFD0 /* CampiNotificationService.appex */,
+				D82A1FDC6C0B611D29F8EB0B /* CampiUITests.xctest */,
+				2463A50A51756C74284D16F7 /* CampiWidget.appex */,
+			);
+			name = Products;
+			sourceTree = "<group>";
+		};
+		37A6A8F480B96B325D550A6F /* CampiUITests */ = {
+			isa = PBXGroup;
+			children = (
+				ECF6EAC467FC4E523FCE0A8A /* SmokeTests.swift */,
+			);
+			path = CampiUITests;
+			sourceTree = "<group>";
+		};
+		3A47446909D8DC9DF82FD8C7 /* Shared */ = {
+			isa = PBXGroup;
+			children = (
+				57FA544A415D300B8E119BF3 /* Badges.swift */,
+				251F3A9F83732407FE7E1EE8 /* Formatting.swift */,
+				9BB631B9487AA0A678C2C25C /* MediaSaver.swift */,
+				11198FCA1C6DF015D1E32A14 /* RemoteImage.swift */,
+				F6713C58CB0D8B470730FB61 /* SightingStore.swift */,
+			);
+			path = Shared;
+			sourceTree = "<group>";
+		};
+		3CDDE74EA799E30C40051999 /* CampiNotificationService */ = {
+			isa = PBXGroup;
+			children = (
+				68B1D06F9D691732589AFEDD /* CampiNotificationService.entitlements */,
+				0B8886547ACE5F7436B6D2DC /* Info.plist */,
+				28FCA63A48CB6F32B7C0C197 /* NotificationService.swift */,
+			);
+			path = CampiNotificationService;
+			sourceTree = "<group>";
+		};
+		43066C44F3EBC52D10C906B3 /* Live */ = {
+			isa = PBXGroup;
+			children = (
+				3D8F775EC74E344E3F4C12F2 /* LiveModel.swift */,
+				35E1A7B16D5E47A8E6495018 /* LiveView.swift */,
+				0E6646DB3012F39FF40360DF /* NetworkPath.swift */,
+			);
+			path = Live;
+			sourceTree = "<group>";
+		};
+		4BAEC8F4810A3A18BE75B7AA /* App */ = {
+			isa = PBXGroup;
+			children = (
+				CAC61D410BB19D85ED354ADF /* AppDelegate.swift */,
+				FB0A57E7C5F1E166B85093ED /* AppModel.swift */,
+				79182482FD527B71C6977FA5 /* CampiApp.swift */,
+				39744264472CDD72B3022907 /* RootView.swift */,
+			);
+			path = App;
+			sourceTree = "<group>";
+		};
+		754F6816CC29E8719261FDCD /* Campi */ = {
+			isa = PBXGroup;
+			children = (
+				4BAEC8F4810A3A18BE75B7AA /* App */,
+				98752E8EF33F2954B33F7690 /* Cardex */,
+				D43BC815B4261967BA481AB2 /* Collection */,
+				19A833C4434DD7FD138B26C4 /* Highlights */,
+				43066C44F3EBC52D10C906B3 /* Live */,
+				A17638718EB11E9F7649892B /* Pairing */,
+				2683DCA8C8A8DF857D333AFE /* Player */,
+				DB9965C70738B968311235DB /* Push */,
+				2BD9699749AF3099FD8DF2EB /* Resources */,
+				83AEC35FBF972A2C313B7124 /* Settings */,
+				3A47446909D8DC9DF82FD8C7 /* Shared */,
+				F3CF86D706D6CE927DDB490C /* Sightings */,
+				8E74463AF65BCDDF6758C98F /* Timelapse */,
+				AF442BE55E548748EB4DD857 /* Today */,
+				C5658DCF12B1BFDCC7CAFC16 /* Campi.entitlements */,
+				F7F3A236A03C0059E6C0CB95 /* Info.plist */,
+			);
+			path = Campi;
+			sourceTree = "<group>";
+		};
+		76C507760D21305B198DA1D3 = {
+			isa = PBXGroup;
+			children = (
+				754F6816CC29E8719261FDCD /* Campi */,
+				3CDDE74EA799E30C40051999 /* CampiNotificationService */,
+				37A6A8F480B96B325D550A6F /* CampiUITests */,
+				FB174B7E60724F7D29B9049D /* CampiWidget */,
+				FC31AB8FD5D0476D032D411A /* Packages */,
+				28E05330C50EA05ECDA01BDA /* Frameworks */,
+				31491E236A15B0C5E598B0F3 /* Products */,
+			);
+			sourceTree = "<group>";
+		};
+		83AEC35FBF972A2C313B7124 /* Settings */ = {
+			isa = PBXGroup;
+			children = (
+				DD247E2EB2267C55A4F08A5F /* SettingsView.swift */,
+			);
+			path = Settings;
+			sourceTree = "<group>";
+		};
+		8E74463AF65BCDDF6758C98F /* Timelapse */ = {
+			isa = PBXGroup;
+			children = (
+				84AC9EE4BA7FE9F8F54B2BBD /* TimelapseView.swift */,
+			);
+			path = Timelapse;
+			sourceTree = "<group>";
+		};
+		98752E8EF33F2954B33F7690 /* Cardex */ = {
+			isa = PBXGroup;
+			children = (
+				1E7E88EEC07DEC39AF4827B3 /* CardexCardView.swift */,
+				324CD3FEB2779E86910C02B8 /* CardexGalleryView.swift */,
+				94DD728C33CBD10F42BAD363 /* CardexGenerator.swift */,
+				858FDE0B70F03FCFAF9E8ABC /* CardexStore.swift */,
+				3213CB18509E726F85F046D5 /* CardInspectorView.swift */,
+				5215A421DB9F0774F90A3F7D /* CardScenes.swift */,
+				E3B1D71F251A423C5BA8CB7A /* CarScene.swift */,
+				4B67C39AA7E5B0B7B61D62FD /* Foil.metal */,
+				9004C3BF6DCBFFE6D6465D03 /* TradingCardView.swift */,
+			);
+			path = Cardex;
+			sourceTree = "<group>";
+		};
+		A17638718EB11E9F7649892B /* Pairing */ = {
+			isa = PBXGroup;
+			children = (
+				3C8AC259857185CC4AF23A27 /* PairingView.swift */,
+			);
+			path = Pairing;
+			sourceTree = "<group>";
+		};
+		AF442BE55E548748EB4DD857 /* Today */ = {
+			isa = PBXGroup;
+			children = (
+				0B71C46D980691C749B7E9D7 /* StatusDetailView.swift */,
+				D57E5E87171B8F4122942817 /* TodayModel.swift */,
+				5711821ADE4404E23CC9A802 /* TodayView.swift */,
+			);
+			path = Today;
+			sourceTree = "<group>";
+		};
+		D43BC815B4261967BA481AB2 /* Collection */ = {
+			isa = PBXGroup;
+			children = (
+				20185174CADBEE36C595822E /* CollectionView.swift */,
+			);
+			path = Collection;
+			sourceTree = "<group>";
+		};
+		DB9965C70738B968311235DB /* Push */ = {
+			isa = PBXGroup;
+			children = (
+				DCAD2BCABB4E94784A7C9960 /* PushManager.swift */,
+			);
+			path = Push;
+			sourceTree = "<group>";
+		};
+		F3CF86D706D6CE927DDB490C /* Sightings */ = {
+			isa = PBXGroup;
+			children = (
+				303A36E5C88D9218DF1F93B0 /* LabelPickerView.swift */,
+				AE8C003F6CBE22F6E0AF2C61 /* SightingDetailView.swift */,
+				3796895C830058CD2D5A3B22 /* SightingFilterView.swift */,
+				C5F7F80899FD8B7A14D1796C /* SightingsModel.swift */,
+				553367140C77690FB7CA8169 /* SightingsView.swift */,
+			);
+			path = Sightings;
+			sourceTree = "<group>";
+		};
+		FB174B7E60724F7D29B9049D /* CampiWidget */ = {
+			isa = PBXGroup;
+			children = (
+				43B7A7B8A672A00356D5494E /* CampiWidget.entitlements */,
+				CA867C174B2E065EEE91E4BE /* CampiWidget.swift */,
+				E30B01F57AB65FBADF03D7E2 /* Info.plist */,
+			);
+			path = CampiWidget;
+			sourceTree = "<group>";
+		};
+		FC31AB8FD5D0476D032D411A /* Packages */ = {
+			isa = PBXGroup;
+			children = (
+				F7671C44D83AD560AEE21700 /* CampiKit */,
+			);
+			name = Packages;
+			sourceTree = "<group>";
+		};
+/* End PBXGroup section */
+
+/* Begin PBXNativeTarget section */
+		1D8DF611EFECA3CFED8FF9FD /* CampiUITests */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = 7C2F165DF8C16034E931EC7F /* Build configuration list for PBXNativeTarget "CampiUITests" */;
+			buildPhases = (
+				F5802127246380EE5C95DEB6 /* Sources */,
+			);
+			buildRules = (
+			);
+			dependencies = (
+				D9B9F72EAC90BAD7FDD7377B /* PBXTargetDependency */,
+			);
+			name = CampiUITests;
+			packageProductDependencies = (
+			);
+			productName = CampiUITests;
+			productReference = D82A1FDC6C0B611D29F8EB0B /* CampiUITests.xctest */;
+			productType = "com.apple.product-type.bundle.ui-testing";
+		};
+		8569B00B7134FEC3B64223DA /* Campi */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = 63F3A022C61BA2A03ACE43FF /* Build configuration list for PBXNativeTarget "Campi" */;
+			buildPhases = (
+				E73E7CC22F7729F1B400F19D /* Sources */,
+				8DBDFC5A1558CE387A764217 /* Resources */,
+				533CAF3445CE9A029F313ABA /* Frameworks */,
+				4561EE51048EF3E19FF597C0 /* Embed Foundation Extensions */,
+			);
+			buildRules = (
+			);
+			dependencies = (
+				3D8FA7B1AB16EF7D84F22F92 /* PBXTargetDependency */,
+				655B60AEE814976869ECD32E /* PBXTargetDependency */,
+			);
+			name = Campi;
+			packageProductDependencies = (
+				C38C3DA85464FB33EAAA3DE9 /* CampiKit */,
+			);
+			productName = Campi;
+			productReference = E314793F7245A404662086F9 /* Campi.app */;
+			productType = "com.apple.product-type.application";
+		};
+		A4D1DBCBB3527D5CB1FD88A4 /* CampiWidget */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = 6865E2E95F193A1A1966C901 /* Build configuration list for PBXNativeTarget "CampiWidget" */;
+			buildPhases = (
+				09247751BE22FE61F83EF6EE /* Sources */,
+				3E5A60EB83D68C53CEB8A7DC /* Frameworks */,
+			);
+			buildRules = (
+			);
+			dependencies = (
+			);
+			name = CampiWidget;
+			packageProductDependencies = (
+				1D9AA4B473CCB75BD080B9B0 /* CampiKit */,
+			);
+			productName = CampiWidget;
+			productReference = 2463A50A51756C74284D16F7 /* CampiWidget.appex */;
+			productType = "com.apple.product-type.app-extension";
+		};
+		D4CE5B732EBD19386A232095 /* CampiNotificationService */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = 2063399F5670B0C6AFE602FC /* Build configuration list for PBXNativeTarget "CampiNotificationService" */;
+			buildPhases = (
+				711E4C98D9D01366CE053426 /* Sources */,
+				A691721178D7E9DBD340922E /* Frameworks */,
+			);
+			buildRules = (
+			);
+			dependencies = (
+			);
+			name = CampiNotificationService;
+			packageProductDependencies = (
+				524286BA4647F69B7244D7C9 /* CampiKit */,
+			);
+			productName = CampiNotificationService;
+			productReference = 494F2BCD7F0E1E06F95ABFD0 /* CampiNotificationService.appex */;
+			productType = "com.apple.product-type.app-extension";
+		};
+/* End PBXNativeTarget section */
+
+/* Begin PBXProject section */
+		2842DB7A802795B1D547194B /* Project object */ = {
+			isa = PBXProject;
+			attributes = {
+				BuildIndependentTargetsInParallel = YES;
+				LastUpgradeCheck = 1430;
+				TargetAttributes = {
+					1D8DF611EFECA3CFED8FF9FD = {
+						DevelopmentTeam = "";
+						ProvisioningStyle = Automatic;
+						TestTargetID = 8569B00B7134FEC3B64223DA;
+					};
+					8569B00B7134FEC3B64223DA = {
+						DevelopmentTeam = "";
+						ProvisioningStyle = Automatic;
+					};
+					A4D1DBCBB3527D5CB1FD88A4 = {
+						DevelopmentTeam = "";
+						ProvisioningStyle = Automatic;
+					};
+					D4CE5B732EBD19386A232095 = {
+						DevelopmentTeam = "";
+						ProvisioningStyle = Automatic;
+					};
+				};
+			};
+			buildConfigurationList = 52ADE4D2F3610D55E6B98EA2 /* Build configuration list for PBXProject "Campi" */;
+			developmentRegion = en;
+			hasScannedForEncodings = 0;
+			knownRegions = (
+				Base,
+				en,
+			);
+			mainGroup = 76C507760D21305B198DA1D3;
+			minimizedProjectReferenceProxies = 1;
+			packageReferences = (
+				0DC1E99E672B222D484D49CA /* XCLocalSwiftPackageReference "CampiKit" */,
+			);
+			preferredProjectObjectVersion = 77;
+			productRefGroup = 31491E236A15B0C5E598B0F3 /* Products */;
+			projectDirPath = "";
+			projectRoot = "";
+			targets = (
+				8569B00B7134FEC3B64223DA /* Campi */,
+				D4CE5B732EBD19386A232095 /* CampiNotificationService */,
+				A4D1DBCBB3527D5CB1FD88A4 /* CampiWidget */,
+				1D8DF611EFECA3CFED8FF9FD /* CampiUITests */,
+			);
+		};
+/* End PBXProject section */
+
+/* Begin PBXResourcesBuildPhase section */
+		8DBDFC5A1558CE387A764217 /* Resources */ = {
+			isa = PBXResourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				B719E9D380BBAD5667966C09 /* Assets.xcassets in Resources */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+/* End PBXResourcesBuildPhase section */
+
+/* Begin PBXSourcesBuildPhase section */
+		09247751BE22FE61F83EF6EE /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				28F04A3116EA73C865A55FEA /* CampiWidget.swift in Sources */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		711E4C98D9D01366CE053426 /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				E0E13CA699A8AD7BE1F980A0 /* NotificationService.swift in Sources */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		E73E7CC22F7729F1B400F19D /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				A21334EB14B037BB6AF4231A /* AppDelegate.swift in Sources */,
+				3D37B4765F2F4F915814C203 /* AppModel.swift in Sources */,
+				40EE5FD23A1E386620E7D4DE /* Badges.swift in Sources */,
+				D90FC23952D39993941BC901 /* CampiApp.swift in Sources */,
+				2DC8F484631FF0174A2AC86A /* CarScene.swift in Sources */,
+				95F7899A246D2576115E9961 /* CardInspectorView.swift in Sources */,
+				B2400B54CDFFE4995A6524E0 /* CardScenes.swift in Sources */,
+				7BABB5A13A1ED9A9CD3FA431 /* CardexCardView.swift in Sources */,
+				C5CFF9414CA2B603A06695FF /* CardexGalleryView.swift in Sources */,
+				E4824254C20BD4E57179D978 /* CardexGenerator.swift in Sources */,
+				1F2B064480ACA77BD83ECD27 /* CardexStore.swift in Sources */,
+				AD6FB95B6E968A76C83E52FA /* CollectionView.swift in Sources */,
+				9E35A0D9AC6D5CE5D6F0C6DA /* Foil.metal in Sources */,
+				ED13FCFD10572138D5995061 /* Formatting.swift in Sources */,
+				B8A8BAAFCB29DFD038E2C4D0 /* HighlightsView.swift in Sources */,
+				45FD47A0EC2628DE07F6D9D1 /* LabelPickerView.swift in Sources */,
+				0DC8D0A5D72DDF8E369B0893 /* LiveModel.swift in Sources */,
+				3069EF04174AB1E862965FE5 /* LiveView.swift in Sources */,
+				561B6344763343687C16DA99 /* MediaSaver.swift in Sources */,
+				B6207662BEDAE6CF8D5B45C2 /* NetworkPath.swift in Sources */,
+				0CE19E9A06368C38AFE93124 /* PairingView.swift in Sources */,
+				F5C8C766CA78D63B516F86BE /* PlayerView.swift in Sources */,
+				42B1569E6CA9128E19EC52E2 /* PushManager.swift in Sources */,
+				F9AD438088856016D7AC0C1D /* RemoteImage.swift in Sources */,
+				8A115BB302582CF7B3CBE309 /* RootView.swift in Sources */,
+				786C29246F9ECCE07F1BE32C /* SettingsView.swift in Sources */,
+				3BF7C81316B30A80DC7DF0F6 /* SightingDetailView.swift in Sources */,
+				FDA4717F4D00BE6C21050A75 /* SightingFilterView.swift in Sources */,
+				C54A645D46F5E46FEEFE5353 /* SightingStore.swift in Sources */,
+				82DF684D58ACC85F085E158C /* SightingsModel.swift in Sources */,
+				0B1EF2E03E121E0E3C5803A0 /* SightingsView.swift in Sources */,
+				04828B348F05CECD58F81D59 /* StatusDetailView.swift in Sources */,
+				F3EA889E5D2371B75BE836A2 /* TimelapseView.swift in Sources */,
+				7DAFE2353591790E0671832E /* TodayModel.swift in Sources */,
+				AA9C17E25599BE6A53C0FF4E /* TodayView.swift in Sources */,
+				81ECA413323E62F22EF2802D /* TradingCardView.swift in Sources */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		F5802127246380EE5C95DEB6 /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				A932689EA4D6DAB637FF4FB1 /* SmokeTests.swift in Sources */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+/* End PBXSourcesBuildPhase section */
+
+/* Begin PBXTargetDependency section */
+		3D8FA7B1AB16EF7D84F22F92 /* PBXTargetDependency */ = {
+			isa = PBXTargetDependency;
+			target = D4CE5B732EBD19386A232095 /* CampiNotificationService */;
+			targetProxy = 11F47CE2D3A46457B2EAC14E /* PBXContainerItemProxy */;
+		};
+		655B60AEE814976869ECD32E /* PBXTargetDependency */ = {
+			isa = PBXTargetDependency;
+			target = A4D1DBCBB3527D5CB1FD88A4 /* CampiWidget */;
+			targetProxy = 3698A07C019FAF44176BB277 /* PBXContainerItemProxy */;
+		};
+		D9B9F72EAC90BAD7FDD7377B /* PBXTargetDependency */ = {
+			isa = PBXTargetDependency;
+			target = 8569B00B7134FEC3B64223DA /* Campi */;
+			targetProxy = DF8BB994E8E75FDFC53D5F9F /* PBXContainerItemProxy */;
+		};
+/* End PBXTargetDependency section */
+
+/* Begin XCBuildConfiguration section */
+		14A13EECE20C871F9338A76D /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				CODE_SIGN_ENTITLEMENTS = CampiNotificationService/CampiNotificationService.entitlements;
+				INFOPLIST_FILE = CampiNotificationService/Info.plist;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/Frameworks",
+					"@executable_path/../../Frameworks",
+				);
+				PRODUCT_BUNDLE_IDENTIFIER = com.braxtonmills.campi.NotificationService;
+				SDKROOT = iphoneos;
+				TARGETED_DEVICE_FAMILY = "1,2";
+			};
+			name = Release;
+		};
+		2262399A64CA4CC38B55E877 /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				CODE_SIGN_ENTITLEMENTS = CampiNotificationService/CampiNotificationService.entitlements;
+				INFOPLIST_FILE = CampiNotificationService/Info.plist;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/Frameworks",
+					"@executable_path/../../Frameworks",
+				);
+				PRODUCT_BUNDLE_IDENTIFIER = com.braxtonmills.campi.NotificationService;
+				SDKROOT = iphoneos;
+				TARGETED_DEVICE_FAMILY = "1,2";
+			};
+			name = Debug;
+		};
+		69BC6DAA65F994B84CF8602A /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				CODE_SIGN_ENTITLEMENTS = CampiWidget/CampiWidget.entitlements;
+				INFOPLIST_FILE = CampiWidget/Info.plist;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/Frameworks",
+					"@executable_path/../../Frameworks",
+				);
+				PRODUCT_BUNDLE_IDENTIFIER = com.braxtonmills.campi.Widget;
+				SDKROOT = iphoneos;
+				TARGETED_DEVICE_FAMILY = "1,2";
+			};
+			name = Debug;
+		};
+		710CE8C7602388E21BB5EE05 /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				BUNDLE_LOADER = "$(TEST_HOST)";
+				GENERATE_INFOPLIST_FILE = YES;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/Frameworks",
+					"@loader_path/Frameworks",
+				);
+				PRODUCT_BUNDLE_IDENTIFIER = com.braxtonmills.campi.uitests;
+				SDKROOT = iphoneos;
+				TARGETED_DEVICE_FAMILY = "1,2";
+				TEST_TARGET_NAME = Campi;
+			};
+			name = Release;
+		};
+		7D539623CBDEBC85507E9B12 /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
+				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
+				CODE_SIGN_ENTITLEMENTS = Campi/Campi.entitlements;
+				CODE_SIGN_IDENTITY = "iPhone Developer";
+				INFOPLIST_FILE = Campi/Info.plist;
+				INFOPLIST_KEY_UILaunchScreen_Generation = YES;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/Frameworks",
+				);
+				PRODUCT_BUNDLE_IDENTIFIER = com.braxtonmills.campi;
+				SDKROOT = iphoneos;
+				TARGETED_DEVICE_FAMILY = "1,2";
+			};
+			name = Debug;
+		};
+		7E715D846E05E4E4CA7D5B0D /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ALWAYS_SEARCH_USER_PATHS = NO;
+				CLANG_ANALYZER_NONNULL = YES;
+				CLANG_ANALYZER_NUMBER_OBJECT_CONVERSION = YES_AGGRESSIVE;
+				CLANG_CXX_LANGUAGE_STANDARD = "gnu++14";
+				CLANG_CXX_LIBRARY = "libc++";
+				CLANG_ENABLE_MODULES = YES;
+				CLANG_ENABLE_OBJC_ARC = YES;
+				CLANG_ENABLE_OBJC_WEAK = YES;
+				CLANG_WARN_BLOCK_CAPTURE_AUTORELEASING = YES;
+				CLANG_WARN_BOOL_CONVERSION = YES;
+				CLANG_WARN_COMMA = YES;
+				CLANG_WARN_CONSTANT_CONVERSION = YES;
+				CLANG_WARN_DEPRECATED_OBJC_IMPLEMENTATIONS = YES;
+				CLANG_WARN_DIRECT_OBJC_ISA_USAGE = YES_ERROR;
+				CLANG_WARN_DOCUMENTATION_COMMENTS = YES;
+				CLANG_WARN_EMPTY_BODY = YES;
+				CLANG_WARN_ENUM_CONVERSION = YES;
+				CLANG_WARN_INFINITE_RECURSION = YES;
+				CLANG_WARN_INT_CONVERSION = YES;
+				CLANG_WARN_NON_LITERAL_NULL_CONVERSION = YES;
+				CLANG_WARN_OBJC_IMPLICIT_RETAIN_SELF = YES;
+				CLANG_WARN_OBJC_LITERAL_CONVERSION = YES;
+				CLANG_WARN_OBJC_ROOT_CLASS = YES_ERROR;
+				CLANG_WARN_QUOTED_INCLUDE_IN_FRAMEWORK_HEADER = YES;
+				CLANG_WARN_RANGE_LOOP_ANALYSIS = YES;
+				CLANG_WARN_STRICT_PROTOTYPES = YES;
+				CLANG_WARN_SUSPICIOUS_MOVE = YES;
+				CLANG_WARN_UNGUARDED_AVAILABILITY = YES_AGGRESSIVE;
+				CLANG_WARN_UNREACHABLE_CODE = YES;
+				CLANG_WARN__DUPLICATE_METHOD_MATCH = YES;
+				CODE_SIGN_STYLE = Automatic;
+				COPY_PHASE_STRIP = NO;
+				CURRENT_PROJECT_VERSION = 1;
+				DEAD_CODE_STRIPPING = YES;
+				DEBUG_INFORMATION_FORMAT = "dwarf-with-dsym";
+				DEVELOPMENT_TEAM = "";
+				ENABLE_NS_ASSERTIONS = NO;
+				ENABLE_STRICT_OBJC_MSGSEND = YES;
+				ENABLE_USER_SCRIPT_SANDBOXING = YES;
+				GCC_C_LANGUAGE_STANDARD = gnu11;
+				GCC_NO_COMMON_BLOCKS = YES;
+				GCC_WARN_64_TO_32_BIT_CONVERSION = YES;
+				GCC_WARN_ABOUT_RETURN_TYPE = YES_ERROR;
+				GCC_WARN_UNDECLARED_SELECTOR = YES;
+				GCC_WARN_UNINITIALIZED_AUTOS = YES_AGGRESSIVE;
+				GCC_WARN_UNUSED_FUNCTION = YES;
+				GCC_WARN_UNUSED_VARIABLE = YES;
+				IPHONEOS_DEPLOYMENT_TARGET = 26.0;
+				MARKETING_VERSION = 0.1.0;
+				MTL_ENABLE_DEBUG_INFO = NO;
+				MTL_FAST_MATH = YES;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SDKROOT = iphoneos;
+				SWIFT_COMPILATION_MODE = wholemodule;
+				SWIFT_OPTIMIZATION_LEVEL = "-O";
+				SWIFT_STRICT_CONCURRENCY = complete;
+				SWIFT_VERSION = 6.0;
+				TARGETED_DEVICE_FAMILY = 1;
+			};
+			name = Release;
+		};
+		B31108957FBFCEF0AF1D605E /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				CODE_SIGN_ENTITLEMENTS = CampiWidget/CampiWidget.entitlements;
+				INFOPLIST_FILE = CampiWidget/Info.plist;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/Frameworks",
+					"@executable_path/../../Frameworks",
+				);
+				PRODUCT_BUNDLE_IDENTIFIER = com.braxtonmills.campi.Widget;
+				SDKROOT = iphoneos;
+				TARGETED_DEVICE_FAMILY = "1,2";
+			};
+			name = Release;
+		};
+		D01E3DE4183FA1F9D656C83E /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
+				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
+				CODE_SIGN_ENTITLEMENTS = Campi/Campi.entitlements;
+				CODE_SIGN_IDENTITY = "iPhone Developer";
+				INFOPLIST_FILE = Campi/Info.plist;
+				INFOPLIST_KEY_UILaunchScreen_Generation = YES;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/Frameworks",
+				);
+				PRODUCT_BUNDLE_IDENTIFIER = com.braxtonmills.campi;
+				SDKROOT = iphoneos;
+				TARGETED_DEVICE_FAMILY = "1,2";
+			};
+			name = Release;
+		};
+		D21BCA4886ED06379D8B1FE3 /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				BUNDLE_LOADER = "$(TEST_HOST)";
+				GENERATE_INFOPLIST_FILE = YES;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/Frameworks",
+					"@loader_path/Frameworks",
+				);
+				PRODUCT_BUNDLE_IDENTIFIER = com.braxtonmills.campi.uitests;
+				SDKROOT = iphoneos;
+				TARGETED_DEVICE_FAMILY = "1,2";
+				TEST_TARGET_NAME = Campi;
+			};
+			name = Debug;
+		};
+		DAD2171C356A1283DC60F443 /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ALWAYS_SEARCH_USER_PATHS = NO;
+				CLANG_ANALYZER_NONNULL = YES;
+				CLANG_ANALYZER_NUMBER_OBJECT_CONVERSION = YES_AGGRESSIVE;
+				CLANG_CXX_LANGUAGE_STANDARD = "gnu++14";
+				CLANG_CXX_LIBRARY = "libc++";
+				CLANG_ENABLE_MODULES = YES;
+				CLANG_ENABLE_OBJC_ARC = YES;
+				CLANG_ENABLE_OBJC_WEAK = YES;
+				CLANG_WARN_BLOCK_CAPTURE_AUTORELEASING = YES;
+				CLANG_WARN_BOOL_CONVERSION = YES;
+				CLANG_WARN_COMMA = YES;
+				CLANG_WARN_CONSTANT_CONVERSION = YES;
+				CLANG_WARN_DEPRECATED_OBJC_IMPLEMENTATIONS = YES;
+				CLANG_WARN_DIRECT_OBJC_ISA_USAGE = YES_ERROR;
+				CLANG_WARN_DOCUMENTATION_COMMENTS = YES;
+				CLANG_WARN_EMPTY_BODY = YES;
+				CLANG_WARN_ENUM_CONVERSION = YES;
+				CLANG_WARN_INFINITE_RECURSION = YES;
+				CLANG_WARN_INT_CONVERSION = YES;
+				CLANG_WARN_NON_LITERAL_NULL_CONVERSION = YES;
+				CLANG_WARN_OBJC_IMPLICIT_RETAIN_SELF = YES;
+				CLANG_WARN_OBJC_LITERAL_CONVERSION = YES;
+				CLANG_WARN_OBJC_ROOT_CLASS = YES_ERROR;
+				CLANG_WARN_QUOTED_INCLUDE_IN_FRAMEWORK_HEADER = YES;
+				CLANG_WARN_RANGE_LOOP_ANALYSIS = YES;
+				CLANG_WARN_STRICT_PROTOTYPES = YES;
+				CLANG_WARN_SUSPICIOUS_MOVE = YES;
+				CLANG_WARN_UNGUARDED_AVAILABILITY = YES_AGGRESSIVE;
+				CLANG_WARN_UNREACHABLE_CODE = YES;
+				CLANG_WARN__DUPLICATE_METHOD_MATCH = YES;
+				CODE_SIGN_STYLE = Automatic;
+				COPY_PHASE_STRIP = NO;
+				CURRENT_PROJECT_VERSION = 1;
+				DEAD_CODE_STRIPPING = YES;
+				DEBUG_INFORMATION_FORMAT = dwarf;
+				DEVELOPMENT_TEAM = "";
+				ENABLE_STRICT_OBJC_MSGSEND = YES;
+				ENABLE_TESTABILITY = YES;
+				ENABLE_USER_SCRIPT_SANDBOXING = YES;
+				GCC_C_LANGUAGE_STANDARD = gnu11;
+				GCC_DYNAMIC_NO_PIC = NO;
+				GCC_NO_COMMON_BLOCKS = YES;
+				GCC_OPTIMIZATION_LEVEL = 0;
+				GCC_PREPROCESSOR_DEFINITIONS = (
+					"$(inherited)",
+					"DEBUG=1",
+				);
+				GCC_WARN_64_TO_32_BIT_CONVERSION = YES;
+				GCC_WARN_ABOUT_RETURN_TYPE = YES_ERROR;
+				GCC_WARN_UNDECLARED_SELECTOR = YES;
+				GCC_WARN_UNINITIALIZED_AUTOS = YES_AGGRESSIVE;
+				GCC_WARN_UNUSED_FUNCTION = YES;
+				GCC_WARN_UNUSED_VARIABLE = YES;
+				IPHONEOS_DEPLOYMENT_TARGET = 26.0;
+				MARKETING_VERSION = 0.1.0;
+				MTL_ENABLE_DEBUG_INFO = INCLUDE_SOURCE;
+				MTL_FAST_MATH = YES;
+				ONLY_ACTIVE_ARCH = YES;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SDKROOT = iphoneos;
+				SWIFT_ACTIVE_COMPILATION_CONDITIONS = DEBUG;
+				SWIFT_OPTIMIZATION_LEVEL = "-Onone";
+				SWIFT_STRICT_CONCURRENCY = complete;
+				SWIFT_VERSION = 6.0;
+				TARGETED_DEVICE_FAMILY = 1;
+			};
+			name = Debug;
+		};
+/* End XCBuildConfiguration section */
+
+/* Begin XCConfigurationList section */
+		2063399F5670B0C6AFE602FC /* Build configuration list for PBXNativeTarget "CampiNotificationService" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				2262399A64CA4CC38B55E877 /* Debug */,
+				14A13EECE20C871F9338A76D /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Debug;
+		};
+		52ADE4D2F3610D55E6B98EA2 /* Build configuration list for PBXProject "Campi" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				DAD2171C356A1283DC60F443 /* Debug */,
+				7E715D846E05E4E4CA7D5B0D /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Debug;
+		};
+		63F3A022C61BA2A03ACE43FF /* Build configuration list for PBXNativeTarget "Campi" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				7D539623CBDEBC85507E9B12 /* Debug */,
+				D01E3DE4183FA1F9D656C83E /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Debug;
+		};
+		6865E2E95F193A1A1966C901 /* Build configuration list for PBXNativeTarget "CampiWidget" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				69BC6DAA65F994B84CF8602A /* Debug */,
+				B31108957FBFCEF0AF1D605E /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Debug;
+		};
+		7C2F165DF8C16034E931EC7F /* Build configuration list for PBXNativeTarget "CampiUITests" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				D21BCA4886ED06379D8B1FE3 /* Debug */,
+				710CE8C7602388E21BB5EE05 /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Debug;
+		};
+/* End XCConfigurationList section */
+
+/* Begin XCLocalSwiftPackageReference section */
+		0DC1E99E672B222D484D49CA /* XCLocalSwiftPackageReference "CampiKit" */ = {
+			isa = XCLocalSwiftPackageReference;
+			relativePath = CampiKit;
+		};
+/* End XCLocalSwiftPackageReference section */
+
+/* Begin XCSwiftPackageProductDependency section */
+		1D9AA4B473CCB75BD080B9B0 /* CampiKit */ = {
+			isa = XCSwiftPackageProductDependency;
+			productName = CampiKit;
+		};
+		524286BA4647F69B7244D7C9 /* CampiKit */ = {
+			isa = XCSwiftPackageProductDependency;
+			productName = CampiKit;
+		};
+		C38C3DA85464FB33EAAA3DE9 /* CampiKit */ = {
+			isa = XCSwiftPackageProductDependency;
+			productName = CampiKit;
+		};
+/* End XCSwiftPackageProductDependency section */
+	};
+	rootObject = 2842DB7A802795B1D547194B /* Project object */;
+}

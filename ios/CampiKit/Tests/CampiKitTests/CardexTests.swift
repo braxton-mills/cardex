@@ -48,4 +48,53 @@ import Testing
         #expect((s.flavor?.count ?? 0) <= 120 && s.flavor?.hasSuffix("…") == true)
         #expect(CardexText(displayName: "x", type: "y", ratings: [], flavor: "  ", generated: true).sanitized().flavor == nil)
     }
+
+    private func item(_ label: String, count: Int, tier: Tier, origin: CollectionItem.Origin = .labelsFile) -> CollectionItem {
+        CollectionItem(label: label, make: nil, model: nil, generic: false, origin: origin, count: count,
+                       firstSeenAt: nil, lastSeenAt: nil, tier: tier, cover: nil)
+    }
+
+    @Test func finishFollowsRarityAndChaseRules() {
+        #expect(CardFinish(for: item("A", count: 0, tier: .uncaught)) == nil)
+        #expect(CardFinish(for: item("A", count: 40, tier: .common)) == .plain)
+        #expect(CardFinish(for: item("A", count: 9, tier: .uncommon)) == .reverseHolo)
+        #expect(CardFinish(for: item("A", count: 2, tier: .rare)) == .holo)
+        #expect(CardFinish(for: item("A", count: 1, tier: .rare)) == .specialIllustration)
+        #expect(CardFinish(for: item("A", count: 5, tier: .uncommon, origin: .discovered)) == .fullArt)
+        // seen-once rares beat discovered
+        #expect(CardFinish(for: item("A", count: 1, tier: .rare, origin: .discovered)) == .specialIllustration)
+        #expect(CardFinish.plain < CardFinish.specialIllustration)
+    }
+
+    @Test func bodyStyleGuesses() {
+        #expect(CarBodyStyle.guess(label: "Ford F-150") == .pickup)
+        #expect(CarBodyStyle.guess(label: "Ram 1500") == .pickup)
+        #expect(CarBodyStyle.guess(label: "Chevrolet Silverado 1500") == .pickup)
+        #expect(CarBodyStyle.guess(label: "Honda Odyssey") == .van)
+        #expect(CarBodyStyle.guess(label: "Jeep Wrangler") == .offRoader)
+        #expect(CarBodyStyle.guess(label: "Toyota RAV4") == .suv)
+        #expect(CarBodyStyle.guess(label: "Tesla Model Y") == .suv)
+        #expect(CarBodyStyle.guess(label: "Subaru Outback") == .wagon)
+        #expect(CarBodyStyle.guess(label: "Ford Mustang") == .coupe)
+        #expect(CarBodyStyle.guess(label: "school bus") == .boxTruck)
+        #expect(CarBodyStyle.guess(label: "Honda Civic") == .sedan)
+        #expect(CarBodyStyle.guess(label: "Tesla Model 3") == .sedan)
+        // whole words only: "fit" isn't in "Fitzgerald"
+        #expect(CarBodyStyle.guess(label: "Fitzgerald Special") == .sedan)
+        #expect(CarBodyStyle.wagon.modelName == "hatchback")
+    }
+
+    @Test func fallbackGuessesBodyStyle() {
+        #expect(CardexPrompt.fallback(for: item("Toyota Tacoma", count: 3, tier: .rare)).bodyStyle == .pickup)
+    }
+
+    @Test func paintColors() {
+        #expect(PaintColor.from(nil) == nil)
+        #expect(PaintColor.from("chartreuse") == nil)
+        #expect(PaintColor.from("silver")?.metallic == true)
+        let blue = try! #require(PaintColor.from("blue"))
+        let dark = try! #require(PaintColor.from("Dark Blue"))
+        #expect(dark.blue < blue.blue)
+        #expect((PaintColor.from("light gray")?.red ?? 0) > (PaintColor.from("gray")?.red ?? 1))
+    }
 }

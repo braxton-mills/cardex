@@ -45,6 +45,13 @@ struct CardexCardView: View {
                 Divider()
                 stats
             }
+            if item.isCaught {
+                NavigationLink(value: CardexCardRoute(item: item)) {
+                    Label("View Trading Card", systemImage: "rectangle.portrait.on.rectangle.portrait.angled")
+                        .font(.subheadline.weight(.semibold))
+                }
+                .accessibilityIdentifier("cardex.viewCard")
+            }
         }
         .padding()
         .background(.background.secondary, in: .rect(cornerRadius: 18))

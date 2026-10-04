@@ -33,3 +33,4 @@ Package.resolved.orig
 tools/mock_media/
 __pycache__/
 *.pyc
+tools/.cache/

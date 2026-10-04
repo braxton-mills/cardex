@@ -14,16 +14,16 @@ struct RemoteImage: View {
     @State private var failed = false
 
     var body: some View {
-        ZStack {
-            Rectangle().fill(.quaternary)
-            if let image {
-                Image(uiImage: image)
-                    .resizable()
-                    .aspectRatio(contentMode: contentMode)
-                    .transition(.opacity)
-            } else if failed || path == nil {
-                Image(systemName: "photo")
-                    .foregroundStyle(.secondary)
+        Group {
+            if contentMode == .fill {
+                // The rectangle takes exactly the offered size; a filled image in a ZStack would grow the
+                // layout past it (cards spilling into the next grid column).
+                Rectangle().fill(.quaternary).overlay { content }
+            } else {
+                ZStack {
+                    Rectangle().fill(.quaternary)
+                    content
+                }
             }
         }
         .clipped()
@@ -32,6 +32,18 @@ struct RemoteImage: View {
         .accessibilityAddTraits(label == nil ? [] : .isImage)
         .accessibilityHidden(label == nil)
         .task(id: path?.cacheKey) { await load() }
+    }
+
+    @ViewBuilder private var content: some View {
+        if let image {
+            Image(uiImage: image)
+                .resizable()
+                .aspectRatio(contentMode: contentMode)
+                .transition(.opacity)
+        } else if failed || path == nil {
+            Image(systemName: "photo")
+                .foregroundStyle(.secondary)
+        }
     }
 
     private func load() async {

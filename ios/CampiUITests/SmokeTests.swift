@@ -218,8 +218,8 @@ final class SmokeTests: XCTestCase {
         app.buttons["Reset All"].tap()
         app.navigationBars["Filters"].buttons["Apply"].tap()
 
-        // Collection -> one label's sightings
-        app.tabBars.buttons["Collection"].tap()
+        // Collection grid -> one label's sightings
+        showCollection(app, mode: "Grid")
         let tile = app.buttons.matching(identifier: "collection.tile").firstMatch
         XCTAssertTrue(tile.waitForExistence(timeout: 10))
         sleep(1)
@@ -308,7 +308,8 @@ final class SmokeTests: XCTestCase {
         // Not counted: Dynamic Type and text clipping (checked with screenshots at the largest size instead; these
         // audits also flag stock Form rows, the search field and reserved second lines), "nearly passed" contrast
         // (iOS's own secondary label color), and contrast measured through the floating tab bar or a system
-        // toolbar button.
+        // toolbar button, and binder trading cards (a picture of a printed card under moving foil: VoiceOver reads the
+        // whole card from its label, and the inspector repeats the stats in Dynamic Type).
         func audit(_ screen: String) throws {
             sleep(1)
             let tabBarTop = app.tabBars.firstMatch.exists ? app.tabBars.firstMatch.frame.minY : .infinity
@@ -318,6 +319,7 @@ final class SmokeTests: XCTestCase {
                     if issue.compactDescription.contains("nearly passed") { return true }
                     guard let el else { return true }   // no element to judge: rows under the tab bar
                     if el.frame.maxY > tabBarTop - 4 || (el.elementType == .button && el.label == "Done") { return true }
+                    if el.identifier == "collection.card" { return true }
                 }
                 let line = "\(screen): \(issue.compactDescription) – \(el?.debugDescription.prefix(160) ?? "no element")"
                 print("AUDIT \(line)")
@@ -335,7 +337,7 @@ final class SmokeTests: XCTestCase {
         XCTAssertTrue(app.navigationBars["Settings"].waitForExistence(timeout: 5))
         try audit("Settings")
         app.navigationBars["Settings"].buttons["Done"].tap()
-        for tab in ["Highlights", "Sightings", "Collection", "Timelapse"] {
+        for tab in ["Highlights", "Sightings", "Cardex", "Timelapse"] {
             app.tabBars.buttons[tab].tap()
             sleep(2)
             try audit(tab)
@@ -356,7 +358,7 @@ final class SmokeTests: XCTestCase {
         attach(app, "40-ax5-today")
         app.swipeUp()
         attach(app, "41-ax5-today-scrolled")
-        for (i, tab) in ["Highlights", "Sightings", "Collection", "Timelapse"].enumerated() {
+        for (i, tab) in ["Highlights", "Sightings", "Cardex", "Timelapse"].enumerated() {
             app.tabBars.buttons[tab].tap()
             sleep(2)
             attach(app, "4\(i + 2)-ax5-\(tab.lowercased())")
@@ -378,7 +380,7 @@ final class SmokeTests: XCTestCase {
         let app = try await launchPaired()
         XCTAssertTrue(app.buttons["today.status"].waitForExistence(timeout: 10))
         try await Self.mockOffline(seconds: 120)
-        for (i, tab) in ["Highlights", "Sightings", "Collection", "Timelapse"].enumerated() {
+        for (i, tab) in ["Highlights", "Sightings", "Cardex", "Timelapse"].enumerated() {
             app.tabBars.buttons[tab].tap()
             XCTAssertTrue(app.buttons["Try Again"].firstMatch.waitForExistence(timeout: 30), "\(tab) has no offline state")
             attach(app, "5\(i)-offline-\(tab.lowercased())")
@@ -413,7 +415,7 @@ final class SmokeTests: XCTestCase {
         allowNotificationsIfAsked()
         sleep(2)
         attach(app, "55-nodb-today")
-        for (i, tab) in ["Highlights", "Sightings", "Collection"].enumerated() {
+        for (i, tab) in ["Highlights", "Sightings", "Cardex"].enumerated() {
             app.tabBars.buttons[tab].tap()
             sleep(3)
             XCTAssertFalse(app.buttons["Try Again"].exists, "\(tab) shows an error with no sightings.db")
@@ -525,7 +527,7 @@ final class SmokeTests: XCTestCase {
     /// Opens the first caught label's page and waits for its card to finish (generated or fallback).
     @MainActor
     private func openFirstCard(_ app: XCUIApplication) -> XCUIElement {
-        app.tabBars.buttons["Collection"].tap()
+        showCollection(app, mode: "Grid")
         let tile = app.buttons.matching(identifier: "collection.tile").firstMatch
         XCTAssertTrue(tile.waitForExistence(timeout: 10))
         tile.tap()
@@ -563,6 +565,65 @@ final class SmokeTests: XCTestCase {
         app.buttons["More"].tap()
         app.buttons["Regenerate Card"].tap()
         XCTAssertTrue(detailCard.waitForExistence(timeout: 5))
+    }
+
+    /// The Cardex tab in Cards (binder) or Grid mode; the mode is remembered across launches.
+    @MainActor
+    private func showCollection(_ app: XCUIApplication, mode: String) {
+        app.tabBars.buttons["Cardex"].tap()
+        let button = app.buttons[mode].firstMatch
+        XCTAssertTrue(button.waitForExistence(timeout: 10), "no \(mode) mode")
+        button.tap()
+    }
+
+    @MainActor
+    func testTradingCards() async throws {
+        // a fixed tilt, so the screenshots show the foil turned toward the light
+        let app = try await launchPaired(["-cardexTilt", "0.55,-0.4"])
+        showCollection(app, mode: "Cards")
+        let card = app.buttons.matching(identifier: "collection.card").firstMatch
+        XCTAssertTrue(card.waitForExistence(timeout: 10), "no trading cards in the binder")
+        sleep(4)   // snapshots render
+        attach(app, "60-cardex-binder")
+        for i in 1...3 {
+            app.swipeUp()
+            sleep(2)
+            attach(app, "6\(i)-cardex-binder-scrolled")
+        }
+        app.swipeDown(); app.swipeDown(); app.swipeDown()
+        card.tap()
+        let held = app.descendants(matching: .any)["cardex.trading"]
+        XCTAssertTrue(held.waitForExistence(timeout: 10), "inspector didn't open")
+        XCTAssertTrue(app.buttons["cardex.seeSightings"].waitForExistence(timeout: 5))
+        sleep(3)
+        attach(app, "65-cardex-inspector")
+        // drag it around; it must settle and stay put
+        let start = held.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.5))
+        start.press(forDuration: 0.2, thenDragTo: held.coordinate(withNormalizedOffset: CGVector(dx: 0.9, dy: 0.2)))
+        XCTAssertTrue(held.exists)
+        app.buttons["cardex.seeSightings"].tap()
+        XCTAssertTrue(app.buttons.matching(identifier: "sightings.card").firstMatch.waitForExistence(timeout: 10))
+    }
+
+    /// Every finish, for review: a binder card per finish opened in turn.
+    @MainActor
+    func testTradingCardFinishes() async throws {
+        let app = try await launchPaired(["-cardexTilt", "0.55,-0.4"])
+        showCollection(app, mode: "Cards")
+        XCTAssertTrue(app.buttons.matching(identifier: "collection.card").firstMatch.waitForExistence(timeout: 10))
+        for finish in ["Plain", "Reverse Holo", "Holo", "Full Art", "Special Illustration"] {
+            let card = app.buttons.matching(NSPredicate(format: "identifier == 'collection.card' AND label CONTAINS %@",
+                                                        ". \(finish). ")).firstMatch
+            for _ in 0..<5 { app.swipeDown() }   // from the top
+            for _ in 0..<12 where !card.isHittable { app.swipeUp() }
+            guard card.exists else { print("no \(finish) card in this collection"); continue }
+            card.tap()
+            XCTAssertTrue(app.buttons["cardex.seeSightings"].waitForExistence(timeout: 10))
+            sleep(3)
+            attach(app, "7x-cardex-\(finish.lowercased().replacingOccurrences(of: " ", with: "-"))")
+            app.navigationBars.buttons.firstMatch.tap()
+            sleep(1)
+        }
     }
 
     @MainActor

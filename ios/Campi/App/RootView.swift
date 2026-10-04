@@ -40,7 +40,7 @@ struct MainTabs: View {
             SwiftUI.Tab("Sightings", systemImage: "car.side", value: .sightings) {
                 SightingsView()
             }
-            SwiftUI.Tab("Collection", systemImage: "square.grid.3x3.fill", value: .collection) {
+            SwiftUI.Tab("Cardex", systemImage: "rectangle.portrait.on.rectangle.portrait.angled.fill", value: .collection) {
                 CollectionView()
             }
             SwiftUI.Tab("Timelapse", systemImage: "film.stack", value: .timelapse) {

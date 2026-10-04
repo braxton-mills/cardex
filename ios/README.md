@@ -14,6 +14,7 @@ The iPhone companion to the Campi timelapse + vehicle-sightings service running 
 | M4.5 Cardex cards (on-device card text per label) | done |
 | M5 Push notifications + Home Screen widget | done |
 | M6 Polish, accessibility, install on device | done |
+| M7 Cardex trading cards (3D cars, holo finishes) | done |
 
 The PC side (`campi ui` API, see `docs/api-contract.md` Appendix A) isn't built yet; the app runs against
 `tools/mock_server.py` until it is.
@@ -25,7 +26,13 @@ The PC side (`campi ui` API, see `docs/api-contract.md` Appendix A) isn't built 
 - **Sightings:** grid by day with filters (dates, type, make, who decided the label, starred, unsure, parked,
   hidden). Detail: crop, full frame, clip, runner-up guesses, star, hide, correct the label, and
   "View in Timelapse" (seeks the 10-minute clip, or the daily video once the clip has expired).
-- **Collection:** every label, caught or not, with counts, rarity tiers and Gemini discoveries.
+- **Cardex** (the Collection tab): every label, caught or not, as a binder of trading cards or the plain grid
+  (Cards/Grid). Each caught car gets a Pokémon-style card with a 3D model of its body style, painted the color
+  the cloud saw, "SEEN ×N" and its rarity. Finishes: common = plain, uncommon = reverse holo, rare = holo,
+  Gemini discoveries = full art, rares seen only once = special illustration rare. Tap a card to hold it, and
+  drag to tilt it: the foil (`Campi/Cardex/Foil.metal`) and glare follow. The models are Kenney's Car Kit (CC0),
+  split into paint and trim by `tools/make_car_models.py`. The on-device model picks the body style, and a
+  keyword guess covers the plain card.
 - **Cardex cards** (collection item page and sighting detail): a trading card per label, written on the phone by
   Apple's on-device model (Foundation Models): name, type (Commuter, Work Truck, JDM, ...), three playful 1–10
   ratings and a line of flavor text, never specs. Generated once per label and cached (SwiftData); "Regenerate
@@ -68,9 +75,11 @@ signed per device. Details: `docs/api-contract.md` §1 and §3.
 
 ## Build and test
 ```sh
+xcodebuild -downloadComponent MetalToolchain   # once: Xcode 26+ needs it for the card foil shader
 xcodegen generate                       # after editing project.yml or adding files
 (cd CampiKit && swift test)             # package tests on the Mac
 python3 tools/mock_server.py &          # for the UI tests and running the app in the simulator
+python3 tools/make_car_models.py        # only to rebuild Campi/Resources/Cars/*.usdz
 xcodebuild -project Campi.xcodeproj -scheme Campi \
   -destination 'platform=iOS Simulator,name=iPhone 18 Pro Max' -collect-test-diagnostics never test
 ```

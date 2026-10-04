@@ -153,9 +153,18 @@ struct SightingGridCard: View {
 }
 
 extension View {
-    /// Navigation destinations shared by every tab that links to sightings or collection items.
-    func sightingDestinations() -> some View {
+    /// Navigation destinations shared by every tab that links to sightings, collection items or trading cards.
+    /// With `cardZoom`, cards open with a zoom from the binder tile whose `matchedTransitionSource` id is the label.
+    func sightingDestinations(cardZoom: Namespace.ID? = nil) -> some View {
         navigationDestination(for: Sighting.self) { SightingDetailView(initial: $0) }
             .navigationDestination(for: CollectionItem.self) { CollectionItemView(item: $0) }
+            .navigationDestination(for: CardexCardRoute.self) { route in
+                if let cardZoom {
+                    CardInspectorView(item: route.item)
+                        .navigationTransition(.zoom(sourceID: route.item.label, in: cardZoom))
+                } else {
+                    CardInspectorView(item: route.item)
+                }
+            }
     }
 }

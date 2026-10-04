@@ -16,6 +16,15 @@ struct GeneratedCard {
 
     @Guide(description: "One playful line of flavor text, at most 90 characters, with no numbers or specifications")
     var flavor: String
+
+    @Guide(description: "The vehicle's body shape. offRoader is a boxy 4x4 like a Wrangler or Bronco; boxTruck covers box trucks, buses and big work trucks")
+    var bodyStyle: GeneratedBodyStyle
+}
+
+/// `CarBodyStyle`, for the model to pick from.
+@Generable
+enum GeneratedBodyStyle: String {
+    case sedan, coupe, suv, offRoader, hatchback, wagon, pickup, van, boxTruck
 }
 
 @Generable
@@ -56,7 +65,10 @@ enum CardexGenerator {
             let card = try await session.respond(to: CardexPrompt.prompt(for: item), generating: GeneratedCard.self).content
             return CardexText(displayName: card.displayName, type: card.type,
                               ratings: card.ratings.map { .init(name: $0.name, value: $0.value) },
-                              flavor: card.flavor, generated: true).sanitized()
+                              flavor: card.flavor,
+                              bodyStyle: CarBodyStyle(rawValue: card.bodyStyle.rawValue)
+                                  ?? CarBodyStyle.guess(label: item.label, make: item.make, model: item.model),
+                              generated: true).sanitized()
         } catch let e as LanguageModelSession.GenerationError {
             switch e {
             case .guardrailViolation, .refusal: throw .failed("Apple Intelligence declined to write this card.")

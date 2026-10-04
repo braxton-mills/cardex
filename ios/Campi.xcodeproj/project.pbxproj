@@ -8,15 +8,19 @@
 
 /* Begin PBXBuildFile section */
 		04828B348F05CECD58F81D59 /* StatusDetailView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0B71C46D980691C749B7E9D7 /* StatusDetailView.swift */; };
+		07240CDA0055C8607E4DA7C2 /* sedan.usdz in Resources */ = {isa = PBXBuildFile; fileRef = F2A92A8F54F4D4B47DDA91E9 /* sedan.usdz */; };
 		0B1EF2E03E121E0E3C5803A0 /* SightingsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 553367140C77690FB7CA8169 /* SightingsView.swift */; };
 		0CE19E9A06368C38AFE93124 /* PairingView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3C8AC259857185CC4AF23A27 /* PairingView.swift */; };
 		0DC8D0A5D72DDF8E369B0893 /* LiveModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3D8F775EC74E344E3F4C12F2 /* LiveModel.swift */; };
 		16E11C816B8C0BC2DF73447E /* CampiWidget.appex in Embed Foundation Extensions */ = {isa = PBXBuildFile; fileRef = 2463A50A51756C74284D16F7 /* CampiWidget.appex */; settings = {ATTRIBUTES = (RemoveHeadersOnCopy, ); }; };
 		1F2B064480ACA77BD83ECD27 /* CardexStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = 858FDE0B70F03FCFAF9E8ABC /* CardexStore.swift */; };
+		27C172193A21337113496D98 /* pickup.usdz in Resources */ = {isa = PBXBuildFile; fileRef = 789B24258F141E7FB7F32432 /* pickup.usdz */; };
 		28F04A3116EA73C865A55FEA /* CampiWidget.swift in Sources */ = {isa = PBXBuildFile; fileRef = CA867C174B2E065EEE91E4BE /* CampiWidget.swift */; };
 		2A605CC3EDA9C80F50D738D5 /* CampiNotificationService.appex in Embed Foundation Extensions */ = {isa = PBXBuildFile; fileRef = 494F2BCD7F0E1E06F95ABFD0 /* CampiNotificationService.appex */; settings = {ATTRIBUTES = (RemoveHeadersOnCopy, ); }; };
+		2DC8F484631FF0174A2AC86A /* CarScene.swift in Sources */ = {isa = PBXBuildFile; fileRef = E3B1D71F251A423C5BA8CB7A /* CarScene.swift */; };
 		2EADDC0CA13ABFA6B18A273C /* WidgetKit.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 1514A3EAB16B360FC891331E /* WidgetKit.framework */; };
 		3069EF04174AB1E862965FE5 /* LiveView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 35E1A7B16D5E47A8E6495018 /* LiveView.swift */; };
+		35A5E91B446FED4A2BCB31B6 /* offRoader.usdz in Resources */ = {isa = PBXBuildFile; fileRef = C6796DFC9DB75CDC678F73A4 /* offRoader.usdz */; };
 		3BF7C81316B30A80DC7DF0F6 /* SightingDetailView.swift in Sources */ = {isa = PBXBuildFile; fileRef = AE8C003F6CBE22F6E0AF2C61 /* SightingDetailView.swift */; };
 		3D37B4765F2F4F915814C203 /* AppModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = FB0A57E7C5F1E166B85093ED /* AppModel.swift */; };
 		40EE5FD23A1E386620E7D4DE /* Badges.swift in Sources */ = {isa = PBXBuildFile; fileRef = 57FA544A415D300B8E119BF3 /* Badges.swift */; };
@@ -25,18 +29,27 @@
 		52CC54D15295CA97856B04B1 /* CampiKit in Frameworks */ = {isa = PBXBuildFile; productRef = C38C3DA85464FB33EAAA3DE9 /* CampiKit */; };
 		561B6344763343687C16DA99 /* MediaSaver.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9BB631B9487AA0A678C2C25C /* MediaSaver.swift */; };
 		5BF3C2760301C196E28598C4 /* SwiftUI.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 2BB84B7A7B94D2AD25C47042 /* SwiftUI.framework */; };
+		5E4D92DA5D446DC590B58650 /* boxTruck.usdz in Resources */ = {isa = PBXBuildFile; fileRef = FB570D4D59BE0DD98034A5D9 /* boxTruck.usdz */; };
 		786C29246F9ECCE07F1BE32C /* SettingsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = DD247E2EB2267C55A4F08A5F /* SettingsView.swift */; };
 		7BABB5A13A1ED9A9CD3FA431 /* CardexCardView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1E7E88EEC07DEC39AF4827B3 /* CardexCardView.swift */; };
 		7DAFE2353591790E0671832E /* TodayModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = D57E5E87171B8F4122942817 /* TodayModel.swift */; };
+		81ECA413323E62F22EF2802D /* TradingCardView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9004C3BF6DCBFFE6D6465D03 /* TradingCardView.swift */; };
 		82DF684D58ACC85F085E158C /* SightingsModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = C5F7F80899FD8B7A14D1796C /* SightingsModel.swift */; };
 		8A115BB302582CF7B3CBE309 /* RootView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 39744264472CDD72B3022907 /* RootView.swift */; };
+		8CF37C1E7611615EA23E18C2 /* suv.usdz in Resources */ = {isa = PBXBuildFile; fileRef = C2F9E8A35A45650CD2DEA71C /* suv.usdz */; };
+		95F7899A246D2576115E9961 /* CardInspectorView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3213CB18509E726F85F046D5 /* CardInspectorView.swift */; };
+		9E35A0D9AC6D5CE5D6F0C6DA /* Foil.metal in Sources */ = {isa = PBXBuildFile; fileRef = 4B67C39AA7E5B0B7B61D62FD /* Foil.metal */; };
+		9E6A4CA56F084AE2FF8AE5FA /* CREDITS.md in Resources */ = {isa = PBXBuildFile; fileRef = 150AB05788479EECBF1AAD31 /* CREDITS.md */; };
 		A21334EB14B037BB6AF4231A /* AppDelegate.swift in Sources */ = {isa = PBXBuildFile; fileRef = CAC61D410BB19D85ED354ADF /* AppDelegate.swift */; };
+		A6C04EEFA5BD5CBE9585065C /* van.usdz in Resources */ = {isa = PBXBuildFile; fileRef = 667BF503772933BFF49D65FD /* van.usdz */; };
 		A932689EA4D6DAB637FF4FB1 /* SmokeTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = ECF6EAC467FC4E523FCE0A8A /* SmokeTests.swift */; };
 		AA9C17E25599BE6A53C0FF4E /* TodayView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5711821ADE4404E23CC9A802 /* TodayView.swift */; };
 		AD6FB95B6E968A76C83E52FA /* CollectionView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 20185174CADBEE36C595822E /* CollectionView.swift */; };
 		B6207662BEDAE6CF8D5B45C2 /* NetworkPath.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0E6646DB3012F39FF40360DF /* NetworkPath.swift */; };
+		B6DC6E3065CC52BDAE69A124 /* hatchback.usdz in Resources */ = {isa = PBXBuildFile; fileRef = 739D872CF0C05C1FE0000FFB /* hatchback.usdz */; };
 		B719E9D380BBAD5667966C09 /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = 5A2AF8456A878CD732AB84DA /* Assets.xcassets */; };
 		B8A8BAAFCB29DFD038E2C4D0 /* HighlightsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 24686F5EFB70E6FE7EC01587 /* HighlightsView.swift */; };
+		B97F1FAB6C75F13F99385CEE /* coupe.usdz in Resources */ = {isa = PBXBuildFile; fileRef = 4A8400B97A4D330B4C9409C6 /* coupe.usdz */; };
 		C54A645D46F5E46FEEFE5353 /* SightingStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = F6713C58CB0D8B470730FB61 /* SightingStore.swift */; };
 		D90FC23952D39993941BC901 /* CampiApp.swift in Sources */ = {isa = PBXBuildFile; fileRef = 79182482FD527B71C6977FA5 /* CampiApp.swift */; };
 		E0E13CA699A8AD7BE1F980A0 /* NotificationService.swift in Sources */ = {isa = PBXBuildFile; fileRef = 28FCA63A48CB6F32B7C0C197 /* NotificationService.swift */; };
@@ -94,6 +107,7 @@
 		0B8886547ACE5F7436B6D2DC /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist; path = Info.plist; sourceTree = "<group>"; };
 		0E6646DB3012F39FF40360DF /* NetworkPath.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NetworkPath.swift; sourceTree = "<group>"; };
 		11198FCA1C6DF015D1E32A14 /* RemoteImage.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RemoteImage.swift; sourceTree = "<group>"; };
+		150AB05788479EECBF1AAD31 /* CREDITS.md */ = {isa = PBXFileReference; lastKnownFileType = net.daringfireball.markdown; path = CREDITS.md; sourceTree = "<group>"; };
 		1514A3EAB16B360FC891331E /* WidgetKit.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = WidgetKit.framework; path = System/Library/Frameworks/WidgetKit.framework; sourceTree = SDKROOT; };
 		1E7E88EEC07DEC39AF4827B3 /* CardexCardView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CardexCardView.swift; sourceTree = "<group>"; };
 		20185174CADBEE36C595822E /* CollectionView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CollectionView.swift; sourceTree = "<group>"; };
@@ -103,6 +117,7 @@
 		28FCA63A48CB6F32B7C0C197 /* NotificationService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NotificationService.swift; sourceTree = "<group>"; };
 		2BB84B7A7B94D2AD25C47042 /* SwiftUI.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = SwiftUI.framework; path = System/Library/Frameworks/SwiftUI.framework; sourceTree = SDKROOT; };
 		303A36E5C88D9218DF1F93B0 /* LabelPickerView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LabelPickerView.swift; sourceTree = "<group>"; };
+		3213CB18509E726F85F046D5 /* CardInspectorView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CardInspectorView.swift; sourceTree = "<group>"; };
 		35E1A7B16D5E47A8E6495018 /* LiveView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LiveView.swift; sourceTree = "<group>"; };
 		3796895C830058CD2D5A3B22 /* SightingFilterView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SightingFilterView.swift; sourceTree = "<group>"; };
 		39744264472CDD72B3022907 /* RootView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RootView.swift; sourceTree = "<group>"; };
@@ -110,20 +125,28 @@
 		3D8F775EC74E344E3F4C12F2 /* LiveModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LiveModel.swift; sourceTree = "<group>"; };
 		43B7A7B8A672A00356D5494E /* CampiWidget.entitlements */ = {isa = PBXFileReference; lastKnownFileType = text.plist.entitlements; path = CampiWidget.entitlements; sourceTree = "<group>"; };
 		494F2BCD7F0E1E06F95ABFD0 /* CampiNotificationService.appex */ = {isa = PBXFileReference; includeInIndex = 0; lastKnownFileType = "wrapper.app-extension"; path = CampiNotificationService.appex; sourceTree = BUILT_PRODUCTS_DIR; };
+		4A8400B97A4D330B4C9409C6 /* coupe.usdz */ = {isa = PBXFileReference; lastKnownFileType = file.usdz; path = coupe.usdz; sourceTree = "<group>"; };
+		4B67C39AA7E5B0B7B61D62FD /* Foil.metal */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.metal; path = Foil.metal; sourceTree = "<group>"; };
 		553367140C77690FB7CA8169 /* SightingsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SightingsView.swift; sourceTree = "<group>"; };
 		5711821ADE4404E23CC9A802 /* TodayView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TodayView.swift; sourceTree = "<group>"; };
 		57FA544A415D300B8E119BF3 /* Badges.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Badges.swift; sourceTree = "<group>"; };
 		5A2AF8456A878CD732AB84DA /* Assets.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; path = Assets.xcassets; sourceTree = "<group>"; };
+		667BF503772933BFF49D65FD /* van.usdz */ = {isa = PBXFileReference; lastKnownFileType = file.usdz; path = van.usdz; sourceTree = "<group>"; };
 		68B1D06F9D691732589AFEDD /* CampiNotificationService.entitlements */ = {isa = PBXFileReference; lastKnownFileType = text.plist.entitlements; path = CampiNotificationService.entitlements; sourceTree = "<group>"; };
 		70F09E70F330808A90E5E281 /* PlayerView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PlayerView.swift; sourceTree = "<group>"; };
+		739D872CF0C05C1FE0000FFB /* hatchback.usdz */ = {isa = PBXFileReference; lastKnownFileType = file.usdz; path = hatchback.usdz; sourceTree = "<group>"; };
+		789B24258F141E7FB7F32432 /* pickup.usdz */ = {isa = PBXFileReference; lastKnownFileType = file.usdz; path = pickup.usdz; sourceTree = "<group>"; };
 		79182482FD527B71C6977FA5 /* CampiApp.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CampiApp.swift; sourceTree = "<group>"; };
 		84AC9EE4BA7FE9F8F54B2BBD /* TimelapseView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TimelapseView.swift; sourceTree = "<group>"; };
 		858FDE0B70F03FCFAF9E8ABC /* CardexStore.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CardexStore.swift; sourceTree = "<group>"; };
+		9004C3BF6DCBFFE6D6465D03 /* TradingCardView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TradingCardView.swift; sourceTree = "<group>"; };
 		94DD728C33CBD10F42BAD363 /* CardexGenerator.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CardexGenerator.swift; sourceTree = "<group>"; };
 		9BB631B9487AA0A678C2C25C /* MediaSaver.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MediaSaver.swift; sourceTree = "<group>"; };
 		AE8C003F6CBE22F6E0AF2C61 /* SightingDetailView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SightingDetailView.swift; sourceTree = "<group>"; };
+		C2F9E8A35A45650CD2DEA71C /* suv.usdz */ = {isa = PBXFileReference; lastKnownFileType = file.usdz; path = suv.usdz; sourceTree = "<group>"; };
 		C5658DCF12B1BFDCC7CAFC16 /* Campi.entitlements */ = {isa = PBXFileReference; lastKnownFileType = text.plist.entitlements; path = Campi.entitlements; sourceTree = "<group>"; };
 		C5F7F80899FD8B7A14D1796C /* SightingsModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SightingsModel.swift; sourceTree = "<group>"; };
+		C6796DFC9DB75CDC678F73A4 /* offRoader.usdz */ = {isa = PBXFileReference; lastKnownFileType = file.usdz; path = offRoader.usdz; sourceTree = "<group>"; };
 		CA867C174B2E065EEE91E4BE /* CampiWidget.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CampiWidget.swift; sourceTree = "<group>"; };
 		CAC61D410BB19D85ED354ADF /* AppDelegate.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppDelegate.swift; sourceTree = "<group>"; };
 		D57E5E87171B8F4122942817 /* TodayModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TodayModel.swift; sourceTree = "<group>"; };
@@ -132,11 +155,14 @@
 		DD247E2EB2267C55A4F08A5F /* SettingsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SettingsView.swift; sourceTree = "<group>"; };
 		E30B01F57AB65FBADF03D7E2 /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist; path = Info.plist; sourceTree = "<group>"; };
 		E314793F7245A404662086F9 /* Campi.app */ = {isa = PBXFileReference; includeInIndex = 0; lastKnownFileType = wrapper.application; path = Campi.app; sourceTree = BUILT_PRODUCTS_DIR; };
+		E3B1D71F251A423C5BA8CB7A /* CarScene.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CarScene.swift; sourceTree = "<group>"; };
 		ECF6EAC467FC4E523FCE0A8A /* SmokeTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SmokeTests.swift; sourceTree = "<group>"; };
+		F2A92A8F54F4D4B47DDA91E9 /* sedan.usdz */ = {isa = PBXFileReference; lastKnownFileType = file.usdz; path = sedan.usdz; sourceTree = "<group>"; };
 		F6713C58CB0D8B470730FB61 /* SightingStore.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SightingStore.swift; sourceTree = "<group>"; };
 		F7671C44D83AD560AEE21700 /* CampiKit */ = {isa = PBXFileReference; lastKnownFileType = folder; name = CampiKit; path = CampiKit; sourceTree = SOURCE_ROOT; };
 		F7F3A236A03C0059E6C0CB95 /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist; path = Info.plist; sourceTree = "<group>"; };
 		FB0A57E7C5F1E166B85093ED /* AppModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppModel.swift; sourceTree = "<group>"; };
+		FB570D4D59BE0DD98034A5D9 /* boxTruck.usdz */ = {isa = PBXFileReference; lastKnownFileType = file.usdz; path = boxTruck.usdz; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -197,6 +223,7 @@
 		2BD9699749AF3099FD8DF2EB /* Resources */ = {
 			isa = PBXGroup;
 			children = (
+				46D4514CFDB4F354471B488A /* Cars */,
 				5A2AF8456A878CD732AB84DA /* Assets.xcassets */,
 			);
 			path = Resources;
@@ -251,6 +278,22 @@
 				0E6646DB3012F39FF40360DF /* NetworkPath.swift */,
 			);
 			path = Live;
+			sourceTree = "<group>";
+		};
+		46D4514CFDB4F354471B488A /* Cars */ = {
+			isa = PBXGroup;
+			children = (
+				FB570D4D59BE0DD98034A5D9 /* boxTruck.usdz */,
+				4A8400B97A4D330B4C9409C6 /* coupe.usdz */,
+				150AB05788479EECBF1AAD31 /* CREDITS.md */,
+				739D872CF0C05C1FE0000FFB /* hatchback.usdz */,
+				C6796DFC9DB75CDC678F73A4 /* offRoader.usdz */,
+				789B24258F141E7FB7F32432 /* pickup.usdz */,
+				F2A92A8F54F4D4B47DDA91E9 /* sedan.usdz */,
+				C2F9E8A35A45650CD2DEA71C /* suv.usdz */,
+				667BF503772933BFF49D65FD /* van.usdz */,
+			);
+			path = Cars;
 			sourceTree = "<group>";
 		};
 		4BAEC8F4810A3A18BE75B7AA /* App */ = {
@@ -322,6 +365,10 @@
 				1E7E88EEC07DEC39AF4827B3 /* CardexCardView.swift */,
 				94DD728C33CBD10F42BAD363 /* CardexGenerator.swift */,
 				858FDE0B70F03FCFAF9E8ABC /* CardexStore.swift */,
+				3213CB18509E726F85F046D5 /* CardInspectorView.swift */,
+				E3B1D71F251A423C5BA8CB7A /* CarScene.swift */,
+				4B67C39AA7E5B0B7B61D62FD /* Foil.metal */,
+				9004C3BF6DCBFFE6D6465D03 /* TradingCardView.swift */,
 			);
 			path = Cardex;
 			sourceTree = "<group>";
@@ -531,6 +578,15 @@
 			buildActionMask = 2147483647;
 			files = (
 				B719E9D380BBAD5667966C09 /* Assets.xcassets in Resources */,
+				9E6A4CA56F084AE2FF8AE5FA /* CREDITS.md in Resources */,
+				5E4D92DA5D446DC590B58650 /* boxTruck.usdz in Resources */,
+				B97F1FAB6C75F13F99385CEE /* coupe.usdz in Resources */,
+				B6DC6E3065CC52BDAE69A124 /* hatchback.usdz in Resources */,
+				35A5E91B446FED4A2BCB31B6 /* offRoader.usdz in Resources */,
+				27C172193A21337113496D98 /* pickup.usdz in Resources */,
+				07240CDA0055C8607E4DA7C2 /* sedan.usdz in Resources */,
+				8CF37C1E7611615EA23E18C2 /* suv.usdz in Resources */,
+				A6C04EEFA5BD5CBE9585065C /* van.usdz in Resources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -561,10 +617,13 @@
 				3D37B4765F2F4F915814C203 /* AppModel.swift in Sources */,
 				40EE5FD23A1E386620E7D4DE /* Badges.swift in Sources */,
 				D90FC23952D39993941BC901 /* CampiApp.swift in Sources */,
+				2DC8F484631FF0174A2AC86A /* CarScene.swift in Sources */,
+				95F7899A246D2576115E9961 /* CardInspectorView.swift in Sources */,
 				7BABB5A13A1ED9A9CD3FA431 /* CardexCardView.swift in Sources */,
 				E4824254C20BD4E57179D978 /* CardexGenerator.swift in Sources */,
 				1F2B064480ACA77BD83ECD27 /* CardexStore.swift in Sources */,
 				AD6FB95B6E968A76C83E52FA /* CollectionView.swift in Sources */,
+				9E35A0D9AC6D5CE5D6F0C6DA /* Foil.metal in Sources */,
 				ED13FCFD10572138D5995061 /* Formatting.swift in Sources */,
 				B8A8BAAFCB29DFD038E2C4D0 /* HighlightsView.swift in Sources */,
 				45FD47A0EC2628DE07F6D9D1 /* LabelPickerView.swift in Sources */,
@@ -587,6 +646,7 @@
 				F3EA889E5D2371B75BE836A2 /* TimelapseView.swift in Sources */,
 				7DAFE2353591790E0671832E /* TodayModel.swift in Sources */,
 				AA9C17E25599BE6A53C0FF4E /* TodayView.swift in Sources */,
+				81ECA413323E62F22EF2802D /* TradingCardView.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};

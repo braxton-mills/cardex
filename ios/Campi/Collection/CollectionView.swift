@@ -6,6 +6,13 @@ struct CollectionView: View {
     @State private var filter: Filter = .all
     @State private var search = ""
     @State private var error: APIError?
+    @AppStorage("collection.mode") private var mode: Mode = .cards
+    @Namespace private var cardZoom
+
+    enum Mode: String, CaseIterable, Identifiable {
+        case cards = "Cards", grid = "Grid"
+        var id: Self { self }
+    }
 
     enum Filter: String, CaseIterable, Identifiable {
         case all = "All", caught = "Caught", missing = "Missing"
@@ -15,6 +22,8 @@ struct CollectionView: View {
 
     @ScaledMetric(relativeTo: .caption) private var tileWidth: CGFloat = 104
     private var columns: [GridItem] { [GridItem(.adaptive(minimum: min(tileWidth, 320)), spacing: 12)] }
+    @ScaledMetric(relativeTo: .caption) private var cardWidth: CGFloat = 150
+    private var cardColumns: [GridItem] { [GridItem(.adaptive(minimum: min(cardWidth, 300)), spacing: 14)] }
 
     var body: some View {
         NavigationStack {
@@ -22,24 +31,25 @@ struct CollectionView: View {
                 if let c = app.collection {
                     VStack(alignment: .leading, spacing: 18) {
                         progress(c)
-                        Picker("Show", selection: $filter) {
-                            ForEach(Filter.allCases) { Text($0.rawValue).tag($0) }
+                        AdaptiveStack(spacing: 10) {
+                            Picker("Show", selection: $filter) {
+                                ForEach(Filter.allCases) { Text($0.rawValue).tag($0) }
+                            }
+                            .pickerStyle(.segmented)
+                            Picker("View", selection: $mode) {
+                                ForEach(Mode.allCases) { Text($0.rawValue).tag($0) }
+                            }
+                            .pickerStyle(.segmented)
+                            .fixedSize()
+                            .accessibilityIdentifier("collection.mode")
                         }
-                        .pickerStyle(.segmented)
                         let sections = c.sections(matching: search, caught: filter.caught)
                         ForEach(sections) { section in
                             VStack(alignment: .leading, spacing: 10) {
                                 Text(section.title).font(.headline)
-                                LazyVGrid(columns: columns, spacing: 14) {
-                                    ForEach(section.items) { item in
-                                        if item.isCaught {
-                                            NavigationLink(value: item) { CollectionTile(item: item) }
-                                                .buttonStyle(.plain)
-                                                .accessibilityIdentifier("collection.tile")
-                                        } else {
-                                            CollectionTile(item: item)
-                                        }
-                                    }
+                                switch mode {
+                                case .cards: binder(section.items, in: c)
+                                case .grid: grid(section.items)
                                 }
                             }
                         }
@@ -64,10 +74,44 @@ struct CollectionView: View {
             }
             .searchable(text: $search, prompt: "Make or model")
             .refreshable { await load(force: true) }
-            .navigationTitle("Collection")
-            .sightingDestinations()
+            .navigationTitle("Cardex")
+            .sightingDestinations(cardZoom: cardZoom)
         }
         .task { await load(force: false) }
+    }
+
+    private func grid(_ items: [CollectionItem]) -> some View {
+        LazyVGrid(columns: columns, spacing: 14) {
+            ForEach(items) { item in
+                if item.isCaught {
+                    NavigationLink(value: item) { CollectionTile(item: item) }
+                        .buttonStyle(.plain)
+                        .accessibilityIdentifier("collection.tile")
+                } else {
+                    CollectionTile(item: item)
+                }
+            }
+        }
+    }
+
+    /// Trading cards for caught cars, numbered slots for the rest.
+    private func binder(_ items: [CollectionItem], in c: LabelCollection) -> some View {
+        LazyVGrid(columns: cardColumns, spacing: 16) {
+            ForEach(items) { item in
+                let number = (c.items.firstIndex { $0.label == item.label } ?? -1) + 1
+                if item.isCaught {
+                    NavigationLink(value: CardexCardRoute(item: item)) {
+                        TradingCardView(item: item, number: number, total: c.total)
+                            .shadow(color: .black.opacity(0.25), radius: 4, y: 2)
+                    }
+                    .buttonStyle(.plain)
+                    .matchedTransitionSource(id: item.label, in: cardZoom)
+                    .accessibilityIdentifier("collection.card")
+                } else {
+                    EmptyCardSlot(item: item, number: number, total: c.total)
+                }
+            }
+        }
     }
 
     private func progress(_ c: LabelCollection) -> some View {
@@ -192,5 +236,31 @@ struct CollectionItemView: View {
             CardexCardView(item: item, showsStats: false)
         }
         .padding()
+    }
+}
+
+/// A binder slot for a car that hasn't been caught yet.
+struct EmptyCardSlot: View {
+    let item: CollectionItem
+    let number: Int
+    let total: Int
+
+    var body: some View {
+        RoundedRectangle(cornerRadius: 12, style: .continuous)
+            .strokeBorder(.tertiary, style: StrokeStyle(lineWidth: 1.5, dash: [6, 4]))
+            .background(.quaternary.opacity(0.4), in: .rect(cornerRadius: 12, style: .continuous))
+            .aspectRatio(TradingCardView.size.width / TradingCardView.size.height, contentMode: .fit)
+            .overlay {
+                VStack(spacing: 6) {
+                    Text("?").font(.system(.largeTitle, design: .rounded).weight(.heavy)).foregroundStyle(.tertiary)
+                    Text(item.label).font(.caption.weight(.semibold)).multilineTextAlignment(.center)
+                        .foregroundStyle(.secondary).lineLimit(3)
+                    Text(String(format: "%03d/%03d", number, total)).font(.caption2).monospacedDigit()
+                        .foregroundStyle(.tertiary)
+                }
+                .padding(10)
+            }
+            .accessibilityElement(children: .ignore)
+            .accessibilityLabel("\(item.label), not caught yet")
     }
 }

@@ -20,14 +20,18 @@ public struct CardexText: Codable, Hashable, Sendable {
     public var type: String
     public var ratings: [Rating]
     public var flavor: String?
+    /// The 3D model on the trading card.
+    public var bodyStyle: CarBodyStyle
     /// `false` for the plain fallback.
     public var generated: Bool
 
-    public init(displayName: String, type: String, ratings: [Rating], flavor: String?, generated: Bool) {
+    public init(displayName: String, type: String, ratings: [Rating], flavor: String?,
+                bodyStyle: CarBodyStyle = .sedan, generated: Bool) {
         self.displayName = displayName
         self.type = type
         self.ratings = ratings
         self.flavor = flavor
+        self.bodyStyle = bodyStyle
         self.generated = generated
     }
 
@@ -43,14 +47,14 @@ public struct CardexText: Codable, Hashable, Sendable {
             .filter { !$0.name.isEmpty && seen.insert($0.name.lowercased()).inserted }
         let flavor = self.flavor.map { clip($0, 120) }
         return CardexText(displayName: clip(displayName, 40), type: clip(type, 20), ratings: Array(ratings.prefix(4)),
-                          flavor: flavor?.isEmpty == true ? nil : flavor, generated: generated)
+                          flavor: flavor?.isEmpty == true ? nil : flavor, bodyStyle: bodyStyle, generated: generated)
     }
 }
 
 /// Prompt and fallback for Cardex cards. Bump `version` when the prompt or the generated shape changes: cached cards
 /// from older versions are regenerated.
 public enum CardexPrompt {
-    public static let version = 1
+    public static let version = 2
 
     public static let instructions = """
         You write short, playful trading-card text for vehicles spotted by a home traffic camera, like a \
@@ -79,6 +83,8 @@ public enum CardexPrompt {
         } else {
             "Vehicle"
         }
-        return CardexText(displayName: item.label, type: type, ratings: [], flavor: nil, generated: false)
+        return CardexText(displayName: item.label, type: type, ratings: [], flavor: nil,
+                          bodyStyle: CarBodyStyle.guess(label: item.label, make: item.make, model: item.model),
+                          generated: false)
     }
 }

@@ -37,7 +37,7 @@ cq = 19                      # NVENC constant quality (libx264 fallback uses crf
 
 [image]
 rotation = 0                 # 0 / 90 / 180 / 270, clockwise
-level_deg = 9.0              # extra counter-clockwise leveling; output is cropped so there are no black corners
+level_deg = 0.0              # extra counter-clockwise leveling; output is cropped so there are no black corners
 
 [deflicker]
 mode = "luma"                # luma (match each frame to a rolling average) | ffmpeg (deflicker filter) | off
@@ -46,7 +46,8 @@ min_gain = 0.8
 max_gain = 1.25
 
 [night]
-luma_threshold = 35          # frames with mean brightness (0-255) below this are skipped
+luma_threshold = 10          # frames with mean brightness (0-255) below this are skipped (the Pi's night
+                             # exposure keeps nights at ~30; only a black frame falls under 10)
 
 [overlay]
 enabled = true

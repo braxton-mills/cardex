@@ -223,6 +223,8 @@ next/previous, `Space` play/pause, `S` star, `Enter` open, `Esc` close.
 - **Collection**: every label in `sightings_labels.txt` as a tile, caught or not, with count, first and last seen and
   a tier from the counts (rare 1-3, uncommon 4-20, common 21+; rare tiles shimmer), plus cars Gemini named that
   aren't in the list (*discovered*) and labels only in your history (*retired*). The dial: X of Y list labels caught.
+- **Cards**: every car model as a Pokémon-style trading card with a live 3D model in the art window (see
+  [Cards](#cards) below).
 - **Timelapse**: the 10-minute clips grouped by hour, the daily videos and the archive parts (all playable except the
   part still being written), each with **Show in folder**.
 - **Live**: the camera through `/live.mjpg`, leveled like the renders. Connected only while this view is showing
@@ -234,6 +236,40 @@ Motion: new sightings "drive by" across the Today hero in the direction the car 
 confetti, stars burst, numbers count up, cards tilt toward the cursor, rare collection tiles shimmer, and Live
 looks like a camera viewfinder. All of it is off when Windows animations are off (Settings > Accessibility > Visual
 effects), via `prefers-reduced-motion`.
+
+### Cards
+Each label is a trading card: make in the stage pill, model as the name, **SEEN ×N** where the HP goes, a type
+(Commuter, Family, Hauler, Speed, City, Cargo, Trail, Volt for EVs, Heavy) that colours the frame, two "moves" built
+from its stats (peak hour, which way it usually goes, best match), first/last seen, and a set number. The finish
+comes from how rarely the model is seen, as a percentile among models seen at least twice, so it keeps meaning
+something as the counts grow (`/api/cards`, desktop only; cut-offs in `ui/sightings_data.py` `FINISHES`):
+
+| Finish | Who gets it | Look |
+|---|---|---|
+| Special Illustration Rare (gold ★) | seen exactly once | full-bleed art over the real street frame from that sighting, gold border, glitter |
+| Full art (★★) | rarest 10% | whole-card art, etched-line rainbow foil, silver border |
+| Holo rare (★) | next 15% | "cosmos" rainbow foil inside the art window |
+| Reverse holo (◆) | next 25% | sparkle foil everywhere except the art window |
+| Plain (●) | most-seen half | gloss only |
+
+**Drag a card** (mouse or touch) to tilt it: the foil is a shader driven by the angle between the card, you and the
+light, so the rainbow bands sweep, the glitter flashes and the gloss slides as you move it. Click a card to inspect
+it full screen (drag to turn it, double-click or `F` to flip, scroll to zoom, `A` auto-tilt, `Esc` closes). `G`
+shows a HUD with the GPU, frame rate, draw calls and resolution.
+
+Rendering is three.js (vendored under `static/vendor/three`, no CDN) in one WebGL2 context: the grid draws each
+visible card into its own viewport; each card is a real 3D object whose art window is a stencil portal onto a
+diorama behind the card (so it has parallax). The inspector renders through a composer (HDR, bloom, soft shadows,
+supersampling: on the RTX 5070 the Ultra preset draws the inspector at 2.5x the screen's pixel ratio at ~280 fps;
+MSAA is avoided because on ANGLE/D3D11 it costs far more than supersampling). The quality preset (Ultra / High /
+Low) is picked from the GPU and can be changed in the tab. The window asks WebView2 for the high-performance GPU.
+
+The 3D car is procedural (body style from the model name, e.g. pickup, SUV, minivan, coupe, painted in the colour
+Gemini reported, else a guess). Optional **scans**: `install.ps1 -Meshes` and `[cards] meshes_enabled = true` turn
+each model's best crop into a mesh with TripoSR on the RTX card (about 5 s a car, 2.4 GB VRAM), in passes the
+supervisor runs while no game is running and no render is using the card (`campi meshes` runs one by hand; log:
+`campi logs meshes`). "Scanned models" in the tab shows them. Scans come from a single street-level photo, so they
+are lumpy, toy-like versions of the real car; the procedural model is the default.
 
 ## API
 The HTTP API for the [Campi iPhone app](https://github.com/braxton-mills/campi-ios) and the desktop UI. The

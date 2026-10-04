@@ -66,6 +66,8 @@ class Supervisor:
         self.clip = None          # (proc, started)
         self.daily = None
         self.housekeep = None
+        self.meshes = None        # optional card meshes pass ([cards] meshes_enabled; TripoSR on the RTX card)
+        self.meshes_missing_logged = False
         self.daily_queue: list[date] = []
         # optional sightings worker (only touched when [sightings] enabled)
         self.sightings = None
@@ -309,6 +311,21 @@ class Supervisor:
             return True
         return False
 
+    def start_meshes(self, now: float) -> float:
+        """Start a card meshes pass unless the RTX card is busy (a game, or a clip/daily render with RIFE + NVENC);
+        returns when to look again."""
+        exe = self.cfg.paths.mesh_python
+        if not exe.exists():
+            if not self.meshes_missing_logged:
+                log.warning("[cards] meshes_enabled but %s is missing (install.ps1 -Meshes)", exe)
+                self.meshes_missing_logged = True
+            return now + 3600
+        gaming = bool(self.game_state.get("active")) or now < self.game_resume_at
+        if gaming or self.clip or self.daily:
+            return now + 300
+        self.meshes = (self.spawn("meshes", low_priority=True, exe=str(exe)), now, "card meshes")
+        return now + self.cfg.cards.mesh_interval_min * 60
+
     # -- schedule ---------------------------------------------------------
     def next_boundary(self, now: float) -> float:
         step = int(self.cfg.render.interval_min) * 60
@@ -370,6 +387,7 @@ class Supervisor:
         now = time.time()
         next_clip = self.next_boundary(now)
         next_house = now + 60
+        next_meshes = now + 300
         hh, mm = (int(x) for x in cfg.daily.run_at.split(":"))
         last_daily_check = None
         if cfg.daily.enabled:  # catch up anything missed while the PC was off
@@ -417,6 +435,9 @@ class Supervisor:
                     next_house = now + 3600
                     self.housekeep = (self.spawn("housekeep", low_priority=True), now, "housekeeping")
 
+                if cfg.cards.meshes_enabled and self.reap("meshes", cfg.cards.mesh_timeout_min * 60, now)                         and now >= next_meshes:
+                    next_meshes = self.start_meshes(now)
+
                 if now - last_status >= 5:
                     self.status(now, next_clip)
                     last_status = now
@@ -428,7 +449,7 @@ class Supervisor:
                 if child and child.poll() is None:
                     subprocess.run(["taskkill", "/T", "/F", "/PID", str(child.pid)], capture_output=True,
                                    creationflags=NO_WINDOW)
-            for slot in ("clip", "daily", "housekeep"):
+            for slot in ("clip", "daily", "housekeep", "meshes"):
                 cur = getattr(self, slot)
                 if cur and cur[0].poll() is None:
                     subprocess.run(["taskkill", "/T", "/F", "/PID", str(cur[0].pid)], capture_output=True,

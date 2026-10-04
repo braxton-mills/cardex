@@ -2,7 +2,7 @@
 
 Every /api request needs `Authorization: Bearer <token>` (also from 127.0.0.1: `tailscale serve` traffic arrives
 from loopback), except POST /api/pair. /media and /live accept a bearer token or a signed URL. Endpoints outside the
-contract (/api/today, /api/activity, /api/clips/newest, /api/desktop/*) answer only the `desktop` device.
+contract (/api/today, /api/activity, /api/cards, /api/clips/newest, /api/desktop/*) answer only the `desktop` device.
 """
 from __future__ import annotations
 
@@ -282,6 +282,10 @@ def create_app(cfg) -> FastAPI:
     def today(dev: dict = Depends(desktop)):
         return sd.today()
 
+    @app.get("/api/cards")
+    def cards(dev: dict = Depends(desktop)):
+        return sd.cards(signer(dev))
+
     @app.get("/api/activity")
     def activity(request: Request, dev: dict = Depends(desktop)):
         return sd.activity(int_param(request.query_params, "days", 1, 1, 31))
@@ -321,7 +325,8 @@ def create_app(cfg) -> FastAPI:
         p = media.resolve(cfg, root, path, lib.current_part())
         if p is None:
             raise not_found(f"no media {root}/{path}")
-        cache = "private, max-age=86400" if root == "sightings" and p.suffix == ".jpg" else "private, max-age=300"
+        cache = ("private, max-age=86400" if (root == "sightings" and p.suffix == ".jpg") or root == "cards"
+                 else "private, max-age=300")  # mesh names change with their source sighting
         return media.serve(request, p, f"{root}/{path}", cache)
 
     @app.get("/live.mjpg")

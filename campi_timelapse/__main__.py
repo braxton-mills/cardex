@@ -211,6 +211,10 @@ def main(argv=None) -> int:
     api = sub.add_parser("api", help="HTTP API for the iPhone app and the desktop UI (venv-ui; [api] in config.toml)")
     api.add_argument("--port", type=int, help="default: [api] port")
     sub.add_parser("pair", help="pair a phone: prints a QR code and a one-time code (venv-ui)")
+    ms = sub.add_parser("meshes", help="3D card meshes from crops with TripoSR (venv-mesh; install.ps1 -Meshes)")
+    ms.add_argument("--label", help="only this label")
+    ms.add_argument("--force", action="store_true", help="regenerate even if the label already has a mesh")
+    ms.add_argument("--limit", type=int, help="at most N labels (default: [cards] meshes_per_pass)")
     dv = sub.add_parser("devices", help="list paired devices; `devices revoke ID` unpairs one (venv-ui)")
     dv.add_argument("action", nargs="?", choices=["revoke"])
     dv.add_argument("device_id", nargs="?")
@@ -276,6 +280,9 @@ def main(argv=None) -> int:
             res = run_bench(cfg, args.parity)
         elif args.cmd == "rife-bench":
             return cmd_rife_bench(cfg)
+        elif args.cmd == "meshes":
+            from .card_meshes import run as run_meshes
+            res = run_meshes(cfg, args.label, args.force, args.limit)
         elif args.cmd == "housekeep":
             from . import housekeeping
             housekeeping.run(cfg)

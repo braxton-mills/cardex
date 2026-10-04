@@ -5,7 +5,7 @@
     campi stop            stop everything; stays stopped until `campi start`
     campi restart
     campi run             run in this window with live logs (Ctrl+C stops); needs `campi stop` first
-    campi logs [name] [-f]  name: supervisor|capture|render|daily|housekeep|gaps|gpu|sightings (default: summary)
+    campi logs [name] [-f]  name: supervisor|capture|render|daily|housekeep|gaps|gpu|sightings|meshes (default: summary)
     campi render-now      render the last 10 minutes right now
     campi test            render the last 1 minute
     campi daily [date]    render a daily video (default: yesterday)
@@ -21,6 +21,7 @@
     campi pair            pair an iPhone: QR code + one-time code (needs the API: [api] enabled or campi api)
     campi devices [revoke ID]   list paired devices / unpair one (its token and media links stop working at once)
     campi api             run the API in this window with live logs (debugging; Ctrl+C stops)
+    campi meshes [--label L] [--force] [--limit N]   3D card scans from crops with TripoSR (install.ps1 -Meshes)
 #>
 param([Parameter(Position = 0)][string]$Command = 'status',
       [Parameter(Position = 1, ValueFromRemainingArguments = $true)][string[]]$Rest)
@@ -30,6 +31,7 @@ $Py = Join-Path $Project '.venv-service\Scripts\python.exe'
 $PyW = Join-Path $Project '.venv-service\Scripts\pythonw.exe'
 $PySightings = Join-Path $env:USERPROFILE 'CampiTimelapse\venv-sightings\Scripts\python.exe'
 $UiScripts = Join-Path $env:USERPROFILE 'CampiTimelapse\venv-ui\Scripts'
+$PyMesh = Join-Path $env:USERPROFILE 'CampiTimelapse\venv-mesh\Scripts\python.exe'
 $TaskName = 'CampiTimelapse'
 Set-Location $Project
 
@@ -120,6 +122,11 @@ switch ($Command) {
     { $_ -in 'sightings-record', 'sightings-test', 'sightings-bench' } {
         if (-not (Test-Path $PySightings)) { Write-Host 'sightings env not installed: run install.ps1 -Sightings'; exit 1 }
         & $PySightings -m campi_timelapse $Command @Rest
+    }
+    'meshes' {
+        if (-not (Test-Path $PyMesh)) { Write-Host 'mesh env not installed: run install.ps1 -Meshes'; exit 1 }
+        & $PyMesh -m campi_timelapse meshes @Rest
+        exit $LASTEXITCODE
     }
     default { Get-Help $PSCommandPath; exit 2 }
 }

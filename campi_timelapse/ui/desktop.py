@@ -207,6 +207,10 @@ def run_window(cfg, page: str, t0: float, home) -> int:
     window.events.loaded += loaded
     window.events.minimized += lambda: set_hidden(True)
     window.events.restored += lambda: set_hidden(False)
+    # The Cards tab renders 3D: ask WebView2 for the discrete GPU (it would otherwise pick by Windows' default, which
+    # can be the iGPU on a two-GPU PC) and don't let a driver blocklist drop WebGL to software
+    os.environ.setdefault("WEBVIEW2_ADDITIONAL_BROWSER_ARGUMENTS",
+                          "--force_high_performance_gpu --ignore-gpu-blocklist --enable-gpu-rasterization")
     # WebView2 profile (cache, remembered filters) under ui\webview, not in a temp folder
     webview.start(gui="edgechromium", private_mode=False, storage_path=str(home / "webview"))
     return 0

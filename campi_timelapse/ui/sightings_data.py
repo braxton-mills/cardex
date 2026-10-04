@@ -14,6 +14,8 @@ from __future__ import annotations
 import bisect
 import json
 import threading
+import zlib
+from collections import Counter
 from contextlib import contextmanager
 from datetime import date, datetime
 from urllib.parse import quote
@@ -37,6 +39,35 @@ def tier(n: int) -> str:
     if n <= 0:
         return "uncaught"
     return next(t["tier"] for t in TIERS if n >= t["min"] and (t["max"] is None or n <= t["max"]))
+
+
+# Card finishes (desktop Cards tab): percentile of count among labels seen at least twice, rarest first. Seen exactly
+# once is always "sir". Returned in /api/cards so the UI never hardcodes the cut-offs.
+FINISHES = [
+    {"finish": "sir", "label": "Special Illustration Rare", "symbol": "gold-star", "min_pct": None, "max_pct": None},
+    {"finish": "fullart", "label": "Full Art", "symbol": "double-star", "min_pct": 0.0, "max_pct": 0.10},
+    {"finish": "holo", "label": "Holo Rare", "symbol": "star", "min_pct": 0.10, "max_pct": 0.25},
+    {"finish": "reverse", "label": "Reverse Holo", "symbol": "diamond", "min_pct": 0.25, "max_pct": 0.50},
+    {"finish": "plain", "label": "Common", "symbol": "circle", "min_pct": 0.50, "max_pct": None},
+]
+FINISHES_BY_PCT = [f for f in FINISHES if f["min_pct"] is not None]
+
+# Gemini's free-text colours -> paint. Unknown labels get a deterministic everyday colour (known: false).
+PAINT = {"black": "#0b0c10", "white": "#e9ecef", "silver": "#aeb4bc", "gray": "#5d636b", "grey": "#5d636b",
+         "dark gray": "#33373d", "dark grey": "#33373d", "blue": "#1f4fa8", "dark blue": "#152a55", "red": "#a3121c",
+         "maroon": "#5a1020", "yellow": "#e3b505", "green": "#1d5a35", "dark green": "#163a26", "brown": "#4f3524",
+         "tan": "#b39a73", "orange": "#d4561a", "gold": "#b8933e", "beige": "#cbb994", "purple": "#4b2a6b",
+         "dark": "#22252a"}
+EVERYDAY = ["white", "black", "silver", "gray", "blue", "red", "dark blue", "dark gray"]
+
+
+def card_color(label: str, name: str | None) -> dict:
+    if name:
+        hexv = PAINT.get(name) or next((v for k, v in PAINT.items() if k in name), None)
+        if hexv:
+            return {"name": name, "hex": hexv, "known": True}
+    pick = EVERYDAY[zlib.crc32(label.lower().encode()) % len(EVERYDAY)]
+    return {"name": pick, "hex": PAINT[pick], "known": False}
 
 
 class Sightings:
@@ -221,6 +252,100 @@ counted AS (SELECT * FROM eff WHERE NOT hidden AND label IS NOT NULL AND label !
             i.pop("_sort")
         return {"total": len(items), "caught": sum(1 for i in items if i["count"] > 0), "tiers": TIERS,
                 "items": items}
+
+    # ------------------------------------------------------------ cards (desktop only, not in the contract)
+
+    def card_stats(self) -> dict:
+        """Per counted label: yolo class, Gemini colour, year range, direction and hour tallies, best crop and frame
+        (confidence x box size). Cached like the catalog."""
+        def build():
+            out: dict[str, dict] = {}
+            with self._open() as (con, eff):
+                if con is None:
+                    return out
+                rows = con.execute(f"WITH {eff} SELECT id, started_at, label, yolo_class, raw_color, raw_year_range, "
+                                   "raw_direction, raw_crop_path, raw_frame_path, raw_max_box_px, raw_confidence "
+                                   "FROM counted").fetchall()
+            for r in rows:
+                s = out.setdefault(r["label"].lower(), {"cls": Counter(), "color": Counter(), "years": Counter(),
+                                                        "dir": Counter(), "hour": Counter(), "best": None,
+                                                        "best_score": -1.0, "best_conf": 0.0})
+                s["cls"][r["yolo_class"]] += 1
+                if r["raw_color"]:
+                    s["color"][r["raw_color"].strip().lower()] += 1
+                if r["raw_year_range"]:
+                    s["years"][r["raw_year_range"]] += 1
+                if r["raw_direction"] in ("LR", "RL"):
+                    s["dir"][r["raw_direction"]] += 1
+                ts = utc_to_ts(r["started_at"])
+                if ts is not None:
+                    s["hour"][datetime.fromtimestamp(ts).hour] += 1
+                conf = r["raw_confidence"] or 0.0
+                s["best_conf"] = max(s["best_conf"], conf)
+                score = conf * (r["raw_max_box_px"] or 0)
+                if r["raw_crop_path"] and score > s["best_score"]:
+                    s["best_score"], s["best"] = score, {"id": r["id"], "crop": r["raw_crop_path"],
+                                                         "frame": r["raw_frame_path"],
+                                                         "box_px": r["raw_max_box_px"],
+                                                         "direction": r["raw_direction"]}
+            return out
+        return self._cached("card_stats", build)
+
+    def mesh_manifest(self) -> dict:
+        """card_meshes' manifest.json ({label lower: {file, sighting_id, box_px, generated_at}}), re-read on change."""
+        p = self.cfg.paths.card_meshes / "manifest.json"
+        try:
+            mtime = p.stat().st_mtime_ns
+        except OSError:
+            return {}
+        hit = self._cache.get("mesh_manifest")
+        if hit and hit[0] == mtime:
+            return hit[1]
+        try:
+            val = json.loads(p.read_text(encoding="utf-8"))
+            val = val if isinstance(val, dict) else {}
+        except (OSError, ValueError):
+            val = {}
+        self._cache["mesh_manifest"] = (mtime, val)
+        return val
+
+    def cards(self, signer) -> dict:
+        """GET /api/cards: the collection as trading cards. Finishes are percentiles of count among labels seen at
+        least twice (rarest first); a label seen exactly once is a Special Illustration Rare."""
+        col = self.collection(signer)
+        stats, meshes = self.card_stats(), self.mesh_manifest()
+        caught = sorted(i["count"] for i in col["items"] if i["count"] >= 2)
+        items = []
+        for n, i in enumerate(col["items"], 1):
+            key = i["label"].lower()
+            s = stats.get(key)
+            c = i["count"]
+            pct = (bisect.bisect_left(caught, c) / len(caught)) if c >= 2 and caught else None
+            finish = None if c <= 0 else "sir" if c == 1 else next(f["finish"] for f in FINISHES_BY_PCT
+                                                                    if f["max_pct"] is None or pct < f["max_pct"])
+            color_name = s["color"].most_common(1)[0][0] if s and s["color"] else None
+            best = s["best"] if s else None
+            m = meshes.get(key)
+            items.append({
+                "label": i["label"], "make": i["make"], "model": i["model"], "generic": i["generic"],
+                "origin": i["origin"], "number": n, "count": c, "finish": finish,
+                "pct": round(pct, 4) if pct is not None else None,
+                "first_seen_at": i["first_seen_at"], "last_seen_at": i["last_seen_at"],
+                "yolo_class": s["cls"].most_common(1)[0][0] if s and s["cls"] else None,
+                "color": card_color(i["label"], color_name),
+                "year_range": s["years"].most_common(1)[0][0] if s and s["years"] else None,
+                "peak_hour": s["hour"].most_common(1)[0][0] if s and s["hour"] else None,
+                "directions": {"LR": s["dir"]["LR"], "RL": s["dir"]["RL"]} if s else {"LR": 0, "RL": 0},
+                "best_confidence": round(s["best_conf"], 3) if s else None,
+                "cover": ({"sighting_id": best["id"], "crop": signer(self.media_path(best["crop"])),
+                           "frame": signer(self.media_path(best["frame"])) if best["frame"] else None}
+                          if best else None),
+                "mesh": ({"url": signer(f"/media/cards/{m['file']}"), "generated_at": m.get("generated_at"),
+                          "source_sighting": m.get("sighting_id")}
+                         if m and (self.cfg.paths.card_meshes / m["file"]).is_file() else None),
+            })
+        return {"generated_at": iso(datetime.now().timestamp()), "set_total": len(items),
+                "caught": sum(1 for i in items if i["count"] > 0), "finishes": FINISHES, "items": items}
 
     def resolve_label(self, label: str) -> dict:
         """The collection item a correction names (§4.5); 422 unknown_label otherwise."""

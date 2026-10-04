@@ -12,8 +12,11 @@
      pywebview, pillow, httpx[http2], pyjwt[crypto], qrcode), a WebView2 runtime check, and a Start Menu shortcut
      "Campi" that runs `campi ui` without a console window. Set [api] enabled = true to run the API for the iPhone
      app under the service (see README "API").
+   - with -Meshes: the optional 3D card scans' own venv (%USERPROFILE%\CampiTimelapse\venv-mesh: CUDA torch,
+     TripoSR checked out under CampiTimelapse\tools\TripoSR, rembg, trimesh, PyMCubes). Weights (about 1.7 GB)
+     download on the first pass. Then set [cards] meshes_enabled = true and run `campi restart`.
 #>
-param([switch]$Sightings, [switch]$UI)
+param([switch]$Sightings, [switch]$UI, [switch]$Meshes)
 $ErrorActionPreference = 'Stop'
 $Project = $PSScriptRoot
 Set-Location $Project
@@ -76,6 +79,20 @@ if ($UI) {
     $sc.Description = 'Campi: sightings, timelapse clips, daily videos and highlights'
     $sc.Save()
     Write-Host "Start Menu shortcut: $lnk"
+}
+
+if ($Meshes) {
+    # TripoSR (image -> 3D mesh) for the Cards tab. Its own env: it needs transformers 4.x (TripoSR's weights use the
+    # 4.x ViT names) and would fight the sightings env. torchmcubes doesn't build for the RTX 50 series on Windows,
+    # so card_meshes swaps in PyMCubes and nothing is compiled.
+    $mv = Join-Path $env:USERPROFILE 'CampiTimelapse\venv-mesh'
+    $mpy = Join-Path $mv 'Scripts\python.exe'
+    $tsr = Join-Path $env:USERPROFILE 'CampiTimelapse\tools\TripoSR'
+    if (-not (Test-Path $tsr)) { git clone --depth 1 https://github.com/VAST-AI-Research/TripoSR $tsr }
+    if (-not (Test-Path $mpy)) { uv venv $mv --python 3.12 }
+    uv pip install --python $mpy torch torchvision --index-url https://download.pytorch.org/whl/cu128
+    uv pip install --python $mpy 'transformers==4.46.3' 'rembg[gpu]' onnxruntime trimesh PyMCubes omegaconf einops huggingface_hub scipy pillow
+    Write-Host 'mesh env ready: campi meshes --limit 1 tries it (TripoSR downloads on the first run)'
 }
 
 # The task runs whether or not you are logged on, which needs admin rights to register.

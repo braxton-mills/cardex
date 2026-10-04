@@ -31,12 +31,13 @@ ARCHIVE_RE = re.compile(r"^campi_archive_(\d{3})\.mp4$")
 DAY_RE = re.compile(r"^\d{4}-\d{2}-\d{2}$")
 CLIP_ID_RE = re.compile(r"^\d{4}-\d{2}-\d{2}_\d{4}$")
 SIGHTING_FILE_RE = re.compile(r"^[A-Za-z0-9_\-]+\.(jpg|mp4)$")
-TYPES = {".mp4": "video/mp4", ".jpg": "image/jpeg"}
+MESH_FILE_RE = re.compile(r"^[a-z0-9\-]+\.glb$")
+TYPES = {".mp4": "video/mp4", ".jpg": "image/jpeg", ".glb": "model/gltf-binary"}
 
 
 def roots(cfg) -> dict[str, Path]:
     return {"clips": cfg.paths.out, "daily": cfg.paths.daily, "archive": cfg.paths.archive,
-            "sightings": cfg.paths.sightings}
+            "sightings": cfg.paths.sightings, "cards": cfg.paths.card_meshes}
 
 
 def resolve(cfg, root: str, rel: str, current_part: int) -> Path | None:
@@ -55,6 +56,8 @@ def resolve(cfg, root: str, rel: str, current_part: int) -> Path | None:
     elif root == "archive":
         m = ARCHIVE_RE.match(name) if len(parts) == 1 else None
         ok = m and int(m.group(1)) != current_part
+    elif root == "cards":  # <slug>-<sid8>.glb written by card_meshes (never manifest.json or *.tmp)
+        ok = len(parts) == 1 and MESH_FILE_RE.match(name)
     else:  # sightings: YYYY-MM-DD/<stem>.jpg|.mp4 written by the worker (never *.tmp.mp4, models\, recordings\)
         ok = len(parts) == 2 and DAY_RE.match(parts[0]) and SIGHTING_FILE_RE.match(name) and ".tmp" not in name
     if not ok:

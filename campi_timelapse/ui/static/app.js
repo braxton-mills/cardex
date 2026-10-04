@@ -8,12 +8,13 @@ import * as today from './views/today.js';
 import * as highlights from './views/highlights.js';
 import * as sightings from './views/sightings.js';
 import * as collection from './views/collection.js';
+import * as cards from './views/cards.js';
 import * as timelapse from './views/timelapse.js';
 import * as live from './views/live.js';
 
-const VIEWS = { today, highlights, sightings, collection, timelapse, live };
+const VIEWS = { today, highlights, sightings, collection, cards, timelapse, live };
 const TITLES = {
-  today: 'Today', highlights: 'Highlights', sightings: 'Sightings', collection: 'Collection', timelapse: 'Timelapse', live: 'Live',
+  today: 'Today', highlights: 'Highlights', sightings: 'Sightings', collection: 'Collection', cards: 'Cards', timelapse: 'Timelapse', live: 'Live',
 };
 let current = null; // {name, handle}
 let hidden = document.hidden;

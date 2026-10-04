@@ -20,6 +20,7 @@
       <a href="#/highlights" data-view="highlights" data-icon="sparkle" title="Highlights"><span>Highlights</span></a>
       <a href="#/sightings" data-view="sightings" data-icon="car" title="Sightings"><span>Sightings</span></a>
       <a href="#/collection" data-view="collection" data-icon="grid" title="Collection"><span>Collection</span></a>
+      <a href="#/cards" data-view="cards" data-icon="cards" title="Cards"><span>Cards</span></a>
       <a href="#/timelapse" data-view="timelapse" data-icon="film" title="Timelapse"><span>Timelapse</span></a>
       <a href="#/live" data-view="live" data-icon="live" title="Live"><span>Live</span></a>
     </nav>
@@ -36,6 +37,9 @@
   </div>
   <datalist id="label-options"></datalist>
   <div id="toast" class="toast" role="status"></div>
+  <script type="importmap">
+    { "imports": { "three": "/static/vendor/three/three.module.js", "three/addons/": "/static/vendor/three/addons/" } }
+  </script>
   <script type="module" src="/static/app.js"></script>
 </body>
 </html>

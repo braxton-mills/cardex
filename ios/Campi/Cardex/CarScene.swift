@@ -4,28 +4,20 @@ import RealityKit
 import SwiftUI
 import UIKit
 
-/// The Cardex 3D car: a bundled body-style model (Resources/Cars, from tools/make_car_models.py) with its "Paint"
-/// mesh painted the car's seen color, centered and scaled to a 1 m box, lit by a soft procedural studio.
+/// The Cardex 3D car: a low-poly mesh built on the phone from the car's `CarShape` (`CarMesh`), painted the car's
+/// seen color, centered and scaled to a 1 m box, lit by a soft procedural studio.
 @MainActor
 enum CarScene {
     /// The three-quarter front view the binder snapshots use and the turntable starts from.
     nonisolated static let restingYaw: Float = .pi / 5
 
-    private static var prototypes: [String: Entity] = [:]
+    private static var meshes: [CarShape: (MeshResource, [CarMesh.Part])] = [:]
     private static var studio: EnvironmentResource?
 
-    /// A fresh painted copy of the style's car, centered on the origin.
-    static func car(_ style: CarBodyStyle, paint: PaintColor) async throws -> Entity {
-        let name = style.modelName
-        let prototype: Entity
-        if let p = prototypes[name] {
-            prototype = p
-        } else {
-            prototype = try await Entity(named: name, in: .main)
-            prototypes[name] = prototype
-        }
-        let model = prototype.clone(recursive: true)
-        apply(paint, to: model)
+    /// A fresh painted car of this shape, centered on the origin.
+    static func car(_ shape: CarShape, paint: PaintColor) throws -> Entity {
+        let (mesh, parts) = try resource(for: shape)
+        let model = ModelEntity(mesh: mesh, materials: parts.map { material($0, paint: paint) })
         let holder = Entity()
         holder.addChild(model)
         let bounds = model.visualBounds(relativeTo: holder)
@@ -35,16 +27,60 @@ enum CarScene {
         return holder
     }
 
-    private static func apply(_ paint: PaintColor, to car: Entity) {
-        guard let body = car.findEntity(named: "Paint"), var model = body.components[ModelComponent.self] else { return }
+    /// One mesh per shape (cached): a part per material, in the order of the returned parts.
+    private static func resource(for shape: CarShape) throws -> (MeshResource, [CarMesh.Part]) {
+        if let cached = meshes[shape] { return cached }
+        let mesh = CarMesh(shape)
+        var descriptors: [MeshDescriptor] = []
+        var parts: [CarMesh.Part] = []
+        for part in CarMesh.Part.allCases {
+            guard let piece = mesh.pieces[part], !piece.indices.isEmpty else { continue }
+            var d = MeshDescriptor(name: "\(part)")
+            d.positions = MeshBuffers.Positions(piece.positions)
+            d.normals = MeshBuffers.Normals(piece.normals)
+            d.primitives = .triangles(piece.indices)
+            d.materials = .allFaces(UInt32(parts.count))
+            descriptors.append(d)
+            parts.append(part)
+        }
+        let resource = (try MeshResource.generate(from: descriptors), parts)
+        meshes[shape] = resource
+        return resource
+    }
+
+    private static func material(_ part: CarMesh.Part, paint: PaintColor) -> any RealityKit.Material {
         var m = PhysicallyBasedMaterial()
-        m.baseColor = .init(tint: UIColor(red: paint.red, green: paint.green, blue: paint.blue, alpha: 1))
-        m.metallic = .init(floatLiteral: paint.metallic ? 0.65 : 0.1)
-        m.roughness = .init(floatLiteral: paint.metallic ? 0.3 : 0.38)
-        m.clearcoat = .init(floatLiteral: 1)
-        m.clearcoatRoughness = .init(floatLiteral: 0.06)
-        model.materials = model.materials.map { _ in m }
-        body.components.set(model)
+        switch part {
+        case .paint:
+            m.baseColor = .init(tint: UIColor(red: paint.red, green: paint.green, blue: paint.blue, alpha: 1))
+            m.metallic = .init(floatLiteral: paint.metallic ? 0.6 : 0.15)
+            m.roughness = .init(floatLiteral: paint.metallic ? 0.3 : 0.36)
+            m.clearcoat = .init(floatLiteral: 1)
+            m.clearcoatRoughness = .init(floatLiteral: 0.06)
+        case .glass:
+            m.baseColor = .init(tint: UIColor(red: 0.1, green: 0.13, blue: 0.19, alpha: 1))
+            m.metallic = .init(floatLiteral: 0.6)
+            m.roughness = .init(floatLiteral: 0.06)
+        case .trim:
+            m.baseColor = .init(tint: UIColor(white: 0.12, alpha: 1))
+            m.roughness = .init(floatLiteral: 0.7)
+        case .tire:
+            m.baseColor = .init(tint: UIColor(white: 0.07, alpha: 1))
+            m.roughness = .init(floatLiteral: 0.9)
+        case .rim:
+            m.baseColor = .init(tint: UIColor(white: 0.78, alpha: 1))
+            m.metallic = .init(floatLiteral: 1)
+            m.roughness = .init(floatLiteral: 0.25)
+        case .headlight:
+            m.baseColor = .init(tint: .white)
+            m.emissiveColor = .init(color: .white)
+            m.emissiveIntensity = 0.6
+        case .taillight:
+            m.baseColor = .init(tint: .red)
+            m.emissiveColor = .init(color: .red)
+            m.emissiveIntensity = 0.8
+        }
+        return m
     }
 
     /// Looks at the car from the front three-quarter, a little above.
@@ -130,7 +166,7 @@ struct TurntableSystem: System {
 
 /// The live 3D car on an inspected card.
 struct CarModelView: View {
-    let style: CarBodyStyle
+    let shape: CarShape
     let paint: PaintColor
     var tilt: CGPoint = .zero
     var spins = true
@@ -145,7 +181,7 @@ struct CarModelView: View {
             _ = Self.registered
             content.camera = .virtual
             let root = Entity()
-            guard let car = try? await CarScene.car(style, paint: paint) else { return }
+            guard let car = try? CarScene.car(shape, paint: paint) else { return }
             car.name = "car"
             car.components.set(TurntableComponent(speed: spins ? 0.35 : 0))
             root.addChild(car)
@@ -159,7 +195,7 @@ struct CarModelView: View {
                 car.components.set(t)
             }
         }
-        .id("\(style.rawValue)-\(paint)")
+        .id(CarSnapshots.Key(shape: shape, paint: paint))
         .accessibilityHidden(true)
     }
 }
@@ -169,24 +205,32 @@ struct CarModelView: View {
 final class CarSnapshots {
     static let shared = CarSnapshots()
 
-    private struct Key: Hashable {
-        var style: CarBodyStyle
+    struct Key: Hashable {
+        var shape: CarShape
         var paint: PaintColor
     }
 
     private var images: [Key: UIImage] = [:]
     private var inflight: [Key: Task<UIImage?, Never>] = [:]
+    /// Renders run one at a time on one renderer, instead of a renderer (and GPU work) per visible card at once.
+    private var renderer: RealityRenderer?
+    private var rendering = false
+    private var waiting: [CheckedContinuation<Void, Never>] = []
 
     /// The art-window size the snapshot is rendered for, in pixels.
     static let pixelSize = CGSize(width: 720, height: 480)
 
-    func cached(_ style: CarBodyStyle, paint: PaintColor) -> UIImage? { images[Key(style: style, paint: paint)] }
+    func cached(_ shape: CarShape, paint: PaintColor) -> UIImage? { images[Key(shape: shape, paint: paint)] }
 
-    func image(_ style: CarBodyStyle, paint: PaintColor) async -> UIImage? {
-        let key = Key(style: style, paint: paint)
+    func image(_ shape: CarShape, paint: PaintColor) async -> UIImage? {
+        let key = Key(shape: shape, paint: paint)
         if let image = images[key] { return image }
         if let running = inflight[key] { return await running.value }
-        let task = Task { @MainActor in await Self.render(style, paint: paint) }
+        let task = Task { @MainActor in
+            await self.acquire()
+            defer { self.release() }
+            return await self.render(shape, paint: paint)
+        }
         inflight[key] = task
         let image = await task.value
         inflight[key] = nil
@@ -194,8 +238,20 @@ final class CarSnapshots {
         return image
     }
 
-    private static func render(_ style: CarBodyStyle, paint: PaintColor) async -> UIImage? {
-        let w = Int(pixelSize.width), h = Int(pixelSize.height)
+    private func acquire() async {
+        if !rendering {
+            rendering = true
+            return
+        }
+        await withCheckedContinuation { waiting.append($0) }
+    }
+
+    private func release() {
+        if waiting.isEmpty { rendering = false } else { waiting.removeFirst().resume() }
+    }
+
+    private func render(_ shape: CarShape, paint: PaintColor) async -> UIImage? {
+        let w = Int(Self.pixelSize.width), h = Int(Self.pixelSize.height)
         guard let device = MTLCreateSystemDefaultDevice() else { return nil }
         let desc = MTLTextureDescriptor.texture2DDescriptor(pixelFormat: .rgba8Unorm_srgb, width: w, height: h,
                                                             mipmapped: false)
@@ -203,8 +259,10 @@ final class CarSnapshots {
         desc.storageMode = .shared
         guard let texture = device.makeTexture(descriptor: desc) else { return nil }
         do {
-            let renderer = try RealityRenderer()
-            let car = try await CarScene.car(style, paint: paint)
+            let renderer = try self.renderer ?? RealityRenderer()
+            self.renderer = renderer
+            renderer.entities.removeAll()
+            let car = try CarScene.car(shape, paint: paint)
             car.orientation = simd_quatf(angle: CarScene.restingYaw, axis: [0, 1, 0])
             let camera = CarScene.camera()
             renderer.entities.append(contentsOf: [car, camera, CarScene.keyLight()])

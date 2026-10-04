@@ -94,7 +94,8 @@ struct CardInspectorView: View {
         VStack(alignment: .leading, spacing: 12) {
             HStack(spacing: 8) {
                 TierBadge(tier: item.tier)
-                Pill(text: finish.title, symbol: "sparkles", color: finish >= .holo ? .yellow : .secondary)
+                Pill(text: HoloPattern.for(label: item.label, finish: finish).title(for: finish), symbol: "sparkles",
+                     color: finish >= .holo ? .yellow : .secondary)
                 if item.origin == .discovered { Pill(text: "Discovered", symbol: "sparkle", color: .indigo) }
             }
             Text("Seen \(item.count) time\(item.count == 1 ? "" : "s")").font(.headline)

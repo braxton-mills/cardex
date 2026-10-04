@@ -1,4 +1,5 @@
 import Foundation
+import simd
 import Testing
 @testable import CampiKit
 
@@ -76,12 +77,14 @@ import Testing
         #expect(CarBodyStyle.guess(label: "Tesla Model Y") == .suv)
         #expect(CarBodyStyle.guess(label: "Subaru Outback") == .wagon)
         #expect(CarBodyStyle.guess(label: "Ford Mustang") == .coupe)
-        #expect(CarBodyStyle.guess(label: "school bus") == .boxTruck)
+        #expect(CarBodyStyle.guess(label: "school bus") == .bus)
+        #expect(CarBodyStyle.guess(label: "Chevrolet Tahoe") == .fullSizeSUV)
+        #expect(CarBodyStyle.guess(label: "Ford Transit") == .cargoVan)
+        #expect(CarBodyStyle.guess(label: "motorcycle") == .motorcycle)
         #expect(CarBodyStyle.guess(label: "Honda Civic") == .sedan)
         #expect(CarBodyStyle.guess(label: "Tesla Model 3") == .sedan)
         // whole words only: "fit" isn't in "Fitzgerald"
         #expect(CarBodyStyle.guess(label: "Fitzgerald Special") == .sedan)
-        #expect(CarBodyStyle.wagon.modelName == "hatchback")
     }
 
     @Test func fallbackGuessesBodyStyle() {
@@ -96,5 +99,74 @@ import Testing
         let dark = try! #require(PaintColor.from("Dark Blue"))
         #expect(dark.blue < blue.blue)
         #expect((PaintColor.from("light gray")?.red ?? 0) > (PaintColor.from("gray")?.red ?? 1))
+    }
+}
+
+@Suite struct CarShapeTests {
+    @Test func everyStyleBuildsAClosedLookingMesh() {
+        for style in CarBodyStyle.allCases {
+            let shape = CarShape.preset(style)
+            let mesh = CarMesh(shape)
+            #expect(mesh.triangleCount > 300 && mesh.triangleCount < 4000, "\(style): \(mesh.triangleCount) triangles")
+            #expect(mesh.pieces[.paint]?.triangleCount ?? 0 > 0)
+            #expect(mesh.pieces[.tire]?.triangleCount ?? 0 > 0)
+            for piece in mesh.pieces.values {
+                #expect(piece.normals.allSatisfy { abs(simd_length($0) - 1) < 0.001 })
+                #expect(piece.indices.allSatisfy { Int($0) < piece.positions.count })
+            }
+            // on the ground, about as long and tall as the shape says
+            let (lo, hi) = mesh.bounds
+            #expect(abs(lo.y) < 0.01, "\(style) floats or sinks: \(lo.y)")
+            // the body, or the wheels where they reach past it (motorcycles)
+            let reach = max(shape.length, shape.wheelbase + shape.wheelDiameter * 1.1)
+            #expect(hi.z - lo.z > reach * 0.95 && hi.z - lo.z < reach * 1.15, "\(style) length \(hi.z - lo.z)")
+            #expect(hi.y < shape.height * 1.15, "\(style) height")
+        }
+    }
+
+    @Test func knownModelsGetTheirOwnShapes() {
+        let wrangler = CarShape.for(label: "Jeep Wrangler")
+        #expect(wrangler.extras.contains(.spareTire) && wrangler.roof == .hatch)
+        #expect(CarShape.for(label: "Tesla Cybertruck").roof == .fastback)
+        #expect(CarShape.for(label: "Tesla Model 3").extras.contains(.glassRoof))
+        #expect(CarShape.for(label: "Ford F-150").roof == .pickup)
+        #expect(CarShape.for(label: "Ford Mustang") != CarShape.for(label: "Toyota GR86"))
+        #expect(CarShape.for(label: "Toyota Camry") != CarShape.for(label: "Toyota Corolla"))
+        // unknown labels fall back to the body style's preset
+        #expect(CarShape.for(label: "Zorblax 9000", style: .van) == CarShape.preset(.van))
+        #expect(CarShape.for(label: "Zorblax 9000") == CarShape.preset(.sedan))
+    }
+
+    @Test func pickupBedIsOpen() {
+        // the bed floor sits below the rails: some trim faces point up from below the belt
+        let shape = CarShape.preset(.pickup)
+        let trim = CarMesh(shape).pieces[.trim]!
+        let belt = shape.belt * shape.height
+        let floorFaces = stride(from: 0, to: trim.indices.count, by: 3).filter { i in
+            let p = trim.positions[Int(trim.indices[i])], n = trim.normals[Int(trim.indices[i])]
+            return n.y > 0.9 && p.y < belt - 0.2 && p.y > shape.clearance + 0.1
+        }
+        #expect(!floorFaces.isEmpty)
+    }
+}
+
+@Suite struct CardStyleTests {
+    @Test func patternsAreStableAndFitTheFinish() {
+        for finish in CardFinish.allCases {
+            let p = HoloPattern.for(label: "Toyota Camry", finish: finish)
+            #expect(HoloPattern.options(for: finish).contains(p))
+            #expect(HoloPattern.for(label: "Toyota Camry", finish: finish) == p)
+        }
+        #expect(HoloPattern.for(label: "anything", finish: .plain) == .gloss)
+        #expect(stableHash("a") == 0xE40C_292C)   // FNV-1a, the same on every launch
+    }
+
+    @Test func aBinderGetsAMix() {
+        let labels = (1...40).map { "Car \($0)" }
+        #expect(Set(labels.map { HoloPattern.for(label: $0, finish: .holo) }).count >= 4)
+        #expect(Set(labels.map { SceneTheme.for(label: $0, style: .sedan, finish: .holo) }).count >= 3)
+        // only special illustrations reach the rare themes, and some do
+        #expect(labels.allSatisfy { ![.space, .aurora].contains(SceneTheme.for(label: $0, style: .sedan, finish: .holo)) })
+        #expect(labels.contains { [.space, .aurora].contains(SceneTheme.for(label: $0, style: .sedan, finish: .specialIllustration)) })
     }
 }

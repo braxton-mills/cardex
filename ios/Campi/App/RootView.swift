@@ -7,11 +7,11 @@ struct RootView: View {
     var body: some View {
         @Bindable var model = model
         Group {
-            if model.isPaired {
-                MainTabs()
-            } else {
-                PairingView()
-            }
+            #if DEBUG
+            if let page = CardexGalleryView.page { CardexGalleryView(page: page) } else { content }
+            #else
+            content
+            #endif
         }
         .overlay(alignment: .bottom) { SaveStatusBanner(saver: model.saver) }
         .sheet(item: Bindable(model.saver).shareItem) { item in
@@ -20,6 +20,14 @@ struct RootView: View {
         .sheet(item: $model.pendingLink) { link in
             PairConfirmView(link: link)
                 .presentationDetents([.medium, .large])
+        }
+    }
+
+    @ViewBuilder private var content: some View {
+        if model.isPaired {
+            MainTabs()
+        } else {
+            PairingView()
         }
     }
 }

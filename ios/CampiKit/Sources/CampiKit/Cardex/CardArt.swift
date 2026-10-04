@@ -1,51 +1,56 @@
 import Foundation
 
-/// The bundled 3D model a Cardex card shows (`Campi/Resources/Cars/<rawValue>.usdz`, built by
-/// tools/make_car_models.py). Picked by the on-device model when it writes the card, else guessed from the label.
+/// The kind of vehicle on a Cardex card: its 3D shape's starting point (`CarShape.preset`) and its energy type.
+/// Picked by the on-device model when it writes the card, else guessed from the label.
 public enum CarBodyStyle: String, Codable, Hashable, Sendable, CaseIterable {
-    case sedan, coupe, suv, offRoader, hatchback, wagon, pickup, van, boxTruck
-
-    /// The model file: wagons share the hatchback's.
-    public var modelName: String { self == .wagon ? CarBodyStyle.hatchback.rawValue : rawValue }
+    case sedan, coupe, supercar, suv, fullSizeSUV, offRoader, hatchback, wagon, pickup, van, cargoVan, boxTruck,
+         bus, motorcycle
 
     public var title: String {
         switch self {
         case .sedan: "Sedan"
         case .coupe: "Coupe"
+        case .supercar: "Supercar"
         case .suv: "SUV"
+        case .fullSizeSUV: "Full-Size SUV"
         case .offRoader: "Off-Roader"
         case .hatchback: "Hatchback"
         case .wagon: "Wagon"
         case .pickup: "Pickup"
         case .van: "Van"
+        case .cargoVan: "Cargo Van"
         case .boxTruck: "Truck"
+        case .bus: "Bus"
+        case .motorcycle: "Motorcycle"
         }
     }
 
     /// Keyword guesses, checked in order: first match wins. Lowercased, matched as whole words.
     private static let keywords: [(CarBodyStyle, [String])] = [
-        (.boxTruck, ["box truck", "dump truck", "semi", "garbage", "mixer", "bus", "excavator", "delivery",
-                     "sprinter", "promaster"]),
+        (.motorcycle, ["motorcycle", "motorbike", "scooter", "harley", "ducati"]),
+        (.bus, ["bus"]),
+        (.boxTruck, ["box truck", "dump truck", "semi", "garbage", "mixer", "excavator", "delivery"]),
+        (.cargoVan, ["sprinter", "promaster", "transit", "cargo van", "e-series"]),
         (.pickup, ["pickup", "truck", "f-150", "f-250", "silverado", "sierra", "ram 1500", "1500", "tacoma",
                    "tundra", "ranger", "colorado", "frontier", "titan", "ridgeline", "maverick", "gladiator",
                    "cybertruck", "r1t"]),
-        (.van, ["van", "minivan", "odyssey", "sienna", "pacifica", "carnival", "transit", "caravan"]),
+        (.van, ["van", "minivan", "odyssey", "sienna", "pacifica", "carnival", "caravan"]),
+        (.fullSizeSUV, ["tahoe", "suburban", "yukon", "expedition", "escalade", "sequoia", "navigator"]),
         (.offRoader, ["wrangler", "bronco", "4runner", "land cruiser", "defender", "g-class", "g-wagon"]),
         (.wagon, ["wagon", "outback", "v60", "v90", "allroad"]),
         (.hatchback, ["hatchback", "golf", "fit", "prius", "bolt", "mini", "veloster", "impreza", "leaf"]),
+        (.supercar, ["huracan", "aventador", "488", "f8", "296", "720s", "r8", "corvette"]),
         (.coupe, ["coupe", "mustang", "camaro", "challenger", "corvette", "911", "gr86", "brz", "miata", "mx-5",
-                  "supra", "roma", "huracan"]),
-        (.suv, ["suv", "rav4", "cr-v", "explorer", "equinox", "tahoe", "suburban", "model y", "forester",
+                  "supra", "roma"]),
+        (.suv, ["suv", "rav4", "cr-v", "explorer", "equinox", "model y", "forester",
                 "cherokee", "rogue", "tucson", "telluride", "cx-5", "cx-50", "x3", "x5", "urus", "r1s", "highlander",
-                "pilot", "escape", "santa fe", "sorento", "pathfinder", "murano", "traverse", "expedition", "yukon",
-                "escalade", "q5", "q7", "gx", "rx", "nx", "atlas", "tiguan", "kona", "seltos", "sportage", "crosstrek",
+                "pilot", "escape", "santa fe", "sorento", "pathfinder", "murano", "traverse", "q5", "q7", "gx", "rx", "nx", "atlas", "tiguan", "kona", "seltos", "sportage", "crosstrek",
                 "ascent", "4xe", "bronco sport", "blazer", "trax", "durango", "palisade", "polestar 3"]),
     ]
 
     /// A body style from the label alone, for cards without a generated one. Defaults to sedan.
     public static func guess(label: String, make: String? = nil, model: String? = nil) -> CarBodyStyle {
-        let text = " " + [label, model ?? ""].joined(separator: " ").lowercased()
-            .replacingOccurrences(of: #"[^a-z0-9\-]+"#, with: " ", options: .regularExpression) + " "
+        let text = words(label, model)
         for (style, words) in keywords where words.contains(where: { text.contains(" \($0) ") }) {
             return style
         }

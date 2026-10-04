@@ -20,6 +20,10 @@ struct TradingCardView: View {
     /// The live 3D car instead of the still snapshot (the inspector).
     var live = false
     var spins = true
+    /// Debug gallery only: show this pattern / scene / finish instead of the card's own.
+    var forcedPattern: HoloPattern?
+    var forcedTheme: SceneTheme?
+    var forcedFinishOverride: CardFinish?
 
     static let size = CGSize(width: 300, height: 419)
 
@@ -48,6 +52,7 @@ struct TradingCardView: View {
 
     private var card: CardexStore.Card? { app.cardex.card(for: item.label) }
     private var finish: CardFinish {
+        if let forcedFinishOverride { return forcedFinishOverride }
         #if DEBUG
         if let forced = Self.forcedFinish { return forced }
         #endif
@@ -66,10 +71,16 @@ struct TradingCardView: View {
         card?.text.bodyStyle ?? CarBodyStyle.guess(label: item.label, make: item.make, model: item.model)
     }
     private var energy: Energy { Energy(style) }
+    private var shape: CarShape {
+        CarShape.for(label: item.label, make: item.make, model: item.model, style: card?.text.bodyStyle)
+    }
     private var name: String { card?.text.displayName ?? item.label }
+    private var pattern: HoloPattern { forcedPattern ?? HoloPattern.for(label: item.label, finish: finish) }
+    private var theme: SceneTheme { forcedTheme ?? SceneTheme.for(label: item.label, style: style, finish: finish) }
 
     private var accessibilityText: String {
-        var parts = ["\(name) trading card", finish.title, item.tier.title, "seen \(item.count) times"]
+        var parts = ["\(name) trading card", finish.title, item.tier.title, "seen \(item.count) times",
+                     "\(theme.title) art"]
         if let ratings = card?.text.ratings, !ratings.isEmpty {
             parts.append(ratings.map { "\($0.name) \($0.value) of 10" }.joined(separator: ", "))
         }
@@ -96,7 +107,13 @@ struct TradingCardView: View {
                                       startPoint: .topLeading, endPoint: .bottomTrailing))
             ZStack {
                 inner.fill(LinearGradient(colors: [energy.light, energy.color], startPoint: .top, endPoint: .bottom))
-                if finish == .reverseHolo { foil(style: 1, strength: 1.1).clipShape(inner) }
+                if finish == .reverseHolo {
+                    if pattern == .energy {
+                        foil(.sheen, strength: 1.6).mask(EnergyPattern(symbol: energy.symbol)).clipShape(inner)
+                    } else {
+                        foil(pattern, strength: 1.1).clipShape(inner)
+                    }
+                }
                 VStack(spacing: 0) {
                     header(onDark: false).padding(.horizontal, 10).padding(.top, 6)
                     artWindow
@@ -124,13 +141,11 @@ struct TradingCardView: View {
     private var fullArtFace: some View {
         let shape = RoundedRectangle(cornerRadius: 14, style: .continuous)
         return ZStack {
-            LinearGradient(colors: [energy.light, energy.color, energy.color.mix(with: .black, by: 0.45)],
-                           startPoint: .topLeading, endPoint: .bottomTrailing)
-            sunburst.opacity(0.18)
-            foil(style: 2, strength: 1.4)
+            EnergyBackdrop(energy: energy, tilt: tilt)
+            foil(pattern, strength: 1.4)
             // in an overlay: art bigger than the card mustn't widen the text layout
             Color.clear.overlay { carImage.frame(width: 360, height: 240).offset(y: -18) }
-            foil(style: 2, strength: 0.4)
+            foil(pattern, strength: 0.4)
             VStack(spacing: 0) {
                 header(onDark: true).padding(.horizontal, 16).padding(.top, 14)
                 Spacer()
@@ -155,10 +170,10 @@ struct TradingCardView: View {
     private var illustrationFace: some View {
         let shape = RoundedRectangle(cornerRadius: 14, style: .continuous)
         return ZStack {
-            IllustratedScene(energy: energy)
-            foil(style: 3, strength: 1.2)
-            Color.clear.overlay { carImage.frame(width: 400, height: 266).offset(y: 34) }
-            foil(style: 3, strength: 0.45)
+            SceneArt(theme: theme, energy: energy, tilt: tilt, horizon: 0.6)
+            foil(pattern, strength: 1.1)
+            Color.clear.overlay { carImage.frame(width: 400, height: 266).offset(y: 30) }
+            foil(pattern, strength: 0.4)
             VStack(spacing: 0) {
                 header(onDark: true).padding(.horizontal, 16).padding(.top, 14)
                 Spacer()
@@ -205,25 +220,23 @@ struct TradingCardView: View {
         .shadow(color: onDark ? .black.opacity(0.5) : .clear, radius: 2)
     }
 
-    /// The car on a backdrop in its energy's colors, with a floor shadow.
+    /// The car in its illustrated scene, with a floor shadow; holos shimmer behind the car.
     private var artWindow: some View {
         ZStack {
-            RadialGradient(colors: [energy.light.mix(with: .white, by: 0.5), energy.color], center: .init(x: 0.5, y: 0.35),
-                           startRadius: 10, endRadius: 220)
-            sunburst.opacity(0.12)
-            if finish == .holo { foil(style: 1, strength: 1.5) }
-            Ellipse().fill(.black.opacity(0.28)).frame(width: 180, height: 26).blur(radius: 8).offset(y: 52)
+            SceneArt(theme: theme, energy: energy, tilt: tilt, horizon: 0.58)
+            if finish == .holo { foil(pattern, strength: 1.4) }
+            Ellipse().fill(.black.opacity(0.35)).frame(width: 190, height: 24).blur(radius: 7).offset(y: 50)
             carImage
-            if finish == .holo { foil(style: 1, strength: 0.35) }
+            if finish == .holo { foil(pattern, strength: 0.3) }
         }
     }
 
     @ViewBuilder private var carImage: some View {
         let paint = app.cardex.paint(for: item.label)
         if live {
-            CarModelView(style: style, paint: paint, tilt: tilt, spins: spins)
+            CarModelView(shape: shape, paint: paint, tilt: tilt, spins: spins)
         } else {
-            CarSnapshotImage(style: style, paint: paint)
+            CarSnapshotImage(shape: shape, paint: paint)
         }
     }
 
@@ -303,25 +316,8 @@ struct TradingCardView: View {
                        startPoint: .topLeading, endPoint: .bottomTrailing)
     }
 
-    private var sunburst: some View {
-        Canvas { ctx, size in
-            let c = CGPoint(x: size.width / 2, y: size.height * 0.42)
-            let r = max(size.width, size.height)
-            for i in 0..<24 where i.isMultiple(of: 2) {
-                let a0 = Double(i) / 24 * 2 * .pi, a1 = Double(i + 1) / 24 * 2 * .pi
-                var p = Path()
-                p.move(to: c)
-                p.addLine(to: CGPoint(x: c.x + r * cos(a0), y: c.y + r * sin(a0)))
-                p.addLine(to: CGPoint(x: c.x + r * cos(a1), y: c.y + r * sin(a1)))
-                p.closeSubpath()
-                ctx.fill(p, with: .color(.white))
-            }
-        }
-        .allowsHitTesting(false)
-    }
-
-    private func foil(style: Float, strength: Float) -> some View {
-        FoilLayer(style: style, strength: strength, tilt: tilt)
+    private func foil(_ pattern: HoloPattern, strength: Float) -> some View {
+        FoilLayer(style: pattern.shaderStyle, strength: strength, tilt: tilt)
     }
 
     /// The light reflecting off the card's surface, opposite the tilt.
@@ -357,20 +353,21 @@ struct FoilLayer: View {
 
 /// The car's still render, from the snapshot cache.
 struct CarSnapshotImage: View {
-    let style: CarBodyStyle
+    let shape: CarShape
     let paint: PaintColor
     @State private var image: UIImage?
 
     var body: some View {
         Group {
-            if let image = image ?? CarSnapshots.shared.cached(style, paint: paint) {
+            if let image = image ?? CarSnapshots.shared.cached(shape, paint: paint) {
                 Image(uiImage: image).resizable().scaledToFit()
             } else {
                 Image(systemName: "car.side.fill").font(.system(size: 60)).foregroundStyle(.white.opacity(0.4))
             }
         }
-        .task(id: "\(style.rawValue)-\(paint)") {
-            image = await CarSnapshots.shared.image(style, paint: paint)
+        .task(id: CarSnapshots.Key(shape: shape, paint: paint)) {
+            image = nil   // don't keep showing the previous car while this one renders
+            image = await CarSnapshots.shared.image(shape, paint: paint)
         }
     }
 }
@@ -384,14 +381,15 @@ struct Energy {
     init(_ style: CarBodyStyle) {
         switch style {
         case .sedan: (color, light, symbol) = (Color(hex: 0xA8A193), Color(hex: 0xE4DFD3), "star.fill")
-        case .coupe: (color, light, symbol) = (Color(hex: 0xE2553A), Color(hex: 0xF7B7A3), "flame.fill")
-        case .suv: (color, light, symbol) = (Color(hex: 0x3D8BD6), Color(hex: 0xA9D4F5), "drop.fill")
+        case .coupe, .supercar: (color, light, symbol) = (Color(hex: 0xE2553A), Color(hex: 0xF7B7A3), "flame.fill")
+        case .suv, .fullSizeSUV: (color, light, symbol) = (Color(hex: 0x3D8BD6), Color(hex: 0xA9D4F5), "drop.fill")
         case .offRoader: (color, light, symbol) = (Color(hex: 0x4E9F48), Color(hex: 0xB7E0A6), "leaf.fill")
         case .hatchback: (color, light, symbol) = (Color(hex: 0xE9BC22), Color(hex: 0xFBE79A), "bolt.fill")
         case .wagon: (color, light, symbol) = (Color(hex: 0x9C5DC4), Color(hex: 0xDCC1EE), "eye.fill")
         case .pickup: (color, light, symbol) = (Color(hex: 0xB86A38), Color(hex: 0xE9C3A2), "hand.raised.fill")
-        case .van: (color, light, symbol) = (Color(hex: 0x8A97A3), Color(hex: 0xD3DAE0), "gearshape.fill")
-        case .boxTruck: (color, light, symbol) = (Color(hex: 0x3C4855), Color(hex: 0x8D9AA8), "moon.fill")
+        case .van, .cargoVan: (color, light, symbol) = (Color(hex: 0x8A97A3), Color(hex: 0xD3DAE0), "gearshape.fill")
+        case .boxTruck, .bus: (color, light, symbol) = (Color(hex: 0x3C4855), Color(hex: 0x8D9AA8), "moon.fill")
+        case .motorcycle: (color, light, symbol) = (Color(hex: 0x6E5AA8), Color(hex: 0xC6B8EC), "wind")
         }
     }
 }
@@ -425,63 +423,34 @@ struct RaritySymbol: View {
     }
 }
 
-/// The special illustration rare's scene: a sunset sky in the car's energy colors, hills, and a road.
-struct IllustratedScene: View {
-    let energy: Energy
-
-    var body: some View {
-        Canvas { ctx, size in
-            let w = size.width, h = size.height
-            ctx.fill(Path(CGRect(origin: .zero, size: size)), with: .linearGradient(
-                Gradient(colors: [Color(hex: 0x2B1E5C), energy.color.mix(with: Color(hex: 0xFF7A59), by: 0.5),
-                                  Color(hex: 0xFFC27A)]),
-                startPoint: .zero, endPoint: CGPoint(x: 0, y: h * 0.62)))
-            // sun
-            ctx.fill(Path(ellipseIn: CGRect(x: w * 0.58, y: h * 0.26, width: w * 0.34, height: w * 0.34)),
-                     with: .color(Color(hex: 0xFFF0B8).opacity(0.9)))
-            // stars
-            for i in 0..<28 {
-                let x = Double((i * 73) % 97) / 97 * w, y = Double((i * 37) % 53) / 53 * h * 0.3
-                ctx.fill(Path(ellipseIn: CGRect(x: x, y: y, width: 1.6, height: 1.6)), with: .color(.white.opacity(0.8)))
-            }
-            // hills, far then near
-            for (i, tone) in [(0, 0.35), (1, 0.6)] {
-                var p = Path()
-                let base = h * (0.52 + Double(i) * 0.06)
-                p.move(to: CGPoint(x: 0, y: base))
-                for x in stride(from: 0.0, through: w, by: 10) {
-                    p.addLine(to: CGPoint(x: x, y: base - (sin(x / w * .pi * (2.2 + Double(i)) + Double(i)) + 1) * h * 0.05))
-                }
-                p.addLine(to: CGPoint(x: w, y: h))
-                p.addLine(to: CGPoint(x: 0, y: h))
-                p.closeSubpath()
-                ctx.fill(p, with: .color(energy.color.mix(with: Color(hex: 0x1A1430), by: tone)))
-            }
-            // road in perspective
-            var road = Path()
-            road.move(to: CGPoint(x: w * 0.44, y: h * 0.6))
-            road.addLine(to: CGPoint(x: w * 0.56, y: h * 0.6))
-            road.addLine(to: CGPoint(x: w * 1.15, y: h))
-            road.addLine(to: CGPoint(x: -w * 0.15, y: h))
-            road.closeSubpath()
-            ctx.fill(road, with: .color(Color(hex: 0x2A2833)))
-            for i in 0..<6 {
-                let t0 = pow(Double(i) / 6, 1.6), t1 = pow((Double(i) + 0.5) / 6, 1.6)
-                let y0 = h * 0.6 + t0 * h * 0.4, y1 = h * 0.6 + t1 * h * 0.4
-                var dash = Path()
-                dash.move(to: CGPoint(x: w / 2 - 0.5 - t0 * 3, y: y0))
-                dash.addLine(to: CGPoint(x: w / 2 + 0.5 + t0 * 3, y: y0))
-                dash.addLine(to: CGPoint(x: w / 2 + 0.5 + t1 * 3, y: y1))
-                dash.addLine(to: CGPoint(x: w / 2 - 0.5 - t1 * 3, y: y1))
-                ctx.fill(dash, with: .color(Color(hex: 0xFFD966)))
-            }
-        }
-    }
-}
-
 extension Color {
     init(hex: UInt32) {
         self.init(red: Double((hex >> 16) & 0xFF) / 255, green: Double((hex >> 8) & 0xFF) / 255,
                   blue: Double(hex & 0xFF) / 255)
+    }
+}
+
+extension HoloPattern {
+    /// The pattern's style index in Foil.metal (an energy reverse holo is the sheen, masked to the symbol).
+    var shaderStyle: Float {
+        switch self {
+        case .gloss: 0
+        case .sheen, .energy: 1
+        case .etched: 2
+        case .swirl: 3
+        case .cosmos: 4
+        case .crackedIce: 5
+        case .starlight: 6
+        case .sequin: 7
+        case .ripple: 8
+        case .etchedWaves: 9
+        case .etchedHex: 10
+        case .galaxy: 11
+        }
+    }
+
+    /// "Cracked Ice Holo", "Energy Reverse Holo", "Plain".
+    func title(for finish: CardFinish) -> String {
+        finish == .plain ? finish.title : "\(title) \(finish.title)"
     }
 }

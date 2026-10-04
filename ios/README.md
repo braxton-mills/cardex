@@ -28,11 +28,14 @@ The PC side (`campi ui` API, see `docs/api-contract.md` Appendix A) isn't built 
   "View in Timelapse" (seeks the 10-minute clip, or the daily video once the clip has expired).
 - **Cardex** (the Collection tab): every label, caught or not, as a binder of trading cards or the plain grid
   (Cards/Grid). Each caught car gets a Pokémon-style card with a 3D model of its body style, painted the color
-  the cloud saw, "SEEN ×N" and its rarity. Finishes: common = plain, uncommon = reverse holo, rare = holo,
-  Gemini discoveries = full art, rares seen only once = special illustration rare. Tap a card to hold it, and
-  drag to tilt it: the foil (`Campi/Cardex/Foil.metal`) and glare follow. The models are Kenney's Car Kit (CC0),
-  split into paint and trim by `tools/make_car_models.py`. The on-device model picks the body style, and a
-  keyword guess covers the plain card.
+  the cloud saw, "SEEN ×N" and its rarity. Finishes: common = plain, uncommon = reverse holo, rare = holo, Gemini
+  discoveries = full art, rares seen only once = special illustration rare. Each card also gets a foil pattern
+  (sheen, cosmos, cracked ice, starlight, sequin, ripple, energy-symbol, etched, galaxy, ...) and an illustrated
+  scene (neon city, mountain pass, coast road, desert night, synthwave, aurora, deep space, ...) picked from its
+  label and body style, so a binder shows a mix; the scene's layers drift with the tilt. Tap a card to hold it,
+  and drag to tilt it: the foil (`Campi/Cardex/Foil.metal`) and glare follow. Each car is built on the phone from
+  its shape (`CampiKit/Cardex/CarShape.swift`): tuned proportions for well-known models (a Wrangler, a Mustang
+  and a Model 3 each get their own silhouette), else the body style's preset, which the on-device model picks.
 - **Cardex cards** (collection item page and sighting detail): a trading card per label, written on the phone by
   Apple's on-device model (Foundation Models): name, type (Commuter, Work Truck, JDM, ...), three playful 1–10
   ratings and a line of flavor text, never specs. Generated once per label and cached (SwiftData); "Regenerate
@@ -79,7 +82,7 @@ xcodebuild -downloadComponent MetalToolchain   # once: Xcode 26+ needs it for th
 xcodegen generate                       # after editing project.yml or adding files
 (cd CampiKit && swift test)             # package tests on the Mac
 python3 tools/mock_server.py &          # for the UI tests and running the app in the simulator
-python3 tools/make_car_models.py        # only to rebuild Campi/Resources/Cars/*.usdz
+# debug builds: -cardexGallery <page> shows sample cards for every holo pattern and scene, 4 per page
 xcodebuild -project Campi.xcodeproj -scheme Campi \
   -destination 'platform=iOS Simulator,name=iPhone 18 Pro Max' -collect-test-diagnostics never test
 ```

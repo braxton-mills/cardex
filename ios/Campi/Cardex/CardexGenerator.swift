@@ -17,14 +17,15 @@ struct GeneratedCard {
     @Guide(description: "One playful line of flavor text, at most 90 characters, with no numbers or specifications")
     var flavor: String
 
-    @Guide(description: "The vehicle's body shape. offRoader is a boxy 4x4 like a Wrangler or Bronco; boxTruck covers box trucks, buses and big work trucks")
+    @Guide(description: "The vehicle's body shape. suv is a crossover like a RAV4; fullSizeSUV is a big one like a Tahoe; offRoader is a boxy 4x4 like a Wrangler or Bronco; van is a minivan; cargoVan is a work van like a Sprinter; boxTruck covers box, dump and other big work trucks")
     var bodyStyle: GeneratedBodyStyle
 }
 
 /// `CarBodyStyle`, for the model to pick from.
 @Generable
 enum GeneratedBodyStyle: String {
-    case sedan, coupe, suv, offRoader, hatchback, wagon, pickup, van, boxTruck
+    case sedan, coupe, supercar, suv, fullSizeSUV, offRoader, hatchback, wagon, pickup, van, cargoVan, boxTruck,
+         bus, motorcycle
 }
 
 @Generable

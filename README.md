@@ -66,8 +66,10 @@ separate low-priority process, so a failed render never touches capture. All chi
 stopping the supervisor kills them too.
 
 Pipeline: q90 JPEG snapshots from the Pi saved as-is -> drop night frames -> split at capture gaps (hard cuts) ->
-level 9 deg and crop to 4:3 with no black corners (1600x1200 of the 1920x1440 frame) -> luminance deflicker ->
-scale to 1440x1080 -> RIFE 2x on the RTX 5070 (rife-ncnn-vulkan, Vulkan) per segment -> timestamp ->
+night dimming of `[image] dim_region` (the water treatment plant's floodlights) -> no leveling (level_deg 0,
+so the full 1920x1440 frame is used) -> luminance deflicker ->
+scale to 1440x1080 -> night temporal denoise (`[night] denoise_frames`, a 3-frame mean on dark frames) ->
+RIFE 2x on the RTX 5070 (rife-ncnn-vulkan, Vulkan) per segment -> timestamp ->
 h264_nvenc CQ 19, yuv420p, bt709, +faststart.
 
 Setup from scratch: `powershell -ExecutionPolicy Bypass -File install.ps1`.
@@ -77,6 +79,12 @@ Setup from scratch: `powershell -ExecutionPolicy Bypass -File install.ps1`.
   mode, `/stream.mjpg` (hardware MJPEG, 30 fps, quality HIGH; the Pi 4 encoder caps at 25 Mbps) and
   `/snapshot.jpg` (software JPEG, q90 by default, `?q=NN` to override), which the timelapse uses.
   1920 is the widest the Pi 4 hardware JPEG encoder can produce (2028 came out as a cropped 1920x1520).
+- Night exposure: the IMX477's normal AE mode is extended so that, once gain reaches 8, exposures stretch up to
+  1 s (`NIGHT_MAX_EXPOSURE_US`) and then gain rises to 16. Daylight and dusk are unchanged at 30 fps; in the dark the
+  stream slows to match (about 1 fps). At the stock 1/30 s cap night frames had a mean luma of about 1 (black);
+  with it, an overcast night is about 30. `/snapshot.jpg` reports exposure, gain and WB in an `X-Exposure` header.
+- White balance is locked to daylight (`WB_KELVIN` 5600, gains from the sensor's calibrated `ct_curve`, about
+  3.10/1.43) so timelapses don't shift color as auto WB chases clouds, dusk and streetlights. Nights come out amber.
 - Runs as a systemd user service (no sudo; starts at boot because linger is enabled):
   `systemctl --user status|restart campi-stream` and `journalctl --user -u campi-stream`.
 - If `campi.local` stops resolving or the Pi gets a new DHCP address, capture finds the Pi by its MAC
@@ -159,7 +167,8 @@ How it behaves:
   or GPU error restarts it with backoff (10 s doubling to 10 min); a hang (no main-loop progress for 2 min) is killed.
   Capture and renders are separate processes and never wait on it. The cuda backend refuses to run without CUDA.
 - Reads the stream at ~30 fps (about 23 Mbit/s over the Pi's Wi-Fi), runs YOLO at `detect_fps`, uses the same Pi
-  host lookup as capture (`stream.pi_mac`), pauses while the frame is darker than `[night] luma_threshold`.
+  host lookup as capture (`stream.pi_mac`), pauses while the frame is darker than `[night] luma_threshold`
+  or the stream drops below 4 fps (night exposures; too blurred to track).
 - A pass ends `max(lost_after_s, post_roll_s)` after the vehicle was last seen. Tracker ID switches on fast cars
   are stitched back into one pass by position and velocity. Optional `roi` polygon: only vehicles whose center
   enters it count.

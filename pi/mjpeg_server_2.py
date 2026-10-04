@@ -18,6 +18,13 @@ from picamera2.encoders import MJPEGEncoder, Quality
 from picamera2.outputs import FileOutput
 
 SNAPSHOT_QUALITY = 90
+# Night: once gain reaches 8, auto-exposure may stretch a frame up to this long (the stream's fps drops to match;
+# daylight and dusk stay at 30 fps). At the stock 1/30 s cap night frames were black (mean luma ~1).
+NIGHT_MAX_EXPOSURE_US = 1_000_000
+SENSOR = "imx477"  # HQ camera; named here because asking libcamera starts it with the stock tuning first
+# White balance is locked to daylight so timelapses don't shift color as auto WB chases clouds, dusk and streetlights
+# (night scenes come out warm, as they look). Gains come from the sensor's calibrated ct_curve at this temperature.
+WB_KELVIN = 5600
 
 PAGE = """\
 <html>
@@ -52,10 +59,13 @@ def snapshot(quality):
         request = picam2.capture_request()
         try:
             arr = request.make_array("main")
+            meta = request.get_metadata()
         finally:
             request.release()
     # XBGR8888 arrives as [R, G, B, 255] per pixel.
-    return simplejpeg.encode_jpeg(arr, quality=quality, colorspace="RGBX", colorsubsampling="420")
+    jpeg = simplejpeg.encode_jpeg(arr, quality=quality, colorspace="RGBX", colorsubsampling="420")
+    r, b = meta.get('ColourGains', (0, 0))
+    return jpeg, f"{meta.get('ExposureTime', 0)} us, gain {meta.get('AnalogueGain', 0):.2f}, wb {r:.2f}/{b:.2f}"
 
 
 class StreamingHandler(server.BaseHTTPRequestHandler):
@@ -76,7 +86,7 @@ class StreamingHandler(server.BaseHTTPRequestHandler):
             try:
                 q = int(parse_qs(url.query).get('q', [SNAPSHOT_QUALITY])[0])
                 t0 = time.monotonic()
-                jpeg = snapshot(max(10, min(q, 100)))
+                jpeg, exposure = snapshot(max(10, min(q, 100)))
                 ms = (time.monotonic() - t0) * 1000
             except Exception as e:
                 logging.exception('snapshot failed')
@@ -87,6 +97,7 @@ class StreamingHandler(server.BaseHTTPRequestHandler):
             self.send_header('Content-Length', len(jpeg))
             self.send_header('Cache-Control', 'no-cache, private')
             self.send_header('X-Capture-Ms', f'{ms:.0f}')
+            self.send_header('X-Exposure', exposure)
             self.end_headers()
             self.wfile.write(jpeg)
         elif self.path == '/stream.mjpg':
@@ -124,8 +135,34 @@ class StreamingServer(socketserver.ThreadingMixIn, server.HTTPServer):
     daemon_threads = True
 
 
-picam2 = Picamera2()
-picam2.configure(picam2.create_video_configuration(main={"size": (1920, 1440)}, sensor={"output_size": (2028, 1520)}))
+def night_tuning():
+    """The sensor's stock tuning with the normal exposure mode extended to NIGHT_MAX_EXPOSURE_US."""
+    tuning = Picamera2.load_tuning_file(SENSOR + ".json")
+    agc = Picamera2.find_tuning_algo(tuning, "rpi.agc")
+    for ch in agc.get("channels", [agc]):
+        ch["exposure_modes"]["normal"] = {
+            "shutter": [100, 10000, 30000, 33333, NIGHT_MAX_EXPOSURE_US, NIGHT_MAX_EXPOSURE_US],
+            "gain": [1.0, 2.0, 4.0, 8.0, 8.0, 16.0]}
+    return tuning
+
+
+def wb_gains(tuning, kelvin):
+    """(red, blue) colour gains for a grey under `kelvin` light, interpolated from the tuning's ct_curve."""
+    c = Picamera2.find_tuning_algo(tuning, "rpi.awb")["ct_curve"]
+    pts = [c[i:i + 3] for i in range(0, len(c), 3)]  # [colour temperature, r/g, b/g]
+    kelvin = min(max(kelvin, pts[0][0]), pts[-1][0])
+    for (k0, r0, b0), (k1, r1, b1) in zip(pts, pts[1:]):
+        if k0 <= kelvin <= k1:
+            f = (kelvin - k0) / (k1 - k0) if k1 > k0 else 0.0
+            return 1 / (r0 + f * (r1 - r0)), 1 / (b0 + f * (b1 - b0))
+
+
+tuning = night_tuning()
+WB_GAINS = wb_gains(tuning, WB_KELVIN)
+picam2 = Picamera2(tuning=tuning)
+picam2.configure(picam2.create_video_configuration(main={"size": (1920, 1440)}, sensor={"output_size": (2028, 1520)},
+                                                   controls={"FrameDurationLimits": (33333, NIGHT_MAX_EXPOSURE_US),
+                                                             "AwbEnable": False, "ColourGains": WB_GAINS}))
 output = StreamingOutput()
 picam2.start_recording(MJPEGEncoder(), FileOutput(output), quality=Quality.HIGH)
 

@@ -49,6 +49,8 @@ MAX_CLIP_S = 60       # clips stop this long after a vehicle is first seen (boun
 SPOT_EMPTY_S = 600    # a stationary spot is forgotten after it has been empty this long
 SPOT_IOU = 0.5
 NIGHT_CHECK_S = 60
+# The Pi stretches exposures at night (up to 1 s); below this frame rate the frames are too blurred to track
+SLOW_STREAM_FPS = 4
 CPU_THREADS = 2       # torch / OpenCV threads in the worker
 STREAM_ERRORS = (OSError, StreamError, http.client.HTTPException, StopIteration)
 
@@ -808,6 +810,7 @@ def run_worker(cfg, check_only: bool = False, prep: bool = False) -> int:
                 hb.set(phase="running", connected=True, host=host, loop_ts=time.time())
                 log.info("connected: %s (%s)", st.url, host)
                 next_night_check = 0.0
+                recent = deque(maxlen=8)
                 while True:
                     data, length = next(frames)
                     ts = time.time()
@@ -819,11 +822,18 @@ def run_worker(cfg, check_only: bool = False, prep: bool = False) -> int:
                         pipe.flush(last_frame, "stream gap")
                     last_frame = ts
                     backoff = st.backoff_initial_s
+                    recent.append(ts)
+                    if s.pause_at_night:
+                        if len(recent) < recent.maxlen:
+                            continue  # rate unknown yet (~0.25 s at 30 fps): don't feed night frames to tracking
+                        fps = (len(recent) - 1) / max(recent[-1] - recent[0], 1e-3)
+                        if fps < SLOW_STREAM_FPS:
+                            raise _Dark(f"stream at {fps:.1f} fps (long night exposures)")
                     if s.pause_at_night and ts >= next_night_check:
                         next_night_check = ts + NIGHT_CHECK_S
                         luma = validate(data, length, 0, 0)
                         if luma is not None and luma < cfg.night.luma_threshold:
-                            raise _Dark(luma)
+                            raise _Dark(f"luma {luma:.0f} < {cfg.night.luma_threshold}")
                     pipe.process(ts, data)
                     hb.set(last_sighting_ts=pipe.last_sighting_ts)
             except _Dark as d:
@@ -831,8 +841,7 @@ def run_worker(cfg, check_only: bool = False, prep: bool = False) -> int:
                     resp.close()
                 pipe.flush(time.time(), "dark")
                 if hb.data["phase"] != "paused_dark":
-                    log.info("dark (luma %.0f < %d): paused; checking every %ds", d.luma, cfg.night.luma_threshold,
-                             NIGHT_CHECK_S)
+                    log.info("dark (%s): paused; checking every %ds", d.why, NIGHT_CHECK_S)
                 hb.set(phase="paused_dark", connected=False)
                 last_frame = None
                 _sleep(hb, NIGHT_CHECK_S, classifier)
@@ -862,9 +871,9 @@ def run_worker(cfg, check_only: bool = False, prep: bool = False) -> int:
 
 
 class _Dark(Exception):
-    def __init__(self, luma):
-        super().__init__(f"dark ({luma:.0f})")
-        self.luma = luma
+    def __init__(self, why: str):
+        super().__init__(f"dark ({why})")
+        self.why = why
 
 
 def _sleep(hb: Heartbeat, seconds: float, classifier=None):

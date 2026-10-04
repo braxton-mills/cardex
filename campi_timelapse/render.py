@@ -17,7 +17,7 @@ import numpy as np
 from . import frames as fr
 from . import render_index
 from .config import NO_WINDOW, FileLock, read_json, side_log, write_json
-from .imageproc import apply_gain, crop_dims, deflicker_gains, level
+from .imageproc import LightDimmer, apply_gain, crop_dims, deflicker_gains, level, night_weight, temporal_denoise
 from .rife import GpuMonitor, Rife, gpu_sample, summarize
 
 log = logging.getLogger("render")
@@ -118,6 +118,8 @@ def render_frames(cfg, frames: list[fr.Frame], out_path: Path, job_name: str, en
     # Downscale before RIFE when the crop is bigger than the output (less GPU work, same result);
     # otherwise interpolate at native size and upscale afterwards.
     pre_scale = cw > w
+    dim = LightDimmer(getattr(cfg.image, "dim_region", []), getattr(cfg.image, "dim_strength", 0.0))
+    denoise_radius = max(0, int(getattr(cfg.night, "denoise_frames", 1)) - 1) // 2
 
     job = cfg.paths.work / job_name
     shutil.rmtree(job, ignore_errors=True)
@@ -141,17 +143,23 @@ def render_frames(cfg, frames: list[fr.Frame], out_path: Path, job_name: str, en
             ind = sdir / "in"
             ind.mkdir(parents=True)
             kept = []
-            for f, g in zip(seg, gains):
-                img = cv2.imread(str(f.path), cv2.IMREAD_COLOR)
-                if img is None:
-                    log.warning("unreadable frame skipped: %s", f.path)
-                    continue
-                img = level(img, cfg.image.rotation, cfg.image.level_deg, w, h)
-                if img.shape[1] != cw:  # a frame with a different source size slipped in
-                    img = cv2.resize(img, (cw, ch), interpolation=cv2.INTER_AREA)
-                if pre_scale:
-                    img = cv2.resize(img, (w, h), interpolation=cv2.INTER_AREA)
-                img = apply_gain(img, float(g))
+
+            def prepared(seg=seg, gains=gains):
+                for f, g in zip(seg, gains):
+                    img = cv2.imread(str(f.path), cv2.IMREAD_COLOR)
+                    if img is None:
+                        log.warning("unreadable frame skipped: %s", f.path)
+                        continue
+                    img = dim(img, f.luma)
+                    img = level(img, cfg.image.rotation, cfg.image.level_deg, w, h)
+                    if img.shape[1] != cw:  # a frame with a different source size slipped in
+                        img = cv2.resize(img, (cw, ch), interpolation=cv2.INTER_AREA)
+                    if pre_scale:
+                        img = cv2.resize(img, (w, h), interpolation=cv2.INTER_AREA)
+                    yield f, apply_gain(img, float(g))
+
+            # Within a segment only: never average across a capture gap
+            for f, img in temporal_denoise(prepared(), denoise_radius, lambda f: night_weight(f.luma)):
                 cv2.imwrite(str(ind / f"{len(kept):08d}.png"), img, [cv2.IMWRITE_PNG_COMPRESSION, 1])
                 kept.append(f)
             n = len(kept)

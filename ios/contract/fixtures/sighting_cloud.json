@@ -1,0 +1,50 @@
+{
+  "id": "224065ed-6136-4cbf-a7e2-0a3d123419d6",
+  "kind": "vehicle",
+  "started_at": "2026-10-01T11:30:00.000-05:00",
+  "ended_at": "2026-10-01T11:30:04.479-05:00",
+  "day": "2026-10-01",
+  "yolo_class": "car",
+  "label": "Rivian R1S",
+  "make": "Rivian",
+  "model": "R1S",
+  "confidence": 0.9508,
+  "decided_by": "cloud",
+  "machine": {
+    "label": "Rivian R1S",
+    "make": "Rivian",
+    "model": "R1S",
+    "confidence": 0.9508,
+    "source": "cloud"
+  },
+  "siglip": {
+    "label": "Subaru Outback",
+    "confidence": 0.2099
+  },
+  "runner_ups": [
+    {
+      "label": "Subaru Outback",
+      "p": 0.095
+    },
+    {
+      "label": "Chevrolet Tahoe",
+      "p": 0.0412
+    }
+  ],
+  "year_range": "2016-2019",
+  "color": "white",
+  "unsure": true,
+  "stationary": false,
+  "direction": "LR",
+  "cloud_status": "done",
+  "starred": false,
+  "hidden": false,
+  "correction": null,
+  "track_frames": 44,
+  "max_box_px": 311,
+  "media": {
+    "crop": "/media/sightings/2026-10-01/113000_224065ed_subaru-outback_crop.jpg?d=dev_k3j9q2m8x4c7v1bz&exp=1791099000&sig=S6o2Wgp1ewJ5diOwE_xTDlheyzApOt222wHiRrv95oY",
+    "frame": "/media/sightings/2026-10-01/113000_224065ed_subaru-outback_frame.jpg?d=dev_k3j9q2m8x4c7v1bz&exp=1791099000&sig=f9Jas4POG7yYK2MCBrv25cf0fRVadmh9JG8hzpJRRGg",
+    "clip": null
+  }
+}

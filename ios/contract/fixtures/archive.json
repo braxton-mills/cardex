@@ -1,0 +1,35 @@
+{
+  "enabled": true,
+  "items": [
+    {
+      "part": 3,
+      "size_bytes": 1234567890,
+      "modified_at": "2026-10-03T14:25:00.000-05:00",
+      "duration_s": null,
+      "current": true,
+      "media": {
+        "video": null
+      }
+    },
+    {
+      "part": 2,
+      "size_bytes": 7846365,
+      "modified_at": "2026-09-24T14:30:00.000-05:00",
+      "duration_s": 30.0,
+      "current": false,
+      "media": {
+        "video": "/media/archive/campi_archive_002.mp4?d=dev_k3j9q2m8x4c7v1bz&exp=1791099000&sig=j-pbgMLnTY-d8nrhUhwC8q_Ca4KhQV6MTJjGoAMjs3Q"
+      }
+    },
+    {
+      "part": 1,
+      "size_bytes": 7846365,
+      "modified_at": "2026-09-03T14:30:00.000-05:00",
+      "duration_s": 30.0,
+      "current": false,
+      "media": {
+        "video": "/media/archive/campi_archive_001.mp4?d=dev_k3j9q2m8x4c7v1bz&exp=1791099000&sig=8nzI4gM-y4ax6SgEAoNiMBWBdjW7jScgG5p8OUkoe38"
+      }
+    }
+  ]
+}

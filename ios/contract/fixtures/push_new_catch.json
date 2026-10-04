@@ -1,0 +1,20 @@
+{
+  "aps": {
+    "alert": {
+      "title": "New catch: Jeep Grand Cherokee",
+      "body": "1:49 PM · car"
+    },
+    "sound": "default",
+    "mutable-content": 1,
+    "thread-id": "sightings",
+    "category": "SIGHTING"
+  },
+  "campi": {
+    "type": "new_catch",
+    "sighting_id": "59a54a7b-b1fe-408f-9712-42425051c1cc",
+    "label": "Jeep Grand Cherokee",
+    "day": "2026-10-03",
+    "crop": "/media/sightings/2026-10-03/134908_59a54a7b_jeep-grand-cherokee_crop.jpg",
+    "alert": null
+  }
+}

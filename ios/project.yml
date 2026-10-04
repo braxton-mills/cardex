@@ -1,0 +1,165 @@
+name: Campi
+options:
+  bundleIdPrefix: com.braxtonmills
+  deploymentTarget:
+    iOS: "26.0"
+  developmentLanguage: en
+  createIntermediateGroups: true
+  groupSortPosition: top
+
+settings:
+  base:
+    DEVELOPMENT_TEAM: ""
+    CODE_SIGN_STYLE: Automatic
+    SWIFT_VERSION: "6.0"
+    SWIFT_STRICT_CONCURRENCY: complete
+    MARKETING_VERSION: "0.1.0"
+    CURRENT_PROJECT_VERSION: "1"
+    TARGETED_DEVICE_FAMILY: "1"
+    ENABLE_USER_SCRIPT_SANDBOXING: YES
+    DEAD_CODE_STRIPPING: YES
+
+packages:
+  CampiKit:
+    path: CampiKit
+
+targets:
+  Campi:
+    type: application
+    platform: iOS
+    sources:
+      - path: Campi
+    dependencies:
+      - package: CampiKit
+      - target: CampiNotificationService
+      - target: CampiWidget
+    info:
+      path: Campi/Info.plist
+      properties:
+        CFBundleDisplayName: Campi
+        CFBundleShortVersionString: $(MARKETING_VERSION)
+        CFBundleVersion: $(CURRENT_PROJECT_VERSION)
+        UILaunchScreen: {}
+        UIApplicationSceneManifest:
+          UIApplicationSupportsMultipleScenes: false
+        UISupportedInterfaceOrientations:
+          - UIInterfaceOrientationPortrait
+          - UIInterfaceOrientationLandscapeLeft
+          - UIInterfaceOrientationLandscapeRight
+        CFBundleURLTypes:
+          - CFBundleURLName: com.braxtonmills.campi
+            CFBundleURLSchemes: [campi]
+        ITSAppUsesNonExemptEncryption: false
+        NSPhotoLibraryAddUsageDescription: Campi saves timelapse clips, daily videos and sighting crops you choose to your photo library.
+        NSLocalNetworkUsageDescription: Campi connects to a test server on your local network during development.
+        NSAppTransportSecurity:
+          NSAllowsLocalNetworking: true
+        CampiAppGroup: group.com.braxtonmills.campi
+        CampiKeychainGroup: $(AppIdentifierPrefix)com.braxtonmills.campi.shared
+    entitlements:
+      path: Campi/Campi.entitlements
+      properties:
+        aps-environment: development
+        com.apple.security.application-groups:
+          - group.com.braxtonmills.campi
+        keychain-access-groups:
+          - $(AppIdentifierPrefix)com.braxtonmills.campi.shared
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: com.braxtonmills.campi
+        ASSETCATALOG_COMPILER_APPICON_NAME: AppIcon
+        ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME: AccentColor
+        INFOPLIST_KEY_UILaunchScreen_Generation: YES
+
+  # Attaches the crop to Campi pushes (api-contract §9.3) and hands the catch to the widget.
+  CampiNotificationService:
+    type: app-extension
+    platform: iOS
+    sources:
+      - path: CampiNotificationService
+    dependencies:
+      - package: CampiKit
+    info:
+      path: CampiNotificationService/Info.plist
+      properties:
+        CFBundleDisplayName: Campi Notifications
+        CFBundleShortVersionString: $(MARKETING_VERSION)
+        CFBundleVersion: $(CURRENT_PROJECT_VERSION)
+        NSExtension:
+          NSExtensionPointIdentifier: com.apple.usernotifications.service
+          NSExtensionPrincipalClass: $(PRODUCT_MODULE_NAME).NotificationService
+        NSAppTransportSecurity:
+          NSAllowsLocalNetworking: true
+        CampiAppGroup: group.com.braxtonmills.campi
+        CampiKeychainGroup: $(AppIdentifierPrefix)com.braxtonmills.campi.shared
+    entitlements:
+      path: CampiNotificationService/CampiNotificationService.entitlements
+      properties:
+        com.apple.security.application-groups:
+          - group.com.braxtonmills.campi
+        keychain-access-groups:
+          - $(AppIdentifierPrefix)com.braxtonmills.campi.shared
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: com.braxtonmills.campi.NotificationService
+
+  # Home Screen widget: latest catch and today's count, "PC unreachable" with the last good data.
+  CampiWidget:
+    type: app-extension
+    platform: iOS
+    sources:
+      - path: CampiWidget
+    dependencies:
+      - package: CampiKit
+      - sdk: WidgetKit.framework
+      - sdk: SwiftUI.framework
+    info:
+      path: CampiWidget/Info.plist
+      properties:
+        CFBundleDisplayName: Campi
+        CFBundleShortVersionString: $(MARKETING_VERSION)
+        CFBundleVersion: $(CURRENT_PROJECT_VERSION)
+        NSExtension:
+          NSExtensionPointIdentifier: com.apple.widgetkit-extension
+        NSAppTransportSecurity:
+          NSAllowsLocalNetworking: true
+        CampiAppGroup: group.com.braxtonmills.campi
+        CampiKeychainGroup: $(AppIdentifierPrefix)com.braxtonmills.campi.shared
+    entitlements:
+      path: CampiWidget/CampiWidget.entitlements
+      properties:
+        com.apple.security.application-groups:
+          - group.com.braxtonmills.campi
+        keychain-access-groups:
+          - $(AppIdentifierPrefix)com.braxtonmills.campi.shared
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: com.braxtonmills.campi.Widget
+
+  CampiUITests:
+    type: bundle.ui-testing
+    platform: iOS
+    sources:
+      - path: CampiUITests
+    dependencies:
+      - target: Campi
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: com.braxtonmills.campi.uitests
+        GENERATE_INFOPLIST_FILE: YES
+
+schemes:
+  Campi:
+    build:
+      targets:
+        Campi: all
+    run:
+      config: Debug
+    test:
+      config: Debug
+      gatherCoverageData: false
+      targets:
+        - package: CampiKit/CampiKitTests
+        - CampiUITests
+    archive:
+      config: Release

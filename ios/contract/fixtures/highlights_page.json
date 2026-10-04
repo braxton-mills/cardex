@@ -1,0 +1,273 @@
+{
+  "items": [
+    {
+      "id": "sighting:59a54a7b-b1fe-408f-9712-42425051c1cc",
+      "types": [
+        "new_catch",
+        "rare"
+      ],
+      "at": "2026-10-03T13:49:08.431-05:00",
+      "day": "2026-10-03",
+      "sighting": {
+        "id": "59a54a7b-b1fe-408f-9712-42425051c1cc",
+        "kind": "vehicle",
+        "started_at": "2026-10-03T13:49:08.431-05:00",
+        "ended_at": "2026-10-03T13:49:13.120-05:00",
+        "day": "2026-10-03",
+        "yolo_class": "car",
+        "label": "Jeep Grand Cherokee",
+        "make": "Jeep",
+        "model": "Grand Cherokee",
+        "confidence": 0.9688,
+        "decided_by": "cloud",
+        "machine": {
+          "label": "Jeep Grand Cherokee",
+          "make": "Jeep",
+          "model": "Grand Cherokee",
+          "confidence": 0.9688,
+          "source": "cloud"
+        },
+        "siglip": {
+          "label": "Jeep Grand Cherokee",
+          "confidence": 0.5176
+        },
+        "runner_ups": [
+          {
+            "label": "Ford F-150",
+            "p": 0.2817
+          },
+          {
+            "label": "dump truck",
+            "p": 0.2068
+          }
+        ],
+        "year_range": "2019-2023",
+        "color": "green",
+        "unsure": false,
+        "stationary": false,
+        "direction": "RL",
+        "cloud_status": "pending",
+        "starred": false,
+        "hidden": false,
+        "correction": null,
+        "track_frames": 46,
+        "max_box_px": 681,
+        "media": {
+          "crop": "/media/sightings/2026-10-03/134908_59a54a7b_jeep-grand-cherokee_crop.jpg?d=dev_k3j9q2m8x4c7v1bz&exp=1791099000&sig=uYst6Kbb1VqkSgiAIbESVl0RZ-yfrrYJJH0GKIGwM3c",
+          "frame": "/media/sightings/2026-10-03/134908_59a54a7b_jeep-grand-cherokee_frame.jpg?d=dev_k3j9q2m8x4c7v1bz&exp=1791099000&sig=V9oSd-ng22oF27dSg-7OPWMWMp9vccqPgDeRnuwMeeA",
+          "clip": "/media/sightings/2026-10-03/134908_59a54a7b_jeep-grand-cherokee.mp4?d=dev_k3j9q2m8x4c7v1bz&exp=1791099000&sig=Ai2vemlGJVvleLCLJQsnGlKBZ8MREvax1NFa1OsTB7A"
+        }
+      },
+      "clip": null,
+      "daily": null,
+      "window": null
+    },
+    {
+      "id": "sighting:3b618676-26bb-4dbd-ad1c-9af0153e7c2a",
+      "types": [
+        "starred"
+      ],
+      "at": "2026-10-03T11:31:38.105-05:00",
+      "day": "2026-10-03",
+      "sighting": {
+        "id": "3b618676-26bb-4dbd-ad1c-9af0153e7c2a",
+        "kind": "vehicle",
+        "started_at": "2026-10-03T11:31:38.105-05:00",
+        "ended_at": "2026-10-03T11:31:39.671-05:00",
+        "day": "2026-10-03",
+        "yolo_class": "car",
+        "label": "Toyota GR86",
+        "make": "Toyota",
+        "model": "GR86",
+        "confidence": 0.795,
+        "decided_by": "siglip",
+        "machine": {
+          "label": "Toyota GR86",
+          "make": "Toyota",
+          "model": "GR86",
+          "confidence": 0.795,
+          "source": "siglip"
+        },
+        "siglip": {
+          "label": "Toyota GR86",
+          "confidence": 0.795
+        },
+        "runner_ups": [
+          {
+            "label": "Mazda3",
+            "p": 0.1937
+          },
+          {
+            "label": "dump truck",
+            "p": 0.1097
+          }
+        ],
+        "year_range": null,
+        "color": null,
+        "unsure": false,
+        "stationary": false,
+        "direction": "RL",
+        "cloud_status": null,
+        "starred": true,
+        "hidden": false,
+        "correction": null,
+        "track_frames": 15,
+        "max_box_px": 218,
+        "media": {
+          "crop": "/media/sightings/2026-10-03/113138_3b618676_toyota-gr86_crop.jpg?d=dev_k3j9q2m8x4c7v1bz&exp=1791099000&sig=1PhSoxhzX6aGLDXA5Q18vxKDHVb2aS2a6MXuT-4xc7o",
+          "frame": "/media/sightings/2026-10-03/113138_3b618676_toyota-gr86_frame.jpg?d=dev_k3j9q2m8x4c7v1bz&exp=1791099000&sig=HD1vp8ite4IKwsCfF-pPESx-_x1Sc8hGszIGT2qGRBQ",
+          "clip": "/media/sightings/2026-10-03/113138_3b618676_toyota-gr86.mp4?d=dev_k3j9q2m8x4c7v1bz&exp=1791099000&sig=DcGHRZ2sHSthcR3xea81qfXOdVI8xPycwGo4828KuP0"
+        }
+      },
+      "clip": null,
+      "daily": null,
+      "window": null
+    },
+    {
+      "id": "sighting:1df9fd78-9c65-4938-ab05-37e65affb229",
+      "types": [
+        "rare"
+      ],
+      "at": "2026-10-03T11:07:45.705-05:00",
+      "day": "2026-10-03",
+      "sighting": {
+        "id": "1df9fd78-9c65-4938-ab05-37e65affb229",
+        "kind": "vehicle",
+        "started_at": "2026-10-03T11:07:45.705-05:00",
+        "ended_at": "2026-10-03T11:07:48.405-05:00",
+        "day": "2026-10-03",
+        "yolo_class": "car",
+        "label": "Toyota Corolla",
+        "make": "Toyota",
+        "model": "Corolla",
+        "confidence": 0.8934,
+        "decided_by": "cloud",
+        "machine": {
+          "label": "Toyota Corolla",
+          "make": "Toyota",
+          "model": "Corolla",
+          "confidence": 0.8934,
+          "source": "cloud"
+        },
+        "siglip": {
+          "label": "Toyota Corolla",
+          "confidence": 0.3927
+        },
+        "runner_ups": [
+          {
+            "label": "Tesla Model 3",
+            "p": 0.2763
+          },
+          {
+            "label": "Ford Bronco",
+            "p": 0.135
+          }
+        ],
+        "year_range": "2014-2019",
+        "color": "blue",
+        "unsure": false,
+        "stationary": false,
+        "direction": "RL",
+        "cloud_status": "done",
+        "starred": false,
+        "hidden": false,
+        "correction": null,
+        "track_frames": 27,
+        "max_box_px": 501,
+        "media": {
+          "crop": "/media/sightings/2026-10-03/110745_1df9fd78_toyota-corolla_crop.jpg?d=dev_k3j9q2m8x4c7v1bz&exp=1791099000&sig=MmX8QXCTrO-b2NUfpOelaxdBEOFhpJJv_lgXr7pOVaU",
+          "frame": "/media/sightings/2026-10-03/110745_1df9fd78_toyota-corolla_frame.jpg?d=dev_k3j9q2m8x4c7v1bz&exp=1791099000&sig=73qkIj4T571NbH33jxcfnxs-OAzVoIMOSAX-FNNbRUs",
+          "clip": "/media/sightings/2026-10-03/110745_1df9fd78_toyota-corolla.mp4?d=dev_k3j9q2m8x4c7v1bz&exp=1791099000&sig=53GvyzdcDegQsMYMFnWkS9W_Yx_tW8nuzIsbQAgqiXM"
+        }
+      },
+      "clip": null,
+      "daily": null,
+      "window": null
+    },
+    {
+      "id": "clip:2026-10-03_0810",
+      "types": [
+        "starred"
+      ],
+      "at": "2026-10-03T08:10:00.000-05:00",
+      "day": "2026-10-03",
+      "sighting": null,
+      "clip": {
+        "id": "2026-10-03_0810",
+        "day": "2026-10-03",
+        "window_start": "2026-10-03T08:10:00.000-05:00",
+        "window_end": "2026-10-03T08:20:00.000-05:00",
+        "exact_window": true,
+        "duration_s": 10.0,
+        "size_bytes": 2631716,
+        "modified_at": "2026-10-03T08:21:15.000-05:00",
+        "expires_after": "2026-10-04T08:21:15.000-05:00",
+        "sightings_count": 0,
+        "starred": true,
+        "media": {
+          "video": "/media/clips/campi_2026-10-03_0810.mp4?d=dev_k3j9q2m8x4c7v1bz&exp=1791099000&sig=Alhj0xIfjmYmiqgqnDQo96YC-eO3m4nl8m-Cy2dZVZY",
+          "poster": "/media/posters/clips/2026-10-03_0810.jpg?d=dev_k3j9q2m8x4c7v1bz&exp=1791099000&sig=Om2OUDfgb4_xka4R3QR1RjmDjrh0u5iUMIPd68dxeKc"
+        }
+      },
+      "daily": null,
+      "window": null
+    },
+    {
+      "id": "daily:2026-10-02",
+      "types": [
+        "daily"
+      ],
+      "at": "2026-10-03T00:00:00.000-05:00",
+      "day": "2026-10-02",
+      "sighting": null,
+      "clip": null,
+      "daily": {
+        "day": "2026-10-02",
+        "duration_s": 60.0,
+        "size_bytes": 15621072,
+        "modified_at": "2026-10-03T00:06:40.000-05:00",
+        "sightings_count": 23,
+        "starred": false,
+        "media": {
+          "video": "/media/daily/campi_daily_2026-10-02.mp4?d=dev_k3j9q2m8x4c7v1bz&exp=1791099000&sig=YjbrwZQU4CsbthaTOt4JK5-jzLoxubTq5yRYoLzs1Ag",
+          "poster": "/media/posters/daily/2026-10-02.jpg?d=dev_k3j9q2m8x4c7v1bz&exp=1791099000&sig=Alr92gM9ZFBf4hqcT0vEnWBnH2yBlfAYtA9h93VyHyg"
+        }
+      },
+      "window": null
+    },
+    {
+      "id": "window:2026-09-26_1120",
+      "types": [
+        "busiest"
+      ],
+      "at": "2026-09-26T11:20:00.000-05:00",
+      "day": "2026-09-26",
+      "sighting": null,
+      "clip": null,
+      "daily": null,
+      "window": {
+        "start": "2026-09-26T11:20:00.000-05:00",
+        "end": "2026-09-26T11:30:00.000-05:00",
+        "sightings_count": 3
+      }
+    },
+    {
+      "id": "window:2026-09-03_1230",
+      "types": [
+        "starred"
+      ],
+      "at": "2026-09-03T12:30:00.000-05:00",
+      "day": "2026-09-03",
+      "sighting": null,
+      "clip": null,
+      "daily": null,
+      "window": {
+        "start": "2026-09-03T12:30:00.000-05:00",
+        "end": "2026-09-03T12:40:00.000-05:00",
+        "sightings_count": 0
+      }
+    }
+  ],
+  "next_cursor": "WzE3OTA2MjM4MDAuMCwgIngiXQ",
+  "total": 126
+}

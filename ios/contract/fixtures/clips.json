@@ -1,0 +1,75 @@
+{
+  "latest_id": "2026-10-03_1410",
+  "retention_hours": 24,
+  "window_min": 10,
+  "items": [
+    {
+      "id": "2026-10-03_1410",
+      "day": "2026-10-03",
+      "window_start": "2026-10-03T14:10:00.000-05:00",
+      "window_end": "2026-10-03T14:20:00.000-05:00",
+      "exact_window": true,
+      "duration_s": 10.0,
+      "size_bytes": 2631716,
+      "modified_at": "2026-10-03T14:21:15.000-05:00",
+      "expires_after": "2026-10-04T14:21:15.000-05:00",
+      "sightings_count": 0,
+      "starred": false,
+      "media": {
+        "video": "/media/clips/campi_2026-10-03_1410.mp4?d=dev_k3j9q2m8x4c7v1bz&exp=1791099000&sig=5VQrKztmIxl4GntN4iK2Q4fVr_IkMQqFxnNJiK3vbUA",
+        "poster": "/media/posters/clips/2026-10-03_1410.jpg?d=dev_k3j9q2m8x4c7v1bz&exp=1791099000&sig=U4cN8RGVzVen0WX4Aph5RyeHQ8wq6MHrfLrRPyRvgtw"
+      }
+    },
+    {
+      "id": "2026-10-03_1400",
+      "day": "2026-10-03",
+      "window_start": "2026-10-03T14:00:00.000-05:00",
+      "window_end": "2026-10-03T14:10:00.000-05:00",
+      "exact_window": true,
+      "duration_s": 10.0,
+      "size_bytes": 2631716,
+      "modified_at": "2026-10-03T14:11:15.000-05:00",
+      "expires_after": "2026-10-04T14:11:15.000-05:00",
+      "sightings_count": 0,
+      "starred": false,
+      "media": {
+        "video": "/media/clips/campi_2026-10-03_1400.mp4?d=dev_k3j9q2m8x4c7v1bz&exp=1791099000&sig=CN0nSuFygr-hq1ePXtQauM8vsHvX1dAutJNjsIQCvO4",
+        "poster": "/media/posters/clips/2026-10-03_1400.jpg?d=dev_k3j9q2m8x4c7v1bz&exp=1791099000&sig=p4usDJUXHV9T0sWlB01smPRzaq9TQLcNWEHAiERNw1Q"
+      }
+    },
+    {
+      "id": "2026-10-03_1350",
+      "day": "2026-10-03",
+      "window_start": "2026-10-03T13:50:00.000-05:00",
+      "window_end": "2026-10-03T14:00:00.000-05:00",
+      "exact_window": true,
+      "duration_s": 10.0,
+      "size_bytes": 2631716,
+      "modified_at": "2026-10-03T14:01:15.000-05:00",
+      "expires_after": "2026-10-04T14:01:15.000-05:00",
+      "sightings_count": 0,
+      "starred": false,
+      "media": {
+        "video": "/media/clips/campi_2026-10-03_1350.mp4?d=dev_k3j9q2m8x4c7v1bz&exp=1791099000&sig=jcwhVNiIBqY6-itKLI3KcfkKMo0ExKedu7jk29zyVYg",
+        "poster": "/media/posters/clips/2026-10-03_1350.jpg?d=dev_k3j9q2m8x4c7v1bz&exp=1791099000&sig=RSVy_6aZMFld1KzmurvRYr8olU19zozS5FOxcOCDg_U"
+      }
+    },
+    {
+      "id": "2026-10-03_1340",
+      "day": "2026-10-03",
+      "window_start": "2026-10-03T13:40:00.000-05:00",
+      "window_end": "2026-10-03T13:50:00.000-05:00",
+      "exact_window": true,
+      "duration_s": 10.0,
+      "size_bytes": 2631716,
+      "modified_at": "2026-10-03T13:51:15.000-05:00",
+      "expires_after": "2026-10-04T13:51:15.000-05:00",
+      "sightings_count": 1,
+      "starred": false,
+      "media": {
+        "video": "/media/clips/campi_2026-10-03_1340.mp4?d=dev_k3j9q2m8x4c7v1bz&exp=1791099000&sig=_F2kp_BQqzqreV0R0SK82B-w7Gs2bXdJzMBvLtdCfSM",
+        "poster": "/media/posters/clips/2026-10-03_1340.jpg?d=dev_k3j9q2m8x4c7v1bz&exp=1791099000&sig=P8GzogL1_JjvEFkLOznr0wwAS5bEJbs1hOgIYkcUrKU"
+      }
+    }
+  ]
+}

@@ -1,0 +1,10 @@
+{
+  "ts": "2026-10-03T02:30:00.000-05:00",
+  "target": "none",
+  "clip_id": null,
+  "day": null,
+  "video": null,
+  "offset_s": null,
+  "approximate": false,
+  "reason": "no_frames"
+}

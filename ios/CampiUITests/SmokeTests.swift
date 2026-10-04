@@ -1,0 +1,757 @@
+import XCTest
+
+/// End-to-end smoke tests against the mock PC. Start it first:
+///     python3 tools/mock_server.py
+/// Skipped when the mock isn't running, so `xcodebuild test` still works without it.
+final class SmokeTests: XCTestCase {
+    static let mock = "http://127.0.0.1:8765"
+
+    override func setUp() async throws {
+        continueAfterFailure = false
+        try await Self.requireMock()
+    }
+
+    static func requireMock() async throws {
+        var req = URLRequest(url: URL(string: mock + "/api/status")!, timeoutInterval: 2)
+        req.httpMethod = "GET"
+        do {
+            let (_, resp) = try await URLSession.shared.data(for: req)
+            guard (resp as? HTTPURLResponse)?.statusCode == 401 else { throw XCTSkip("unexpected answer from \(mock)") }
+        } catch let skip as XCTSkip {
+            throw skip
+        } catch {
+            throw XCTSkip("mock PC not running at \(mock): python3 tools/mock_server.py")
+        }
+    }
+
+    /// A fresh single-use pairing code from the mock (POST /mock/pair-code exists only on the mock).
+    static func freshCode() async throws -> String {
+        var req = URLRequest(url: URL(string: mock + "/mock/pair-code")!, timeoutInterval: 5)
+        req.httpMethod = "POST"
+        let (data, _) = try await URLSession.shared.data(for: req)
+        let obj = try JSONSerialization.jsonObject(with: data) as? [String: String]
+        return try XCTUnwrap(obj?["code"])
+    }
+
+    @MainActor
+    func testPairManuallyThenTodayStatusSettingsUnpair() async throws {
+        let pairCode = try await Self.freshCode()
+        let app = XCUIApplication()
+        app.launchArguments = ["-resetPairing"]
+        app.launch()
+
+        XCTAssertTrue(app.staticTexts["Pair with your PC"].waitForExistence(timeout: 10))
+        attach(app, "1-pairing")
+
+        let server = app.textFields["pair.server"]
+        server.tap()
+        server.typeText(Self.mock)
+        let code = app.textFields["pair.code"]
+        code.tap()
+        code.typeText(pairCode)
+        app.buttons["pair.submit"].tap()
+
+        XCTAssertTrue(app.navigationBars["CAMPI-PC"].waitForExistence(timeout: 15), "Today didn't appear after pairing")
+        allowNotificationsIfAsked()
+        XCTAssertTrue(app.buttons["today.status"].waitForExistence(timeout: 10))
+        XCTAssertTrue(app.staticTexts["Latest sightings"].exists)
+        sleep(2)   // let crops load for the screenshot
+        attach(app, "2-today")
+
+        app.buttons["today.status"].tap()
+        XCTAssertTrue(app.navigationBars["Status"].waitForExistence(timeout: 5))
+        attach(app, "3-status")
+        app.navigationBars["Status"].buttons["Done"].tap()
+
+        app.buttons["Settings"].tap()
+        XCTAssertTrue(app.navigationBars["Settings"].waitForExistence(timeout: 5))
+        // Push prefs come from the PC and are written back to it.
+        let rare = app.switches["settings.push.rare"]
+        XCTAssertTrue(rare.waitForExistence(timeout: 10), "no notification toggles")
+        let before = rare.value as? String
+        rare.switches.firstMatch.tap()
+        XCTAssertTrue(waitFor(rare, value: before == "1" ? "0" : "1"), "rare toggle didn't change")
+        attach(app, "4-settings")
+        app.buttons["Unpair this iPhone"].tap()
+        app.buttons["Unpair"].firstMatch.tap()
+        XCTAssertTrue(app.staticTexts["Pair with your PC"].waitForExistence(timeout: 10), "didn't return to pairing")
+    }
+
+    @MainActor
+    func testPairingDeepLinkRejectsWrongCode() throws {
+        // ZZZZ9999 is never issued, so the PC must refuse it.
+        let app = XCUIApplication()
+        app.launchArguments = ["-resetPairing"]
+        app.launch()
+        XCTAssertTrue(app.staticTexts["Pair with your PC"].waitForExistence(timeout: 10))
+
+        let link = "campi://pair?u=\(Self.mock.addingPercentEncoding(withAllowedCharacters: .alphanumerics)!)&c=ZZZZ9999"
+        XCUIDevice.shared.system.open(URL(string: link)!)
+        XCTAssertTrue(app.navigationBars["Pair this iPhone?"].waitForExistence(timeout: 10))
+        attach(app, "5-deeplink-confirm")
+        app.navigationBars["Pair this iPhone?"].buttons["Pair"].tap()
+        XCTAssertTrue(app.staticTexts.containing(NSPredicate(format: "label CONTAINS 'wrong, already used, or expired'"))
+            .firstMatch.waitForExistence(timeout: 10))
+        attach(app, "6-deeplink-bad-code")
+    }
+
+    /// Launches fresh and pairs with the mock by typing a fresh code; ends on Today.
+    @MainActor
+    private func launchPaired(_ extraArguments: [String] = []) async throws -> XCUIApplication {
+        let pairCode = try await Self.freshCode()
+        let app = XCUIApplication()
+        app.launchArguments = ["-resetPairing"] + extraArguments
+        app.launch()
+        XCTAssertTrue(app.navigationBars["Campi"].waitForExistence(timeout: 10))
+        for _ in 0..<6 where !(app.buttons["pair.submit"].exists && app.buttons["pair.submit"].isHittable) { app.swipeUp() }   // large text sizes
+        XCTAssertTrue(app.textFields["pair.server"].waitForExistence(timeout: 5))
+        app.textFields["pair.server"].tap()
+        app.textFields["pair.server"].typeText(Self.mock)
+        app.textFields["pair.code"].tap()
+        app.textFields["pair.code"].typeText(pairCode)
+        app.buttons["pair.submit"].tap()
+        XCTAssertTrue(app.navigationBars["CAMPI-PC"].waitForExistence(timeout: 15), "pairing failed")
+        allowNotificationsIfAsked()
+        return app
+    }
+
+    /// Pairing asks for notification permission once per install; allow it.
+    @MainActor
+    private func allowNotificationsIfAsked() {
+        let allow = XCUIApplication(bundleIdentifier: "com.apple.springboard").alerts.buttons["Allow"]
+        if allow.waitForExistence(timeout: 4) { allow.tap() }
+    }
+
+    // MARK: Push (M5)
+
+    /// Mock-only `/mock/push`: the mock runs `xcrun simctl push booted` with a contract payload.
+    @discardableResult
+    static func mockPush(_ type: String) async throws -> [String: Any] {
+        var req = URLRequest(url: URL(string: mock + "/mock/push")!, timeoutInterval: 40)
+        req.httpMethod = "POST"
+        req.httpBody = try JSONSerialization.data(withJSONObject: ["type": type])
+        let (data, resp) = try await URLSession.shared.data(for: req)
+        XCTAssertEqual((resp as? HTTPURLResponse)?.statusCode, 200, String(decoding: data, as: UTF8.self))
+        return try JSONSerialization.jsonObject(with: data) as? [String: Any] ?? [:]
+    }
+
+    @MainActor
+    func testPushOpensSightingAndStatus() async throws {
+        let app = try await launchPaired()
+        XCTAssertTrue(app.buttons["today.status"].waitForExistence(timeout: 10))
+        let springboard = XCUIApplication(bundleIdentifier: "com.apple.springboard")
+
+        // In the background: a new-catch banner; tapping it opens that sighting.
+        XCUIDevice.shared.press(.home)
+        let sent = try await Self.mockPush("new_catch")
+        let label = try XCTUnwrap((sent["sent"] as? [String: Any])?["label"] as? String)
+        let banner = springboard.descendants(matching: .any)
+            .matching(NSPredicate(format: "label CONTAINS %@", "New catch: \(label)")).firstMatch
+        XCTAssertTrue(banner.waitForExistence(timeout: 20), "no banner for the push")
+        sleep(3)   // the notification extension attaches the crop
+        let shot = XCTAttachment(screenshot: XCUIScreen.main.screenshot())
+        shot.name = "30-push-banner"
+        shot.lifetime = .keepAlways
+        add(shot)
+        banner.tap()
+        XCTAssertTrue(app.buttons["detail.timelapse"].waitForExistence(timeout: 20), "the tap didn't open the sighting")
+        XCTAssertTrue(app.navigationBars[label].exists || app.staticTexts[label].exists)
+        attach(app, "31-push-opened-sighting")
+        app.buttons["Done"].firstMatch.tap()
+
+        // In the foreground: a service alert still shows; tapping it opens the status.
+        try await Self.mockPush("service")
+        let alert = springboard.descendants(matching: .any)
+            .matching(NSPredicate(format: "label CONTAINS 'stream lost'")).firstMatch
+        XCTAssertTrue(alert.waitForExistence(timeout: 20), "no banner while in the foreground")
+        alert.tap()
+        XCTAssertTrue(app.navigationBars["Status"].waitForExistence(timeout: 15), "the tap didn't open the status")
+        attach(app, "32-push-opened-status")
+    }
+
+    @MainActor
+    func testSightingsDetailCollectionHighlights() async throws {
+        let app = try await launchPaired()
+
+        // Sightings grid -> detail
+        app.tabBars.buttons["Sightings"].tap()
+        let card = app.buttons.matching(identifier: "sightings.card").firstMatch
+        XCTAssertTrue(card.waitForExistence(timeout: 10))
+        sleep(1)
+        attach(app, "07-sightings")
+        card.tap()
+        let star = app.buttons["detail.star"]
+        XCTAssertTrue(star.waitForExistence(timeout: 10))
+        let before = star.value as? String
+        star.tap()
+        XCTAssertTrue(waitFor(star, value: before == "starred" ? "not starred" : "starred"), "star didn't toggle")
+        attach(app, "08-detail")
+        star.tap()   // restore
+        XCTAssertTrue(waitFor(star, value: before ?? "not starred"))
+
+        // Label picker opens with the collection
+        app.buttons["detail.correct"].tap()
+        XCTAssertTrue(app.navigationBars["Correct Label"].waitForExistence(timeout: 5))
+        XCTAssertTrue(app.buttons.matching(NSPredicate(format: "label BEGINSWITH 'Toyota Camry'")).firstMatch
+            .waitForExistence(timeout: 10))
+        attach(app, "09-label-picker")
+        app.navigationBars["Correct Label"].buttons["Cancel"].tap()
+
+        // View in timelapse: a player, or an explanation (e.g. the window isn't rendered yet)
+        app.buttons["detail.timelapse"].tap()
+        let done = app.buttons["player.done"]
+        let alert = app.alerts.firstMatch
+        XCTAssertTrue(waitForAny([done, alert], timeout: 15), "View in timelapse showed nothing")
+        sleep(1)
+        attach(app, "10-view-in-timelapse")
+        if done.exists { done.tap() } else { alert.buttons["OK"].tap() }
+        app.navigationBars.buttons.element(boundBy: 0).tap()   // back to the grid
+
+        // Filters: starred only, then reset
+        app.buttons["Filters"].tap()
+        XCTAssertTrue(app.navigationBars["Filters"].waitForExistence(timeout: 5))
+        app.switches["Starred only"].switches.firstMatch.tap()
+        app.navigationBars["Filters"].buttons["Apply"].tap()
+        sleep(2)
+        attach(app, "11-starred-filter")
+        app.buttons["Filters"].tap()
+        app.buttons["Reset All"].tap()
+        app.navigationBars["Filters"].buttons["Apply"].tap()
+
+        // Collection grid -> one label's sightings
+        showCollection(app, mode: "Grid")
+        let tile = app.buttons.matching(identifier: "collection.tile").firstMatch
+        XCTAssertTrue(tile.waitForExistence(timeout: 10))
+        sleep(1)
+        attach(app, "12-collection")
+        tile.tap()
+        XCTAssertTrue(app.buttons.matching(identifier: "sightings.card").firstMatch.waitForExistence(timeout: 10))
+        sleep(1)
+        attach(app, "13-collection-item")
+
+        // Highlights -> daily video plays
+        app.tabBars.buttons["Highlights"].tap()
+        XCTAssertTrue(app.buttons.matching(identifier: "highlight.row").firstMatch.waitForExistence(timeout: 10))
+        sleep(1)
+        attach(app, "14-highlights")
+        app.buttons["Daily video"].firstMatch.tap()
+        let row = app.buttons.matching(identifier: "highlight.row").firstMatch
+        XCTAssertTrue(row.waitForExistence(timeout: 10))
+        row.tap()
+        XCTAssertTrue(done.waitForExistence(timeout: 15), "daily video didn't open")
+        sleep(2)
+        attach(app, "15-daily-player")
+        done.tap()
+    }
+
+    @MainActor
+    func testTimelapseSaveAndShare() async throws {
+        // fallback if the simulator wasn't pre-granted (xcrun simctl privacy <sim> grant photos-add <bundle>)
+        addUIInterruptionMonitor(withDescription: "Photos permission") { alert in
+            for title in ["Allow Full Access", "Allow", "OK"] where alert.buttons[title].exists {
+                alert.buttons[title].tap()
+                return true
+            }
+            return false
+        }
+        let app = try await launchPaired()
+        XCTAssertTrue(app.buttons["today.newestClip"].waitForExistence(timeout: 10), "no newest clip on Today")
+        sleep(1)
+        attach(app, "16-today-newest-clip")
+
+        app.tabBars.buttons["Timelapse"].tap()
+        let clip = app.buttons.matching(identifier: "timelapse.clip").firstMatch
+        XCTAssertTrue(clip.waitForExistence(timeout: 10))
+        sleep(1)
+        attach(app, "17-clips")
+        clip.tap()
+        let done = app.buttons["player.done"]
+        XCTAssertTrue(done.waitForExistence(timeout: 10))
+        sleep(2)
+        attach(app, "18-clip-player")
+        done.tap()
+
+        // Save to Photos from the context menu
+        openMenu(on: clip, item: "Save to Photos", in: app).tap()
+        XCTAssertTrue(app.staticTexts["Saved to Photos"].waitForExistence(timeout: 30), "save didn't finish")
+        attach(app, "19-saved-to-photos")
+
+        // Share sheet (after the "Saved" banner goes away)
+        _ = app.staticTexts["Saved to Photos"].waitForNonExistence(timeout: 6)
+        openMenu(on: clip, item: "Share…", in: app).tap()
+        let sheet = app.otherElements["ActivityListView"]
+        XCTAssertTrue(waitForAny([sheet, app.buttons["Copy"], app.cells["Copy"]], timeout: 20), "share sheet didn't open")
+        sleep(1)
+        attach(app, "20-share-sheet")
+        if app.buttons["Close"].exists { app.buttons["Close"].tap() } else { app.swipeDown(velocity: .fast) }
+
+        // Daily and archive lists
+        XCTAssertTrue(app.buttons["Daily"].waitForExistence(timeout: 5))
+        app.buttons["Daily"].tap()
+        XCTAssertTrue(app.buttons.matching(identifier: "timelapse.daily").firstMatch.waitForExistence(timeout: 10))
+        sleep(1)
+        attach(app, "21-daily")
+        app.buttons["Archive"].tap()
+        XCTAssertTrue(app.buttons.matching(identifier: "timelapse.archive").firstMatch.waitForExistence(timeout: 10))
+        attach(app, "22-archive")
+    }
+
+    /// Long-presses for the context menu and returns `item`, retrying the press once (it can miss while
+    /// another animation is finishing).
+    // MARK: Accessibility (M6)
+
+    /// Runs Xcode's accessibility audit on every main screen; logs each issue, then fails if any are left.
+    @MainActor
+    func testAccessibilityAudit() async throws {
+        let app = try await launchPaired()
+        var issues: [String] = []
+        // Not counted: Dynamic Type and text clipping (checked with screenshots at the largest size instead; these
+        // audits also flag stock Form rows, the search field and reserved second lines), "nearly passed" contrast
+        // (iOS's own secondary label color), and contrast measured through the floating tab bar or a system
+        // toolbar button, and binder trading cards (a picture of a printed card under moving foil: VoiceOver reads the
+        // whole card from its label, and the inspector repeats the stats in Dynamic Type).
+        func audit(_ screen: String) throws {
+            sleep(1)
+            let tabBarTop = app.tabBars.firstMatch.exists ? app.tabBars.firstMatch.frame.minY : .infinity
+            try app.performAccessibilityAudit(for: .all.subtracting([.dynamicType, .textClipped])) { issue in
+                let el = issue.element
+                if issue.auditType == .contrast {
+                    if issue.compactDescription.contains("nearly passed") { return true }
+                    guard let el else { return true }   // no element to judge: rows under the tab bar
+                    if el.frame.maxY > tabBarTop - 4 || (el.elementType == .button && el.label == "Done") { return true }
+                    if el.identifier == "collection.card" { return true }
+                }
+                let line = "\(screen): \(issue.compactDescription) – \(el?.debugDescription.prefix(160) ?? "no element")"
+                print("AUDIT \(line)")
+                issues.append(line)
+                return true
+            }
+        }
+        XCTAssertTrue(app.buttons["today.status"].waitForExistence(timeout: 10))
+        try audit("Today")
+        app.buttons["today.live"].tap()
+        XCTAssertTrue(app.images["live.image"].waitForExistence(timeout: 15))
+        try audit("Live")
+        app.buttons["live.close"].tap()
+        app.buttons["Settings"].tap()
+        XCTAssertTrue(app.navigationBars["Settings"].waitForExistence(timeout: 5))
+        try audit("Settings")
+        app.navigationBars["Settings"].buttons["Done"].tap()
+        for tab in ["Highlights", "Sightings", "Cardex", "Timelapse"] {
+            app.tabBars.buttons[tab].tap()
+            sleep(2)
+            try audit(tab)
+        }
+        app.tabBars.buttons["Sightings"].tap()
+        app.buttons.matching(identifier: "sightings.card").firstMatch.tap()
+        XCTAssertTrue(app.buttons["detail.timelapse"].waitForExistence(timeout: 10))
+        try audit("Detail")
+        XCTAssertTrue(issues.isEmpty, "\(issues.count) accessibility issues:\n" + issues.joined(separator: "\n"))
+    }
+
+    /// Every main screen at the largest accessibility text size (AX5), for review: nothing may overlap or vanish.
+    @MainActor
+    func testLargestTextSize() async throws {
+        let app = try await launchPaired(["-UIPreferredContentSizeCategoryName", "UICTContentSizeCategoryAccessibilityXXXL"])
+        XCTAssertTrue(app.buttons["today.status"].waitForExistence(timeout: 10))
+        sleep(2)
+        attach(app, "40-ax5-today")
+        app.swipeUp()
+        attach(app, "41-ax5-today-scrolled")
+        for (i, tab) in ["Highlights", "Sightings", "Cardex", "Timelapse"].enumerated() {
+            app.tabBars.buttons[tab].tap()
+            sleep(2)
+            attach(app, "4\(i + 2)-ax5-\(tab.lowercased())")
+        }
+        app.tabBars.buttons["Sightings"].tap()
+        app.buttons.matching(identifier: "sightings.card").firstMatch.tap()
+        XCTAssertTrue(app.buttons["detail.timelapse"].waitForExistence(timeout: 10))
+        sleep(2)
+        attach(app, "46-ax5-detail")
+        app.swipeUp()
+        attach(app, "47-ax5-detail-card")
+    }
+
+    /// Every tab when the PC stops answering before it was ever loaded, and Today when it stops after.
+    @MainActor
+    func testOfflineStates() async throws {
+        try await Self.mockOffline(seconds: 0)
+        addTeardownBlock { try? await Self.mockOffline(seconds: 0) }
+        let app = try await launchPaired()
+        XCTAssertTrue(app.buttons["today.status"].waitForExistence(timeout: 10))
+        try await Self.mockOffline(seconds: 120)
+        for (i, tab) in ["Highlights", "Sightings", "Cardex", "Timelapse"].enumerated() {
+            app.tabBars.buttons[tab].tap()
+            XCTAssertTrue(app.buttons["Try Again"].firstMatch.waitForExistence(timeout: 30), "\(tab) has no offline state")
+            attach(app, "5\(i)-offline-\(tab.lowercased())")
+        }
+        app.tabBars.buttons["Today"].tap()
+        app.swipeDown()   // pull to refresh: keeps the last status, marked stale
+        XCTAssertTrue(app.staticTexts.containing(NSPredicate(format: "label CONTAINS 'last known status'")).firstMatch
+            .waitForExistence(timeout: 30))
+        attach(app, "54-offline-today-stale")
+    }
+
+    /// A PC whose sightings worker never ran (no sightings.db): python3 tools/mock_server.py --port 8766 --no-sightings-db
+    @MainActor
+    func testNoSightingsDatabase() async throws {
+        let other = "http://127.0.0.1:8766"
+        var req = URLRequest(url: URL(string: other + "/mock/pair-code")!, timeoutInterval: 2)
+        req.httpMethod = "POST"
+        guard let (data, _) = try? await URLSession.shared.data(for: req),
+              let code = (try? JSONSerialization.jsonObject(with: data) as? [String: String])?["code"] else {
+            throw XCTSkip("no mock with --no-sightings-db on \(other)")
+        }
+        let app = XCUIApplication()
+        app.launchArguments = ["-resetPairing"]
+        app.launch()
+        for _ in 0..<6 where !(app.buttons["pair.submit"].exists && app.buttons["pair.submit"].isHittable) { app.swipeUp() }
+        app.textFields["pair.server"].tap()
+        app.textFields["pair.server"].typeText(other)
+        app.textFields["pair.code"].tap()
+        app.textFields["pair.code"].typeText(code)
+        app.buttons["pair.submit"].tap()
+        XCTAssertTrue(app.buttons["today.status"].waitForExistence(timeout: 15))
+        allowNotificationsIfAsked()
+        sleep(2)
+        attach(app, "55-nodb-today")
+        for (i, tab) in ["Highlights", "Sightings", "Cardex"].enumerated() {
+            app.tabBars.buttons[tab].tap()
+            sleep(3)
+            XCTAssertFalse(app.buttons["Try Again"].exists, "\(tab) shows an error with no sightings.db")
+            attach(app, "5\(i + 6)-nodb-\(tab.lowercased())")
+        }
+    }
+
+    /// A server that cuts 206s short (the PC bug found in integration) must give a clear error, not AVKit's bare
+    /// crossed-out play button. Needs: python3 tools/mock_server.py --port 8767 --range-cap 4194304
+    @MainActor
+    func testUnplayableVideoExplainsItself() async throws {
+        let other = "http://127.0.0.1:8767"
+        var req = URLRequest(url: URL(string: other + "/mock/pair-code")!, timeoutInterval: 2)
+        req.httpMethod = "POST"
+        guard let (data, _) = try? await URLSession.shared.data(for: req),
+              let code = (try? JSONSerialization.jsonObject(with: data) as? [String: String])?["code"] else {
+            throw XCTSkip("no mock with --range-cap on \(other)")
+        }
+        let app = XCUIApplication()
+        app.launchArguments = ["-resetPairing"]
+        app.launch()
+        for _ in 0..<6 where !(app.buttons["pair.submit"].exists && app.buttons["pair.submit"].isHittable) { app.swipeUp() }
+        app.textFields["pair.server"].tap()
+        app.textFields["pair.server"].typeText(other)
+        app.textFields["pair.code"].tap()
+        app.textFields["pair.code"].typeText(code)
+        app.buttons["pair.submit"].tap()
+        XCTAssertTrue(app.buttons["today.status"].waitForExistence(timeout: 15))
+        allowNotificationsIfAsked()
+        app.tabBars.buttons["Timelapse"].tap()
+        app.buttons["Daily"].tap()
+        let daily = app.buttons.matching(identifier: "timelapse.daily").firstMatch
+        XCTAssertTrue(daily.waitForExistence(timeout: 10))
+        daily.tap()
+        XCTAssertTrue(app.staticTexts["Can't play this video"].waitForExistence(timeout: 30),
+                      "no explanation when AVPlayer fails")
+        XCTAssertTrue(app.staticTexts.containing(NSPredicate(format: "label CONTAINS 'byte range'")).firstMatch.exists,
+                      "the explanation doesn't name the range problem")
+        attach(app, "60-unplayable-video")
+    }
+
+    // MARK: Widget (M5)
+
+    static func mockOffline(seconds: Double) async throws {
+        var req = URLRequest(url: URL(string: mock + "/mock/offline")!, timeoutInterval: 5)
+        req.httpMethod = "POST"
+        req.httpBody = try JSONSerialization.data(withJSONObject: ["seconds": seconds])
+        _ = try await URLSession.shared.data(for: req)
+    }
+
+    /// Adds the medium Campi widget to the home screen unless one is there (it survives reinstalls over the top).
+    @MainActor
+    private func addWidgetIfNeeded(_ springboard: XCUIApplication) {
+        let widget = springboard.descendants(matching: .any).matching(NSPredicate(format: "label CONTAINS 'sightings today'")).firstMatch
+        if widget.waitForExistence(timeout: 3) { return }
+        springboard.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.6)).press(forDuration: 2.0)
+        XCTAssertTrue(springboard.buttons["Edit"].waitForExistence(timeout: 5), "home screen didn't enter edit mode")
+        springboard.buttons["Edit"].tap()
+        springboard.buttons["Add Widget"].tap()
+        let search = springboard.searchFields["Search Widgets"]
+        XCTAssertTrue(search.waitForExistence(timeout: 5))
+        search.tap()
+        search.typeText("Campi")
+        springboard.cells["Campi"].tap()
+        let add = springboard.buttons.matching(NSPredicate(format: "label CONTAINS 'Add Widget'")).firstMatch
+        XCTAssertTrue(add.waitForExistence(timeout: 5))
+        springboard.swipeLeft()   // the medium size
+        sleep(1)
+        add.tap()
+        sleep(2)
+        if springboard.buttons["Done"].exists { springboard.buttons["Done"].tap() }
+    }
+
+    @MainActor
+    func testWidgetShowsLatestCatchThenUnreachable() async throws {
+        try await Self.mockOffline(seconds: 0)
+        addTeardownBlock { try? await Self.mockOffline(seconds: 0) }
+        let app = try await launchPaired()
+        XCTAssertTrue(app.buttons["today.status"].waitForExistence(timeout: 10))
+        XCUIDevice.shared.press(.home)   // backgrounding reloads the widget
+        let springboard = XCUIApplication(bundleIdentifier: "com.apple.springboard")
+        addWidgetIfNeeded(springboard)
+
+        let fresh = springboard.descendants(matching: .any)
+            .matching(NSPredicate(format: "label CONTAINS 'sightings today' AND NOT (label CONTAINS 'unreachable')")).firstMatch
+        XCTAssertTrue(fresh.waitForExistence(timeout: 20), "widget never showed today's count")
+        sleep(3)
+        let shot1 = XCTAttachment(screenshot: XCUIScreen.main.screenshot())
+        shot1.name = "33-widget"
+        shot1.lifetime = .keepAlways
+        add(shot1)
+
+        // The PC stops answering: the widget keeps the last good data and says so.
+        try await Self.mockOffline(seconds: 120)
+        app.activate()
+        sleep(1)
+        XCUIDevice.shared.press(.home)
+        let stale = springboard.descendants(matching: .any).matching(NSPredicate(format: "label CONTAINS 'PC unreachable'")).firstMatch
+        XCTAssertTrue(stale.waitForExistence(timeout: 30), "widget never showed the unreachable state")
+        sleep(1)
+        let shot2 = XCTAttachment(screenshot: XCUIScreen.main.screenshot())
+        shot2.name = "34-widget-unreachable"
+        shot2.lifetime = .keepAlways
+        add(shot2)
+    }
+
+    // MARK: Cardex (M4.5)
+
+    /// Opens the first caught label's page and waits for its card to finish (generated or fallback).
+    @MainActor
+    private func openFirstCard(_ app: XCUIApplication) -> XCUIElement {
+        showCollection(app, mode: "Grid")
+        let tile = app.buttons.matching(identifier: "collection.tile").firstMatch
+        XCTAssertTrue(tile.waitForExistence(timeout: 10))
+        tile.tap()
+        let card = app.descendants(matching: .any)["cardex.card"]
+        XCTAssertTrue(card.waitForExistence(timeout: 10), "no Cardex card on the collection item page")
+        let writing = app.staticTexts["Writing card…"]
+        let done = XCTNSPredicateExpectation(predicate: NSPredicate(format: "exists == false"), object: writing)
+        XCTAssertEqual(XCTWaiter.wait(for: [done], timeout: 90), .completed, "card never finished")
+        return card
+    }
+
+    @MainActor
+    func testCardexCardsOnCollectionAndDetail() async throws {
+        let app = try await launchPaired()
+        _ = openFirstCard(app)
+        // Generated cards have rating rows ("Speed, 7 of 10"); fallback cards say why there's no text.
+        let rating = app.descendants(matching: .any).matching(NSPredicate(format: "label ENDSWITH ' of 10'")).firstMatch
+        let generated = rating.exists
+        print("Cardex: \(generated ? "generated on device" : "fallback (Apple Intelligence unavailable here)")")
+        XCTAssertTrue(generated || app.images["apple.intelligence"].exists
+                      || app.staticTexts.containing(NSPredicate(format: "label CONTAINS 'Apple Intelligence'")).firstMatch.exists)
+        attach(app, "27-cardex-collection-item")
+
+        // The same card on one of that label's sightings.
+        let sighting = app.buttons.matching(identifier: "sightings.card").firstMatch
+        XCTAssertTrue(sighting.waitForExistence(timeout: 10))
+        sighting.tap()
+        XCTAssertTrue(app.buttons["detail.timelapse"].waitForExistence(timeout: 10))
+        let detailCard = app.descendants(matching: .any)["cardex.card"]
+        XCTAssertTrue(detailCard.waitForExistence(timeout: 15), "no Cardex card on the sighting detail")
+        app.swipeUp()
+        attach(app, "28-cardex-detail")
+
+        // Regenerate from the ⋯ menu keeps a card on screen.
+        app.buttons["More"].tap()
+        app.buttons["Regenerate Card"].tap()
+        XCTAssertTrue(detailCard.waitForExistence(timeout: 5))
+    }
+
+    /// The Cardex tab in Cards (binder) or Grid mode; the mode is remembered across launches.
+    @MainActor
+    private func showCollection(_ app: XCUIApplication, mode: String) {
+        app.tabBars.buttons["Cardex"].tap()
+        let button = app.buttons[mode].firstMatch
+        XCTAssertTrue(button.waitForExistence(timeout: 10), "no \(mode) mode")
+        button.tap()
+    }
+
+    @MainActor
+    func testTradingCards() async throws {
+        // a fixed tilt, so the screenshots show the foil turned toward the light
+        let app = try await launchPaired(["-cardexTilt", "0.55,-0.4"])
+        showCollection(app, mode: "Cards")
+        let card = app.buttons.matching(identifier: "collection.card").firstMatch
+        XCTAssertTrue(card.waitForExistence(timeout: 10), "no trading cards in the binder")
+        sleep(4)   // snapshots render
+        attach(app, "60-cardex-binder")
+        for i in 1...3 {
+            app.swipeUp()
+            sleep(2)
+            attach(app, "6\(i)-cardex-binder-scrolled")
+        }
+        app.swipeDown(); app.swipeDown(); app.swipeDown()
+        card.tap()
+        let held = app.descendants(matching: .any)["cardex.trading"]
+        XCTAssertTrue(held.waitForExistence(timeout: 10), "inspector didn't open")
+        XCTAssertTrue(app.buttons["cardex.seeSightings"].waitForExistence(timeout: 5))
+        sleep(3)
+        attach(app, "65-cardex-inspector")
+        // drag it around; it must settle and stay put
+        let start = held.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.5))
+        start.press(forDuration: 0.2, thenDragTo: held.coordinate(withNormalizedOffset: CGVector(dx: 0.9, dy: 0.2)))
+        XCTAssertTrue(held.exists)
+        app.buttons["cardex.seeSightings"].tap()
+        XCTAssertTrue(app.buttons.matching(identifier: "sightings.card").firstMatch.waitForExistence(timeout: 10))
+    }
+
+    /// Every finish, for review: a binder card per finish opened in turn.
+    @MainActor
+    func testTradingCardFinishes() async throws {
+        let app = try await launchPaired(["-cardexTilt", "0.55,-0.4"])
+        showCollection(app, mode: "Cards")
+        XCTAssertTrue(app.buttons.matching(identifier: "collection.card").firstMatch.waitForExistence(timeout: 10))
+        for finish in ["Plain", "Reverse Holo", "Holo", "Full Art", "Special Illustration"] {
+            let card = app.buttons.matching(NSPredicate(format: "identifier == 'collection.card' AND label CONTAINS %@",
+                                                        ". \(finish). ")).firstMatch
+            for _ in 0..<5 { app.swipeDown() }   // from the top
+            for _ in 0..<12 where !card.isHittable { app.swipeUp() }
+            guard card.exists else { print("no \(finish) card in this collection"); continue }
+            card.tap()
+            XCTAssertTrue(app.buttons["cardex.seeSightings"].waitForExistence(timeout: 10))
+            sleep(3)
+            attach(app, "7x-cardex-\(finish.lowercased().replacingOccurrences(of: " ", with: "-"))")
+            app.navigationBars.buttons.firstMatch.tap()
+            sleep(1)
+        }
+    }
+
+    @MainActor
+    func testCardexFallbackWithoutAppleIntelligence() async throws {
+        let app = try await launchPaired(["-cardexFallback"])
+        _ = openFirstCard(app)
+        XCTAssertTrue(app.staticTexts["Card text is turned off for this test run."].waitForExistence(timeout: 5))
+        XCTAssertFalse(app.descendants(matching: .any).matching(NSPredicate(format: "label ENDSWITH ' of 10'")).firstMatch.exists)
+        attach(app, "29-cardex-fallback")
+    }
+
+    // MARK: Live (M4)
+
+    struct LiveCounters: Decodable { var state: String; var viewers: Int; var opened: Int; var closed: Int }
+
+    /// Mock-only `/mock/live`: reads the viewer counters; with `state`, changes how live answers.
+    @discardableResult
+    static func mockLive(state: String? = nil, rotation: Int? = nil) async throws -> LiveCounters {
+        var req = URLRequest(url: URL(string: mock + "/mock/live")!, timeoutInterval: 5)
+        if state != nil || rotation != nil {
+            var body: [String: Any] = [:]
+            body["state"] = state
+            body["rotation"] = rotation
+            req.httpMethod = "POST"
+            req.httpBody = try JSONSerialization.data(withJSONObject: body)
+        }
+        let (data, _) = try await URLSession.shared.data(for: req)
+        return try JSONDecoder().decode(LiveCounters.self, from: data)
+    }
+
+    /// Polls the mock until `check` holds for its live counters.
+    @MainActor
+    func waitForLive(_ what: String, timeout: TimeInterval = 10,
+                     _ check: @Sendable (LiveCounters) -> Bool) async throws {
+        let end = Date().addingTimeInterval(timeout)
+        while Date() < end {
+            if check(try await Self.mockLive()) { return }
+            try await Task.sleep(for: .milliseconds(250))
+        }
+        XCTFail("mock live counters never showed: \(what) (now \(try await Self.mockLive()))")
+    }
+
+    @MainActor
+    func testLiveVideoSnapshotsErrorsAndDisconnect() async throws {
+        try await Self.mockLive(state: "ok", rotation: 90)
+        addTeardownBlock { _ = try? await Self.mockLive(state: "ok", rotation: 0) }
+        let app = try await launchPaired()
+
+        let tile = app.buttons["today.live"]
+        XCTAssertTrue(tile.waitForExistence(timeout: 10))
+        tile.tap()
+        let image = app.images["live.image"]
+        XCTAssertTrue(image.waitForExistence(timeout: 15), "no live frame")
+        try await waitForLive("one viewer") { $0.viewers == 1 }
+        sleep(1)
+        // rotation 90: the landscape MJPEG frames are shown portrait
+        XCTAssertGreaterThan(image.frame.height, image.frame.width, "video frame not rotated")
+        attach(app, "23-live-video")
+
+        // Leaving the foreground closes the stream (and the PC's upstream); coming back reopens it.
+        let before = try await Self.mockLive()
+        XCUIDevice.shared.press(.home)
+        try await waitForLive("stream closed after backgrounding", timeout: 6) { $0.viewers == 0 && $0.closed > before.closed }
+        app.activate()
+        try await waitForLive("stream reopened", timeout: 15) { $0.viewers == 1 }
+
+        // Snapshots: no MJPEG viewer, a frame time instead of fps.
+        app.buttons["Snapshots"].tap()
+        try await waitForLive("video closed for snapshots") { $0.viewers == 0 }
+        let status = app.descendants(matching: .any)["live.status"]
+        XCTAssertTrue(waitForAny([app.staticTexts.containing(NSPredicate(format: "label BEGINSWITH 'Frame from'")).firstMatch],
+                                 timeout: 10), "snapshot frame time never shown")
+        XCTAssertTrue(status.exists)
+        attach(app, "24-live-snapshots")
+
+        // 503 live_busy, then "Show Snapshots Instead".
+        try await Self.mockLive(state: "busy")
+        app.buttons["Video"].tap()
+        XCTAssertTrue(app.staticTexts["Live is busy"].waitForExistence(timeout: 10))
+        attach(app, "25-live-busy")
+        app.buttons["Show Snapshots Instead"].tap()
+        XCTAssertTrue(waitForAny([app.staticTexts.containing(NSPredicate(format: "label BEGINSWITH 'Frame from'")).firstMatch],
+                                 timeout: 10))
+
+        // 502 pi_unreachable.
+        try await Self.mockLive(state: "unreachable")
+        app.buttons["Video"].tap()
+        XCTAssertTrue(app.staticTexts["The camera isn't answering"].waitForExistence(timeout: 10))
+        attach(app, "26-live-pi-unreachable")
+
+        try await Self.mockLive(state: "ok")
+        app.buttons["live.close"].tap()
+        try await waitForLive("stream closed on dismiss") { $0.viewers == 0 }
+        XCTAssertTrue(tile.waitForExistence(timeout: 5))
+    }
+
+    @MainActor
+    private func openMenu(on el: XCUIElement, item: String, in app: XCUIApplication) -> XCUIElement {
+        for _ in 0..<2 {
+            el.press(forDuration: 1.2)
+            if app.buttons[item].waitForExistence(timeout: 3) { return app.buttons[item] }
+            app.navigationBars.firstMatch.tap()   // dismiss whatever came up, without hitting a row
+        }
+        XCTFail("context menu item \(item) never appeared")
+        return app.buttons[item]
+    }
+
+    @MainActor
+    private func waitFor(_ el: XCUIElement, value: String, timeout: TimeInterval = 10) -> Bool {
+        let exp = XCTNSPredicateExpectation(predicate: NSPredicate(format: "value == %@", value), object: el)
+        return XCTWaiter.wait(for: [exp], timeout: timeout) == .completed
+    }
+
+    @MainActor
+    private func waitForAny(_ els: [XCUIElement], timeout: TimeInterval) -> Bool {
+        let end = Date().addingTimeInterval(timeout)
+        while Date() < end {
+            if els.contains(where: \.exists) { return true }
+            usleep(250_000)
+        }
+        return false
+    }
+
+    @MainActor
+    private func attach(_ app: XCUIApplication, _ name: String) {
+        let a = XCTAttachment(screenshot: app.screenshot())
+        a.name = name
+        a.lifetime = .keepAlways
+        add(a)
+    }
+}

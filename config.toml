@@ -38,6 +38,9 @@ cq = 19                      # NVENC constant quality (libx264 fallback uses crf
 [image]
 rotation = 0                 # 0 / 90 / 180 / 270, clockwise
 level_deg = 0.0              # extra counter-clockwise leveling; output is cropped so there are no black corners
+dim_region = [[0.76, 0.515], [1.0, 0.515], [1.0, 0.59], [0.76, 0.59]]   # polygon, 0-1 of the camera frame: water
+                             # treatment plant floodlights; [] = off. Renders only (live view and sightings see raw)
+dim_strength = 0.6           # at night, brightness above the knee in dim_region is compressed by this much (1 = flat)
 
 [deflicker]
 mode = "luma"                # luma (match each frame to a rolling average) | ffmpeg (deflicker filter) | off
@@ -48,6 +51,8 @@ max_gain = 1.25
 [night]
 luma_threshold = 10          # frames with mean brightness (0-255) below this are skipped (the Pi's night
                              # exposure keeps nights at ~30; only a black frame falls under 10)
+denoise_frames = 3           # night frames are averaged with their neighbours (odd count; 1 = off). Cuts
+                             # sensor-noise shimmer ~sqrt(n); fades out at dawn like dim_region
 
 [overlay]
 enabled = true

@@ -66,8 +66,10 @@ separate low-priority process, so a failed render never touches capture. All chi
 stopping the supervisor kills them too.
 
 Pipeline: q90 JPEG snapshots from the Pi saved as-is -> drop night frames -> split at capture gaps (hard cuts) ->
-no leveling (level_deg 0, so the full 1920x1440 frame is used) -> luminance deflicker ->
-scale to 1440x1080 -> RIFE 2x on the RTX 5070 (rife-ncnn-vulkan, Vulkan) per segment -> timestamp ->
+night dimming of `[image] dim_region` (the water treatment plant's floodlights) -> no leveling (level_deg 0,
+so the full 1920x1440 frame is used) -> luminance deflicker ->
+scale to 1440x1080 -> night temporal denoise (`[night] denoise_frames`, a 3-frame mean on dark frames) ->
+RIFE 2x on the RTX 5070 (rife-ncnn-vulkan, Vulkan) per segment -> timestamp ->
 h264_nvenc CQ 19, yuv420p, bt709, +faststart.
 
 Setup from scratch: `powershell -ExecutionPolicy Bypass -File install.ps1`.

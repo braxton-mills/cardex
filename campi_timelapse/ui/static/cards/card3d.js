@@ -1,8 +1,8 @@
 // One trading card as a real 3D object with its own scene and camera.
 // The art window is a stencil portal: a mask quad writes stencil 1, and the diorama (backdrop, road, car) sits behind
 // the card plane and only draws where stencil == 1, so tilting the card gives true parallax. The printed face
-// (alpha 0 inside the window) and the additive foil layer go on top. A Special Illustration Rare's car skips the
-// stencil, so whatever pokes in front of the card plane breaks out of the frame.
+// (alpha 0 inside the window) and the additive foil layer go on top. Every car is stencilled to the window and sits
+// entirely behind the card plane, so tilting never shows it through the face, past the edges or out of the back.
 import * as THREE from 'three';
 import { CARD_H, CARD_W, drawBackdrop, drawBack, drawFace, drawGround } from './face.js';
 import { faceMaterial, foilMaterial } from './shaders.js';
@@ -156,7 +156,8 @@ export class Card3D {
     // car turntable
     this.carHolder = new THREE.Group();
     this.carLen = aw * (this.full ? 0.86 : 0.8);
-    this.carHolder.position.set(0, groundY, this.sir ? -0.12 : -0.32);
+    // deep enough that the car's turning radius never reaches the card plane (z=0)
+    this.carHolder.position.set(0, groundY, -(this.carLen * 0.55 + 0.06));
     dio.add(this.carHolder);
     this.groundY = groundY;
     this.setCar(this.opts.scanned && item.mesh ? 'scanned' : 'procedural');
@@ -213,7 +214,7 @@ export class Card3D {
 
   setCar(kind) {
     this.carKind = kind;
-    const stencil = !this.sir;
+    const stencil = true;
     const place = (car) => {
       if (this.disposed) return;
       if (this.car) this.carHolder.remove(this.car);
@@ -235,7 +236,7 @@ export class Card3D {
   }
 
   procedural() {
-    return proceduralCar(this.opts.style || this.styleKey(), { color: this.item.color?.hex || '#888', stencil: !this.sir, sir: this.sir, hq: this.opts.quality.hq });
+    return proceduralCar(this.opts.style || this.styleKey(), { color: this.item.color?.hex || '#888', stencil: true, sir: this.sir, hq: this.opts.quality.hq });
   }
 
   styleKey() { return this.opts.styleOf ? this.opts.styleOf(this.item) : 'sedan'; }
@@ -258,6 +259,11 @@ export class Card3D {
     s.vry += (k * (s.try - s.ry) - c * s.vry) * dt; s.ry += s.vry * dt;
     s.vlift += (220 * (s.tlift - s.lift) - 22 * s.vlift) * dt; s.lift += s.vlift * dt;
     this.root.rotation.set(s.rx, s.ry, 0);
+    // the art follows only ~30% of the tilt: the window turns with the card, the scene behind it shifts a little
+    // (depth, not a deep box you look down into). Measured from the nearest face-up angle so flips don't swing it.
+    const fy = s.ry - Math.round(s.ry / (Math.PI * 2)) * Math.PI * 2;
+    const follow = 0.7; // share of the tilt the art cancels
+    this.dio.rotation.set(0.3 - THREE.MathUtils.clamp(s.rx, -0.8, 0.8) * follow, -THREE.MathUtils.clamp(fy, -0.8, 0.8) * follow, 0);
     this.root.position.z = s.lift * 0.35;
     this.root.scale.setScalar(1 + s.lift * 0.06);
     this.light.lerp(this.lightTarget, 1 - Math.exp(-dt * 10));
@@ -267,6 +273,12 @@ export class Card3D {
     // hide the diorama when the back faces the camera (it lives behind the face)
     const n = new THREE.Vector3(0, 0, 1).applyQuaternion(this.root.quaternion);
     this.dio.visible = n.dot(this.camera.position.clone().sub(this.root.position).normalize()) > 0.02;
+  }
+
+  // 0 at rest .. 1 lifted / fully tilted: the grid pads the viewport by it and draws the most active card last
+  activity() {
+    const s = this.s;
+    return Math.min(1, Math.max(Math.abs(s.lift), Math.abs(s.rx) / 0.6, Math.abs(s.ry) / 0.7));
   }
 
   setPointer(nx, ny, active) {

@@ -51,6 +51,9 @@ export class CardEngine {
     r.toneMapping = THREE.NeutralToneMapping;
     r.toneMappingExposure = 1.0;
     r.outputColorSpace = THREE.SRGBColorSpace;
+    // render() must not clear: each card's padded viewport overlaps its neighbours, and an auto-clear would erase them
+    // (the grid clears depth + stencil per card by hand; the composer's RenderPass clears its own target)
+    r.autoClear = false;
     r.shadowMap.type = THREE.PCFShadowMap;
     r.info.autoReset = false;
     this.gpu = gpuName(r);
@@ -136,8 +139,9 @@ export class CardEngine {
         const [nx, ny, r] = pos(d.el, e);
         d.moved = Math.max(d.moved, Math.hypot(e.clientX - d.x0, e.clientY - d.y0));
         if (card) {
-          card.s.trx = THREE.MathUtils.clamp(-((e.clientY - d.y0) / r.height) * 2.4, -1.05, 1.05);
-          card.s.try = THREE.MathUtils.clamp(((e.clientX - d.x0) / r.width) * 2.4, -1.2, 1.2);
+          // held like a real card: up to ~35-40 degrees
+          card.s.trx = THREE.MathUtils.clamp(-((e.clientY - d.y0) / r.height) * 2.2, -0.6, 0.6);
+          card.s.try = THREE.MathUtils.clamp(((e.clientX - d.x0) / r.width) * 2.2, -0.7, 0.7);
           card.lightTarget.set(nx * 1.2, ny * 1.4, 1.2);
         }
         return;
@@ -194,9 +198,10 @@ export class CardEngine {
     let builds = this.preset.builds;
     const list = [...this.visible].map((el) => [el, el.getBoundingClientRect()]).filter(([, b]) => b.bottom > mr.top - 40 && b.top < mr.bottom + 40);
     list.sort((a, b) => a[1].top - b[1].top || a[1].left - b[1].left);
-    // the lifted card draws last so it overlaps its neighbours
+    // the most lifted/tilted card draws last so it overlaps its neighbours (also while it springs back after release)
     const lifted = this.drag?.el;
-    list.sort((a, b) => (a[0] === lifted) - (b[0] === lifted));
+    const act = (el) => (el === lifted ? 2 : this.cards.get(el)?.card?.activity() || 0);
+    list.sort((a, b) => act(a[0]) - act(b[0]));
     r.setScissorTest(true);
     for (const [el, b] of list) {
       const rec = this.cards.get(el);
@@ -215,7 +220,7 @@ export class CardEngine {
         card.lightTarget.set(Math.sin(this.t * 0.4 + rec.phase) * 0.8, 0.7 + Math.cos(this.t * 0.3 + rec.phase) * 0.4, 1.4);
       }
       card.update(dt, this.t, { spin: !this.reduceMotion() });
-      const pad = b.width * (el === lifted ? 0.45 : 0.16);
+      const pad = b.width * (0.14 + 0.4 * (el === lifted ? 1 : card.activity()));
       const vx = b.left - pad, vy = H - b.bottom - pad, vw = b.width + pad * 2, vh = b.height + pad * 2;
       const sx = Math.max(vx, mr.left), sy = Math.max(vy, H - mr.bottom);
       const ex = Math.min(vx + vw, mr.right), ey = Math.min(vy + vh, H - mr.top);

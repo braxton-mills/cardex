@@ -44,7 +44,8 @@ export async function mount(el, _params, ctx) {
     h('div', { class: 'ch-gpu' }, icon('chip', 16), gpuLine, presetSel)));
   const syncChips = () => el.querySelectorAll('.fchip').forEach((b) => b.classList.toggle('on', b.classList.contains(`f-${only}`)));
 
-  const grid = h('div', { class: 'tcard-grid' });
+  // no native image/text drag: it would cancel the pointer drag that tilts a card
+  const grid = h('div', { class: 'tcard-grid', ondragstart: (e) => e.preventDefault() });
   el.append(grid);
 
   // ---- engine (three.js is only loaded for this tab)
@@ -106,7 +107,7 @@ export async function mount(el, _params, ctx) {
       'aria-label': `${i.label}: ${i.count ? `${FINISH_SHORT[i.finish]}, seen ${i.count} times` : 'not seen yet'}`,
     },
     h('div', { class: 'tc-fallback' },
-      i.cover?.crop ? h('img', { src: i.cover.crop, loading: 'lazy', alt: '' }) : h('div', { class: 'tc-nocrop' }, icon('car', 40)),
+      i.cover?.crop ? h('img', { src: i.cover.crop, loading: 'lazy', alt: '', draggable: 'false' }) : h('div', { class: 'tc-nocrop' }, icon('car', 40)),
       h('div', { class: 'tc-name' }, h('span', { class: 'cap' }, i.generic ? 'type' : i.make || ''), h('b', {}, name)),
       h('div', { class: 'tc-meta' }, h('span', {}, i.finish ? FINISH_SHORT[i.finish] : 'not yet'), h('b', { class: 'num' }, `${i.count}×`))));
   }

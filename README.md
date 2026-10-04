@@ -246,7 +246,7 @@ something as the counts grow (`/api/cards`, desktop only; cut-offs in `ui/sighti
 
 | Finish | Who gets it | Look |
 |---|---|---|
-| Special Illustration Rare (gold ★) | seen exactly once | full-bleed art over the real street frame from that sighting, gold border, glitter, the car breaks out of the frame |
+| Special Illustration Rare (gold ★) | seen exactly once | full-bleed art over the real street frame from that sighting, gold border, glitter |
 | Full art (★★) | rarest 10% | whole-card art, etched-line rainbow foil, silver border |
 | Holo rare (★) | next 15% | "cosmos" rainbow foil inside the art window |
 | Reverse holo (◆) | next 25% | sparkle foil everywhere except the art window |

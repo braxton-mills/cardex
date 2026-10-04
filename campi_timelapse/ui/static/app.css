@@ -576,7 +576,7 @@ body.cards-inspecting .cards-gl { z-index: 61; }
 .tcard.lifted { cursor: grabbing; z-index: 2; }
 .tcard.sel::after { content: ''; position: absolute; inset: -8px; border-radius: 18px; box-shadow: 0 0 0 2px rgba(255, 77, 141, .8), 0 0 30px rgba(255, 77, 141, .35); pointer-events: none; }
 .tc-fallback { position: absolute; inset: 0; display: flex; flex-direction: column; border-radius: 12px; overflow: hidden; padding: 10px; background: linear-gradient(165deg, rgba(255, 255, 255, .09), rgba(255, 255, 255, .02)); border: 1px solid var(--line); transition: opacity .5s var(--ease); }
-.tcard.gl-ready .tc-fallback { opacity: 0; }
+.tcard.gl-ready .tc-fallback { opacity: 0; pointer-events: none; }
 .tc-fallback img { width: 100%; aspect-ratio: 4 / 3; object-fit: cover; border-radius: 8px; }
 .tc-nocrop { display: grid; place-items: center; aspect-ratio: 4 / 3; color: var(--muted-2); }
 .tc-name { margin-top: 10px; display: flex; flex-direction: column; }

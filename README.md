@@ -1,4 +1,4 @@
-# campi
+# cardex
 
 A Raspberry Pi camera pointed at a street, and the software around it: a Windows PC turns the Pi's stream into
 10-minute and daily timelapse videos (RIFE frame interpolation on the GPU), logs every passing vehicle with a
@@ -14,7 +14,7 @@ The service is AGPL-3.0 because its sightings worker uses [Ultralytics YOLO](htt
 which is AGPL-3.0. The app and the contract don't depend on it and are MIT.
 
 ## Not supported
-This is built for one setup: a Windows 11 PC with an NVIDIA GPU (RIFE, NVENC) and an Intel iGPU (OpenVINO
+This is built for my setup: a Windows 11 PC with an NVIDIA GPU (RIFE, NVENC) and an Intel iGPU (OpenVINO
 sightings), a Raspberry Pi with a camera module, and Tailscale for reaching the PC from the phone. Paths, hardware
 choices and defaults assume that setup. It's published as-is for reference; issues and pull requests may not get a
 response.

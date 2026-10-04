@@ -1,6 +1,6 @@
 # Open questions on the PC specs
 
-These are ambiguities and conflicts found while writing `api-contract.md` against `docs/pc-ui-spec.md`,
+These are ambiguities and conflicts found while writing `../../api/api-contract.md` against `docs/pc-ui-spec.md`,
 `docs/pc-sightings-spec.md` and the PC repo as it is today. Each one has the default the contract adopted.
 **Bold** items change or add to a PC spec, and need a yes/no before the PC side is built.
 

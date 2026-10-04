@@ -1,4 +1,4 @@
-"""Shape validation for the Campi API contract (contract/schema.json). Stdlib only.
+"""Shape validation for the Campi API contract (api/contract/schema.json). Stdlib only.
 
     from campi_contract import Schema
     errors = Schema.load().validate(obj, "Sighting")   # [] when valid
@@ -10,9 +10,9 @@ import re
 from pathlib import Path
 from urllib.parse import parse_qs, urlsplit
 
-ROOT = Path(__file__).resolve().parent.parent
-SCHEMA_PATH = ROOT / "contract" / "schema.json"
-FIXTURES = ROOT / "contract" / "fixtures"
+ROOT = Path(__file__).resolve().parents[2]  # repo root (ios/tools/ -> .)
+SCHEMA_PATH = ROOT / "api" / "contract" / "schema.json"
+FIXTURES = ROOT / "api" / "contract" / "fixtures"
 
 DATETIME_RE = re.compile(r"^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}\.\d{3}[+-]\d{2}:\d{2}$")
 DATE_RE = re.compile(r"^\d{4}-\d{2}-\d{2}$")

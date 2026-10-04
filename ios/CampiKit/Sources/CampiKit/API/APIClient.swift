@@ -1,6 +1,6 @@
 import Foundation
 
-/// Client for the Campi PC API (docs/api-contract.md). Stateless and Sendable: a new token means a new client.
+/// Client for the Campi PC API (api/api-contract.md). Stateless and Sendable: a new token means a new client.
 public struct APIClient: Sendable {
     public let baseURL: URL
     let token: String

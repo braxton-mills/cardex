@@ -1,14 +1,14 @@
 # Campi API contract (v1)
 
 This document is the **source of truth for the Campi PC's HTTP API**. The PC side (the `campi ui` FastAPI
-server from `docs/pc-ui-spec.md`, plus the always-on mode added here) is built to match it, and the Campi iPhone
+server from `../ios/docs/pc-ui-spec.md`, plus the always-on mode added here) is built to match it, and the Campi iPhone
 app and the desktop UI both consume it.
 
 - Machine-readable shapes: `contract/schema.json`. Example responses: `contract/fixtures/`.
-- Compliance test: `python3 tools/contract_check.py <base-url> --token <token>` must pass against the PC.
-- Reference implementation for clients: `python3 tools/mock_server.py`.
+- Compliance test: `python3 ios/tools/contract_check.py <base-url> --token <token>` must pass against the PC.
+- Reference implementation for clients: `python3 ios/tools/mock_server.py`.
 - If this document and `schema.json` disagree, this document wins and `schema.json` gets fixed.
-- Open questions about the PC specs, and the defaults this contract chose, are in `docs/spec-questions.md`.
+- Open questions about the PC specs, and the defaults this contract chose, are in `../ios/docs/spec-questions.md`.
 
 Everything below is normative unless marked *(note)*.
 
@@ -669,7 +669,7 @@ Service alerts (`campi.alert`):
 
 ## Appendix A. PC-side requirements implied by this contract
 
-These are additions to `docs/pc-ui-spec.md` / `docs/pc-sightings-spec.md`. Where this appendix conflicts with
+These are additions to `../ios/docs/pc-ui-spec.md` / `../ios/docs/pc-sightings-spec.md`. Where this appendix conflicts with
 pc-ui-spec, this appendix wins for the API (see spec-questions.md).
 
 **A.1 Config** (new sections, defaults shown; with `enabled = false` nothing changes):

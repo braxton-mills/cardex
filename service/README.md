@@ -272,11 +272,11 @@ supervisor runs while no game is running and no render is using the card (`campi
 are lumpy, toy-like versions of the real car; the procedural model is the default.
 
 ## API
-The HTTP API for the [Campi iPhone app](https://github.com/braxton-mills/campi-ios) and the desktop UI. The
-contract is `docs/api-contract.md` in that repo (normative, v1); `tools/contract_check.py` there checks a running PC
-against it:
+The HTTP API for the [Campi iPhone app](../ios/) and the desktop UI. The contract is
+[`api/api-contract.md`](../api/api-contract.md) (normative, v1);
+[`ios/tools/contract_check.py`](../ios/tools/contract_check.py) checks a running PC against it:
 ```
-python ..\campi-ios\tools\contract_check.py http://127.0.0.1:8765 --token <token of a device paired for the check>
+python ..\ios\tools\contract_check.py http://127.0.0.1:8765 --token <token of a device paired for the check>
 ```
 
 ### Running it

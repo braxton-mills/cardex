@@ -1,10 +1,10 @@
 #!/usr/bin/env python3
-"""Mock Campi PC: implements docs/api-contract.md with synthetic data, for building the iOS app before the PC exists.
+"""Mock Campi PC: implements api/api-contract.md with synthetic data, for building the iOS app before the PC exists.
 
     python3 tools/mock_server.py                    # http://127.0.0.1:8765, dev token "mock-token"
     python3 tools/mock_server.py --host 0.0.0.0     # reachable from a phone on the LAN (debug builds only)
     python3 tools/mock_server.py --sightings-off --v1
-    python3 tools/mock_server.py --write-fixtures   # regenerate contract/fixtures/ (fixed clock and seed)
+    python3 tools/mock_server.py --write-fixtures   # regenerate api/contract/fixtures/ (fixed clock and seed)
     python3 tools/mock_server.py --print-push new_catch > /tmp/p.apns   # for `xcrun simctl push`
     curl -X POST http://127.0.0.1:8765/mock/pair-code                   # mock-only: issue a fresh pairing code
     python3 tools/mock_server.py --live busy --rotation 90               # exercise Live's error states / rotation

@@ -1,4 +1,4 @@
-"""Conventions of the Campi API contract (campi-ios docs/api-contract.md §2): time format, errors, paging and
+"""Conventions of the Campi API contract (api/api-contract.md §2): time format, errors, paging and
 strict parameter parsing. Every API module builds its answers with these helpers."""
 from __future__ import annotations
 

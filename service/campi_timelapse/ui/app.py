@@ -1,4 +1,4 @@
-"""The Campi HTTP API (campi-ios docs/api-contract.md, v1) plus the desktop UI's static frontend.
+"""The Campi HTTP API (api/api-contract.md, v1) plus the desktop UI's static frontend.
 
 Every /api request needs `Authorization: Bearer <token>` (also from 127.0.0.1: `tailscale serve` traffic arrives
 from loopback), except POST /api/pair. /media and /live accept a bearer token or a signed URL. Endpoints outside the

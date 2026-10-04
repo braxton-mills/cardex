@@ -1,10 +1,10 @@
 #!/usr/bin/env python3
-"""Check a running Campi API against docs/api-contract.md. Stdlib only.
+"""Check a running Campi API against api/api-contract.md. Stdlib only.
 
     python3 tools/contract_check.py http://127.0.0.1:8765 --token <token>
     python3 tools/contract_check.py https://campi-pc.tail1234.ts.net --pair K3J9-Q2M8     # code from `campi pair`
     python3 tools/contract_check.py https://campi-pc.tail1234.ts.net --token <token> --skip-live
-    python3 tools/contract_check.py --fixtures          # only validate contract/fixtures against schema.json
+    python3 tools/contract_check.py --fixtures          # only validate api/contract/fixtures against schema.json
 
 `--pair` pairs a device named "contract-check" with a code from `campi pair` and uses its token; revoke it afterwards
 with `campi devices revoke <id>` (the id is printed). Use a device paired just for this check: the check changes its push
@@ -534,7 +534,7 @@ def main(argv=None) -> int:
     ap.add_argument("base", nargs="?", help="base URL, e.g. http://127.0.0.1:8765")
     ap.add_argument("--token")
     ap.add_argument("--pair", metavar="CODE", help="pair a contract-check device with this code and use its token")
-    ap.add_argument("--fixtures", action="store_true", help="only validate contract/fixtures")
+    ap.add_argument("--fixtures", action="store_true", help="only validate api/contract/fixtures")
     ap.add_argument("--read-only", action="store_true", help="skip checks that change state")
     ap.add_argument("--skip-live", action="store_true")
     ap.add_argument("-v", "--verbose", action="store_true")

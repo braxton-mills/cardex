@@ -110,40 +110,40 @@ void main() {
     float region = (1.0 - art) * allow * (1.0 - border * 0.7);
     vec2 cell = floor(vUv * vec2(240.0, 335.0));
     vec3 fn = normalize(vec3(hash(cell) - 0.5, hash(cell + 3.1) - 0.5, 2.2));
-    float fleck = pow(max(dot(normalize(fn.x * T + fn.y * B + fn.z * N), H), 0.0), 160.0) * step(0.55, hash(cell + 9.7));
-    col = (rainbow * (0.16 + 1.25 * band) + vec3(1.0) * fleck * 2.2) * region;
+    float fleck = pow(max(dot(normalize(fn.x * T + fn.y * B + fn.z * N), H), 0.0), 320.0) * step(0.85, hash(cell + 9.7));
+    col = (rainbow * (0.12 + 0.9 * band) + vec3(1.0) * fleck * 0.45) * region;
   } else if (uFinish == 2) {                // holo rare: "cosmos" foil inside the art window
     float region = art * allow;
     float swirl = fbm(vUv * vec2(5.0, 7.0) + vt * 0.7);
     float neb = fbm(vUv * 2.6 + vec2(swirl * 1.3, -swirl));
     vec2 sc = floor(vUv * vec2(170.0, 237.0));
-    float star = step(0.982, hash(sc)) * (0.5 + 0.5 * sin(uTime * 3.0 + hash(sc + 1.0) * 40.0));
-    float twinkle = star * pow(ndh, 18.0) * 4.0;
+    float star = step(0.993, hash(sc)) * (0.5 + 0.5 * sin(uTime * 3.0 + hash(sc + 1.0) * 40.0));
+    float twinkle = star * pow(ndh, 24.0) * 0.9;
     vec3 c = hsv2rgb(vec3(fract(phase + neb * 0.7), 0.62, 1.0));
-    col = (c * (0.1 + 1.25 * band) * (0.35 + neb * 1.1) + vec3(twinkle)) * region;
+    col = (c * (0.08 + 0.95 * band) * (0.35 + neb * 1.1) + vec3(twinkle)) * region;
     col += border * rainbow * 0.08 * band;
   } else if (uFinish == 3) {                // full art: etched diagonal foil over the whole card
     float l = abs(fract((vUv.x * 0.8 + vUv.y * 1.12) * 95.0) - 0.5);
     float lines = smoothstep(0.22, 0.42, l);
     float tex = fbm(vUv * vec2(18.0, 25.0));
-    col = rainbow * (0.08 + 1.15 * band) * lines * (0.6 + tex * 0.7) * allow;
+    col = rainbow * (0.06 + 0.85 * band) * lines * (0.6 + tex * 0.7) * allow;
     col += border * mix(vec3(0.92, 0.95, 1.0), rainbow, 0.45) * (0.18 + 1.3 * band);
     col += vec3(glare) * 0.7;
   } else if (uFinish == 4) {                // special illustration rare: glitter + gold sweep + textured emboss
     vec2 cell = floor(vUv * vec2(160.0, 223.0));
     vec3 fn = normalize(vec3(hash(cell) - 0.5, hash(cell + 7.1) - 0.5, 1.4));
     vec3 Nf = normalize(fn.x * T + fn.y * B + fn.z * N);
-    float glit = pow(max(dot(Nf, H), 0.0), 420.0) * 7.0 * step(0.9, hash(cell + 2.3));
+    float glit = pow(max(dot(Nf, H), 0.0), 600.0) * 1.1 * step(0.95, hash(cell + 2.3));
     float tex = fbm(vUv * vec2(36.0, 50.0) + vec2(uTime * 0.01));
     vec3 gold = mix(vec3(1.0, 0.78, 0.32), rainbow, 0.5 + 0.3 * sin(phase * 3.0));
-    col = gold * (0.03 + 0.42 * band) * (0.35 + tex) * allow * (1.0 - art * 0.45);
-    col += vec3(1.0, 0.95, 0.82) * glit * allow;
-    col += border * vec3(1.0, 0.83, 0.42) * (0.3 + 1.4 * band);
+    col = gold * (0.02 + 0.3 * band) * (0.35 + tex) * allow * (1.0 - art * 0.6);
+    col += vec3(1.0, 0.95, 0.82) * glit * allow * (1.0 - art * 0.85);
+    col += border * vec3(1.0, 0.83, 0.42) * (0.25 + 1.0 * band);
   } else {                                  // not caught yet: dull
     col = vec3(glare * 0.2);
   }
   float fres = pow(1.0 - max(dot(N, V), 0.0), 4.0);
-  col += fres * rainbow * (uFinish >= 2 && uFinish <= 4 ? 0.35 : 0.08);
+  col += fres * rainbow * (uFinish >= 2 && uFinish <= 4 ? 0.2 : 0.06);
   gl_FragColor = vec4(col * uStrength, 1.0);
 }`,
     transparent: true,
@@ -170,7 +170,7 @@ void main() {
   p.x += sin(uTime * 0.6 + seed * 20.0) * 0.03;
   vec4 mv = modelViewMatrix * vec4(p, 1.0);
   vA = pow(0.5 + 0.5 * sin(uTime * (2.0 + seed * 3.0) + seed * 50.0), 6.0);
-  gl_PointSize = uScale * (6.0 + seed * 16.0) / -mv.z;
+  gl_PointSize = uScale * (4.0 + seed * 9.0) / -mv.z;
   gl_Position = projectionMatrix * mv;
 }`,
     fragmentShader: /* glsl */`
@@ -181,7 +181,7 @@ void main() {
   float r = length(d);
   float cross = max(0.0, 1.0 - abs(d.x) * 9.0) * max(0.0, 1.0 - abs(d.y) * 1.6) + max(0.0, 1.0 - abs(d.y) * 9.0) * max(0.0, 1.0 - abs(d.x) * 1.6);
   float a = (smoothstep(0.5, 0.0, r) * 0.6 + cross) * vA;
-  gl_FragColor = vec4(uColor * a * 2.5, 1.0);
+  gl_FragColor = vec4(uColor * a * 0.9, 1.0);
 }`,
     transparent: true, blending: THREE.AdditiveBlending, depthWrite: false,
   });

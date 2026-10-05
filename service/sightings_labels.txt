@@ -157,6 +157,7 @@ Volvo | XC90
 Porsche | 911
 Porsche | Cayenne
 Porsche | Macan
+Alfa Romeo | Giulia
 Mitsubishi | Outlander
 Mitsubishi | Mirage
 Rivian | R1T

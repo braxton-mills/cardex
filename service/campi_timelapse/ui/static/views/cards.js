@@ -120,14 +120,16 @@ export async function mount(el, _params, ctx) {
     close();
     engine.openInspector(item, { scanned });
     const finish = item.count ? item.finish : null;
-    const stage = h('div', { class: 'cards-insp', role: 'dialog', 'aria-label': `${item.label} card` });
+    // input layer (below the WebGL canvas, which is click-through) + chrome layer (above the canvas)
+    const stage = h('div', { class: 'cards-insp' });
+    const ui = h('div', { class: 'cards-insp-ui', role: 'dialog', 'aria-label': `${item.label} card` });
     const autoBtn = iconButton('play', 'Auto tilt (A)', () => { engine.insp.auto = !engine.insp.auto; autoBtn.classList.toggle('on', engine.insp.auto); });
     autoBtn.classList.toggle('on', !!engine.insp?.auto);
     const modelBtn = item.mesh ? h('button', {
       class: 'pill-btn', title: 'Switch between the procedural model and the 3D scan',
       onclick: () => { const c3 = engine.insp.card; c3.setCar(c3.carKind === 'scanned' ? 'procedural' : 'scanned'); modelBtn.textContent = c3.carKind === 'scanned' ? 'Scan' : 'Procedural'; },
     }, scanned ? 'Scan' : 'Procedural') : null;
-    stage.append(
+    ui.append(
       h('div', { class: 'ci-top' },
         h('div', { class: 'ci-title' },
           h('span', { class: `fbadge f-${finish || 'none'}` }, finish ? (finishInfo[finish]?.label || FINISH_SHORT[finish]) : 'Not caught yet'),
@@ -143,17 +145,18 @@ export async function mount(el, _params, ctx) {
           stat('Paint', item.color ? `${item.color.name}${item.color.known ? '' : ' (guess)'}` : '—'),
           item.year_range ? stat('Years', item.year_range) : null),
         h('div', { class: 'grow' }),
-        h('span', { class: 'muted ci-hint' }, 'Drag to tilt · double-click to flip · scroll to zoom'),
+        h('span', { class: 'muted ci-hint' }, 'Drag to tilt · double-click to flip · scroll to zoom · click outside or Esc to close'),
         item.count ? h('a', { class: 'pill-btn', href: `#/sightings${qs({ label: item.label })}` }, 'Sightings', icon('arrowRight', 16)) : null));
-    document.body.append(stage);
-    engine.attachInspector(stage);
-    requestAnimationFrame(() => stage.classList.add('in'));
-    insp = stage;
+    document.body.append(stage, ui);
+    engine.attachInspector(stage, close);
+    requestAnimationFrame(() => { stage.classList.add('in'); ui.classList.add('in'); });
+    insp = { stage, ui };
   }
   const stat = (k, v) => h('div', {}, h('span', { class: 'cap' }, k), h('b', {}, v));
   function close() {
     if (!insp) return;
-    insp.remove();
+    insp.stage.remove();
+    insp.ui.remove();
     insp = null;
     engine?.closeInspector();
   }

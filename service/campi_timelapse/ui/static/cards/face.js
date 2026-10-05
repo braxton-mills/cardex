@@ -253,66 +253,6 @@ function mix(a, b, t) {
   return `rgb(${x.map((v, i) => Math.round(v + (y[i] - v) * t)).join(',')})`;
 }
 
-// Art backdrop behind the car: an illustrated sky/skyline/road for standard cards, a speed-line burst for full art,
-// the real street frame (painterly) for SIR once it loads.
-export function drawBackdrop(item, type, finish, img = null) {
-  const c = canvas(1024, 1.25);
-  const x = c.getContext('2d');
-  const W = c.width, H = c.height;
-  if (finish === 'sir' && img) {
-    const s = Math.max(W / img.width, H / img.height) * 1.08;
-    x.filter = 'saturate(1.55) contrast(1.12) brightness(1.06) blur(1.2px)';
-    x.drawImage(img, (W - img.width * s) / 2, H * 0.62 - img.height * s * 0.6, img.width * s, img.height * s);
-    x.filter = 'none';
-    const glow = x.createRadialGradient(W * 0.5, H * 0.45, 10, W * 0.5, H * 0.45, W * 0.8);
-    glow.addColorStop(0, 'rgba(255,240,200,.25)'); glow.addColorStop(1, 'rgba(40,20,80,.35)');
-    x.fillStyle = glow; x.fillRect(0, 0, W, H);
-    return c;
-  }
-  if (finish === 'fullart' || finish === 'sir') {
-    const g = x.createRadialGradient(W / 2, H * 0.48, 10, W / 2, H * 0.48, W);
-    g.addColorStop(0, '#ffffff'); g.addColorStop(0.18, type.light); g.addColorStop(0.55, type.deep); g.addColorStop(1, type.accent);
-    x.fillStyle = g; x.fillRect(0, 0, W, H);
-    x.save(); x.translate(W / 2, H * 0.48);
-    for (let i = 0; i < 90; i++) {
-      const a = (i / 90) * Math.PI * 2 + Math.random() * 0.03;
-      x.rotate(a - (i ? (i - 1) / 90 * Math.PI * 2 : 0));
-      x.globalAlpha = 0.08 + Math.random() * 0.12;
-      x.fillStyle = i % 2 ? '#fff' : type.light;
-      x.beginPath(); x.moveTo(40, -2); x.lineTo(W, -14 - Math.random() * 20); x.lineTo(W, 14 + Math.random() * 20); x.lineTo(40, 2); x.fill();
-    }
-    x.restore();
-    for (let i = 0; i < 60; i++) {
-      x.globalAlpha = 0.1 + Math.random() * 0.25;
-      x.fillStyle = '#fff';
-      x.beginPath(); x.arc(Math.random() * W, Math.random() * H, 3 + Math.random() * 22, 0, Math.PI * 2); x.fill();
-    }
-    x.globalAlpha = 1;
-    return c;
-  }
-  // sky
-  const sky = x.createLinearGradient(0, 0, 0, H * 0.62);
-  sky.addColorStop(0, mix(type.deep, '#0b1030', 0.35)); sky.addColorStop(0.55, type.deep); sky.addColorStop(1, type.light);
-  x.fillStyle = sky; x.fillRect(0, 0, W, H);
-  const sun = x.createRadialGradient(W * 0.68, H * 0.38, 4, W * 0.68, H * 0.38, W * 0.36);
-  sun.addColorStop(0, 'rgba(255,250,230,.95)'); sun.addColorStop(0.12, 'rgba(255,240,200,.6)'); sun.addColorStop(1, 'rgba(255,240,200,0)');
-  x.fillStyle = sun; x.fillRect(0, 0, W, H);
-  // skyline
-  let seed = [...(item.label || 'x')].reduce((a, ch) => (a * 31 + ch.charCodeAt(0)) >>> 0, 7);
-  const rnd = () => ((seed = (seed * 1664525 + 1013904223) >>> 0) / 4294967296);
-  for (const [alpha, base, hmax] of [[0.28, 0.6, 0.3], [0.5, 0.62, 0.18]]) {
-    x.fillStyle = type.accent; x.globalAlpha = alpha;
-    let bx = 0;
-    while (bx < W) { const bw = 30 + rnd() * 70, bh = H * (0.04 + rnd() * hmax); x.fillRect(bx, H * base - bh, bw - 4, bh + 2); bx += bw; }
-  }
-  x.globalAlpha = 1;
-  // ground haze
-  const haze = x.createLinearGradient(0, H * 0.5, 0, H * 0.64);
-  haze.addColorStop(0, 'rgba(255,255,255,0)'); haze.addColorStop(1, 'rgba(255,255,255,.35)');
-  x.fillStyle = haze; x.fillRect(0, H * 0.5, W, H * 0.14);
-  return c;
-}
-
 // Road/ground texture under the car (fades to transparent at the edges)
 export function drawGround(type, full) {
   const c = canvas(512, 1);

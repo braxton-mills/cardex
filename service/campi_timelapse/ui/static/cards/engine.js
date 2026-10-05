@@ -11,6 +11,7 @@ import { UnrealBloomPass } from 'three/addons/postprocessing/UnrealBloomPass.js'
 import { OutputPass } from 'three/addons/postprocessing/OutputPass.js';
 import { Card3D } from './card3d.js';
 import { sparkleMaterial } from './shaders.js';
+import { paintLayers } from './art.js';
 import { bodyStyle } from './styles.js';
 
 const dpr = () => window.devicePixelRatio || 1;
@@ -22,7 +23,7 @@ export const PRESETS = {
   low: { label: 'Low', gridDpr: () => 1, inspDpr: () => 1, bloom: false, shadows: false, shadowSize: 1024, hq: false, facePx: 600, inspFacePx: 1024, sparkles: 250, builds: 2 },
 };
 const SPARKLE = { sir: '#ffd36b', fullart: '#d8e8ff', holo: '#ffffff', reverse: '#c4f1ff', plain: '#ffffff', none: '#000000' };
-const SPARKLE_N = { sir: 1, fullart: 0.85, holo: 0.6, reverse: 0.4, plain: 0.2, none: 0 };
+const SPARKLE_N = { sir: 0.25, fullart: 0.18, holo: 0.12, reverse: 0, plain: 0, none: 0 };
 
 export function gpuName(renderer) {
   const gl = renderer.getContext();
@@ -249,15 +250,33 @@ export class CardEngine {
     });
     card.camera.fov = 30;
     const scene = card.scene;
-    const bg = document.createElement('canvas');
-    bg.width = bg.height = 512;
-    const g = bg.getContext('2d');
-    const grd = g.createRadialGradient(256, 230, 10, 256, 256, 380);
-    grd.addColorStop(0, card.finish === 'none' ? '#1a1c26' : `${card.type.deep}55`);
-    grd.addColorStop(0.45, '#0c0d1a'); grd.addColorStop(1, '#04040a');
-    g.fillStyle = '#05050b'; g.fillRect(0, 0, 512, 512); g.fillStyle = grd; g.fillRect(0, 0, 512, 512);
-    const bgT = new THREE.CanvasTexture(bg); bgT.colorSpace = THREE.SRGBColorSpace;
-    scene.background = bgT;
+    // background artwork: the card type's scene in depth layers fixed to the camera, shifted with the pointer
+    scene.add(card.camera);
+    const bgLayers = [];
+    paintLayers(card.type.key, card.finish).forEach(({ depth, canvas }) => {
+      const t = new THREE.CanvasTexture(canvas);
+      t.colorSpace = THREE.SRGBColorSpace;
+      const dim = card.finish === 'none' ? 0.28 : 0.5;
+      const m = new THREE.MeshBasicMaterial({ map: t, transparent: true, depthWrite: false, color: new THREE.Color(dim, dim, dim) });
+      const mesh = new THREE.Mesh(new THREE.PlaneGeometry(1, 1), m);
+      mesh.renderOrder = -100 + depth;
+      mesh.userData = { depth, dist: 6.6 - depth * 0.4, aspect: canvas.width / canvas.height };
+      card.camera.add(mesh);
+      bgLayers.push(mesh);
+    });
+    const vig = document.createElement('canvas');
+    vig.width = vig.height = 256;
+    const g = vig.getContext('2d');
+    const grd = g.createRadialGradient(128, 128, 40, 128, 128, 182);
+    grd.addColorStop(0, 'rgba(4,4,10,0)'); grd.addColorStop(1, 'rgba(4,4,10,.85)');
+    g.fillStyle = grd; g.fillRect(0, 0, 256, 256);
+    const vigT = new THREE.CanvasTexture(vig);
+    const vigMesh = new THREE.Mesh(new THREE.PlaneGeometry(1, 1), new THREE.MeshBasicMaterial({ map: vigT, transparent: true, depthWrite: false }));
+    vigMesh.renderOrder = -90;
+    vigMesh.userData = { depth: 4, dist: 4.6, aspect: 0 };
+    card.camera.add(vigMesh);
+    bgLayers.push(vigMesh);
+    scene.background = new THREE.Color('#04040a');
     const n = Math.round(p.sparkles * (SPARKLE_N[card.finish] ?? 0.3));
     let sparks = null;
     if (n) {
@@ -283,9 +302,9 @@ export class CardEngine {
     composer.setSize(w, h);
     composer.addPass(new RenderPass(scene, card.camera));
     let bloom = null;
-    if (p.bloom) { bloom = new UnrealBloomPass(new THREE.Vector2(w, h), 0.42, 0.38, 1.0); composer.addPass(bloom); }
+    if (p.bloom) { bloom = new UnrealBloomPass(new THREE.Vector2(w, h), 0.3, 0.35, 1.0); composer.addPass(bloom); }
     composer.addPass(new OutputPass());
-    this.insp = { item, card, composer, sparks, bgT, zoom: 0.8, auto: !this.reduceMotion(), size: `${w}x${h}x${pr}` };
+    this.insp = { item, card, composer, sparks, bgLayers, ptr: new THREE.Vector2(), ptrT: new THREE.Vector2(), zoom: 0.8, auto: !this.reduceMotion(), size: `${w}x${h}x${pr}` };
     card.s.ry = -Math.PI * 0.9; card.s.lift = -0.6; // fly in, flipping from the back
     document.body.classList.add('cards-inspecting');
     return card;
@@ -298,19 +317,25 @@ export class CardEngine {
     ins.composer.renderTarget1.dispose(); ins.composer.renderTarget2.dispose();
     for (const pass of ins.composer.passes) pass.dispose?.();
     ins.sparks?.geometry.dispose(); ins.sparks?.material.dispose();
-    ins.bgT.dispose();
+    for (const m of ins.bgLayers) { m.geometry.dispose(); m.material.map.dispose(); m.material.dispose(); }
     ins.card.dispose();
     this.renderer.shadowMap.enabled = false;
     document.body.classList.remove('cards-inspecting');
   }
 
   // drag / flip / zoom in the inspector (pointer events from the overlay element)
-  attachInspector(el) {
+  attachInspector(el, onClose = null) {
     let d = null;
+    const ray = new THREE.Raycaster();
+    const onCard = (e) => {
+      const c = this.insp.card;
+      ray.setFromCamera(new THREE.Vector2((e.clientX / window.innerWidth) * 2 - 1, -((e.clientY / window.innerHeight) * 2 - 1)), c.camera);
+      return ray.intersectObjects([c.face, c.backMesh], false).length > 0;
+    };
     const down = (e) => {
       if (!this.insp || e.target.closest('button, a, select')) return;
       const s = this.insp.card.s;
-      d = { id: e.pointerId, x0: e.clientX, y0: e.clientY, ry: s.try, rx: s.trx };
+      d = { id: e.pointerId, x0: e.clientX, y0: e.clientY, t0: performance.now(), ry: s.try, rx: s.trx, moved: 0 };
       el.setPointerCapture(e.pointerId);
       this.insp.dragging = true;
     };
@@ -318,18 +343,22 @@ export class CardEngine {
       if (!this.insp) return;
       const nx = (e.clientX / window.innerWidth) * 2 - 1, ny = -((e.clientY / window.innerHeight) * 2 - 1);
       this.insp.card.lightTarget.set(nx * 1.6, ny * 1.6, 1.5);
+      this.insp.ptrT.set(nx, ny);
       if (!d || e.pointerId !== d.id) return;
+      d.moved = Math.max(d.moved, Math.hypot(e.clientX - d.x0, e.clientY - d.y0));
       const s = this.insp.card.s;
       s.try = d.ry + (e.clientX - d.x0) * 0.0085;
       s.trx = THREE.MathUtils.clamp(d.rx + (e.clientY - d.y0) * 0.0065, -1.1, 1.1);
     };
     const up = (e) => {
       if (!d || e.pointerId !== d.id || !this.insp) return;
+      const click = e.type === 'pointerup' && d.moved < 6 && performance.now() - d.t0 < 450;
       d = null;
       this.insp.dragging = false;
       const s = this.insp.card.s;
       s.try = Math.round(s.try / Math.PI) * Math.PI; // settle on the front or the back
       s.trx = 0;
+      if (click && onClose && !onCard(e)) onClose(); // a click beside the card closes the inspector
     };
     const wheel = (e) => {
       if (!this.insp) return;
@@ -365,6 +394,18 @@ export class CardEngine {
     card.update(dt, this.t, { spin: !this.reduceMotion() });
     card.root.position.y = Math.sin(this.t * 1.1) * 0.012;
     card.fit(this.size.w / this.size.h, ins.zoom);
+    // background parallax: follows the pointer and a little of the card's tilt
+    ins.ptr.lerp(ins.ptrT, 1 - Math.exp(-dt * 4));
+    const cam = card.camera, vh = 2 * Math.tan(THREE.MathUtils.degToRad(cam.fov / 2));
+    const tilt = card.s.ry - Math.round(card.s.ry / Math.PI) * Math.PI;
+    for (const m of ins.bgLayers) {
+      const { depth, dist, aspect } = m.userData;
+      const h = vh * dist, w = h * cam.aspect;
+      const sw = aspect ? Math.max(w, h * aspect) * 1.1 : w * 1.02, sh = aspect ? sw / aspect : h * 1.02;
+      m.scale.set(sw, sh, 1);
+      const k = [0.012, 0.03, 0.05, 0.075, 0][depth] * dist;
+      m.position.set(-(ins.ptr.x * 0.6 + tilt * 0.5) * k, -ins.ptr.y * 0.4 * k + (aspect ? (sh - h) * 0.1 : 0), -dist);
+    }
     if (ins.sparks) ins.sparks.material.uniforms.uTime.value = this.t, ins.sparks.material.uniforms.uScale.value = this.size.h * pr * 0.0022;
     this.renderer.setViewport(0, 0, this.size.w, this.size.h);
     ins.composer.render(dt);

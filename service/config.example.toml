@@ -39,9 +39,11 @@ cq = 19                      # NVENC constant quality (libx264 fallback uses crf
 [image]
 rotation = 0                 # 0 / 90 / 180 / 270, clockwise
 level_deg = 0.0              # extra counter-clockwise leveling; output is cropped so there are no black corners
-dim_region = []              # polygon, 0-1 of the camera frame, e.g. [[0.76, 0.5], [1.0, 0.5], [1.0, 0.6], [0.76, 0.6]]:
-                             # bright lights in frame; [] = off. Renders only (live view and sightings see raw)
-dim_strength = 0.6           # at night, brightness above the knee in dim_region is compressed by this much (1 = flat)
+dim_region = []              # polygon, 0-1 of the camera frame, e.g. [[0.76, 0.5], [1.0, 0.5], [1.0, 0.6], [0.76, 0.6]]
+                             # where to look for bright lights (glare around it is caught too, the edge is feathered);
+                             # [] = off. Renders only (live view and sightings see raw)
+dim_strength = 0.6           # at night, share of the glare above the knee (in stops of local brightness) removed
+                             # in and around dim_region; small lamps stay bright, blown-out white takes the glow colour
 
 [deflicker]
 mode = "luma"                # luma (match each frame to a rolling average) | ffmpeg (deflicker filter) | off

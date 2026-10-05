@@ -4,7 +4,8 @@
 // (alpha 0 inside the window) and the additive foil layer go on top. Every car is stencilled to the window and sits
 // entirely behind the card plane, so tilting never shows it through the face, past the edges or out of the back.
 import * as THREE from 'three';
-import { CARD_H, CARD_W, drawBackdrop, drawBack, drawFace, drawGround } from './face.js';
+import { CARD_H, CARD_W, drawBack, drawFace, drawGround } from './face.js';
+import { paintBackdrop } from './art.js';
 import { faceMaterial, foilMaterial } from './shaders.js';
 import { material, proceduralCar, scannedCar } from './car.js';
 
@@ -42,6 +43,13 @@ function cardGeometry(r) {
 const STENCIL_EQ = { stencilWrite: true, stencilRef: 1, stencilFunc: THREE.EqualStencilFunc, stencilFail: THREE.KeepStencilOp, stencilZFail: THREE.KeepStencilOp, stencilZPass: THREE.KeepStencilOp };
 
 const backTex = new WeakMap();
+const sceneTexs = new WeakMap(); // renderer -> Map(key -> texture), shared by every card showing that scene
+function sceneTex(renderer, typeKey, finish, variant) {
+  if (!sceneTexs.has(renderer)) sceneTexs.set(renderer, new Map());
+  const m = sceneTexs.get(renderer), key = `${typeKey}|${finish}|${variant}`;
+  if (!m.has(key)) m.set(key, tex(paintBackdrop(typeKey, finish, variant), renderer));
+  return m.get(key);
+}
 
 export class Card3D {
   // opts: {renderer, env, quality: {hq, shadows, shadowSize}, gpu, total, px, inspector, scanned}
@@ -102,23 +110,11 @@ export class Card3D {
     back.position.set(0, ah * 0.25, -0.75);
     dio.add(back);
     this.backdrop = back;
-    const bdCanvas = drawBackdrop(item, d.type, this.finish === 'none' ? 'plain' : this.finish);
-    const bdT = tex(bdCanvas, renderer);
-    back.material.map = bdT;
-    back.material.color.set(this.finish === 'none' ? '#6a6e78' : this.full ? '#b8bcc4' : '#d9dadd'); // keeps the sky under the bloom threshold
-    this.disposables.push(back.geometry, back.material, bdT);
-    if (this.sir && item.cover?.frame) {
-      const img = new Image();
-      img.onload = () => {
-        if (this.disposed) return;
-        const t = tex(drawBackdrop(item, d.type, 'sir', img), renderer);
-        back.material.map?.dispose();
-        back.material.map = t;
-        back.material.needsUpdate = true;
-        this.disposables.push(t);
-      };
-      img.src = item.cover.frame;
-    }
+    // illustrated scenery for the card's type (shared texture per scene; never disposed with the card)
+    const variant = [...(item.label || '')].reduce((a, ch) => a + ch.charCodeAt(0), 0) % 2;
+    back.material.map = sceneTex(renderer, d.type.key, this.finish, variant);
+    back.material.color.set(this.finish === 'none' ? '#5a5e66' : this.full ? '#e4e6ea' : '#eceef0'); // keeps the sky under the bloom threshold
+    this.disposables.push(back.geometry, back.material);
     const groundY = this.full ? -0.07 : -ah * 0.36; // full art: the car sits between the header and the moves
     const groundT = tex(drawGround(d.type, this.full), renderer);
     const ground = new THREE.Mesh(new THREE.PlaneGeometry(aw * 2.2, 1.2), new THREE.MeshStandardMaterial({
@@ -208,6 +204,7 @@ export class Card3D {
     const backMesh = new THREE.Mesh(geo, backMat);
     backMesh.rotation.y = Math.PI;
     backMesh.position.z = -THICK;
+    this.backMesh = backMesh;
     this.root.add(backMesh);
     this.disposables.push(edgeGeo, edgeMat, backMat);
   }
@@ -247,7 +244,7 @@ export class Card3D {
     cam.aspect = aspect;
     const half = THREE.MathUtils.degToRad(cam.fov / 2);
     cam.position.set(0, 0, (0.5 / fill) / Math.tan(half));
-    cam.near = 0.05; cam.far = cam.position.z + 5;
+    cam.near = 0.05; cam.far = Math.max(cam.position.z + 5, 8); // the inspector backdrop sits up to 6.6 out
     cam.updateProjectionMatrix();
   }
 

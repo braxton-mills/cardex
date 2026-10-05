@@ -69,28 +69,44 @@ def deflicker_gains(lumas: list[float], window: int, lo: float, hi: float) -> np
 
 
 class LightDimmer:
-    """Pull bright pixels inside a polygon down on dark frames (e.g. floodlights that blow out at night).
+    """Tame floodlights that blow out at night, in and around a polygon (0-1 of the camera frame, before leveling, so
+    it matches the live view).
 
-    Works on the camera frame before leveling, so the polygon (0-1 of the frame) matches what the live view shows.
-    Brightness above KNEE is compressed by (1 - strength), keeping brighter pixels brighter (a flat multiplier would
-    turn the lamps into dark holes inside their glow); below KNEE nothing changes. Colour is scaled with the
-    brightness, the polygon edge is feathered, and the effect follows night_weight()."""
-    KNEE = 60.0
+    The gain follows the local brightness (luminance blurred over about SIGMA of the frame width), not each pixel:
+    big blown-out areas and their glare are pulled down as a whole, the texture inside them survives, and small lamps
+    on a dark background (which barely lift the local average) stay bright points. Local brightness above KNEE is
+    compressed in log space with a soft knee, so there is no visible threshold; `strength` is how much of the excess
+    (in stops) is removed. Pixels that clipped to white have no colour of their own, so as they are dimmed they take
+    the tint of the unclipped glow around them instead of going grey. The polygon only says where to look: its edge
+    is feathered widely, and as the gain is 1 wherever the scene is dark, the edge never shows. Follows night_weight().
+    """
+    KNEE = 60.0        # local brightness (0-255) where compression starts
+    SOFT = 0.6         # knee width, stops
+    SIGMA = 0.008      # local-brightness blur, fraction of the frame width (lamps are smaller, buildings larger)
+    TINT_SIGMA = 0.02  # how far clipped pixels look for the colour of their glow
+    RECON_DEPTH = 0.01  # clipped blobs: +1 stop of estimated brightness per this much depth (fraction of width)
+    RECON_STOPS = 3.0   # ... up to this many stops
+    RECON_LOCAL = 0.5   # share of those stops that counts toward the local brightness (how hard glare is pulled down)
+    SCALE = 4          # the blurs run at 1/SCALE resolution
 
-    def __init__(self, polygon, strength: float, feather: float = 0.01):
+    def __init__(self, polygon, strength: float, feather: float = 0.04):
         self.poly = np.asarray(polygon, np.float32) if len(polygon) >= 3 else None
         self.strength, self.feather = float(strength), feather
         self._shape = None
 
     def _build(self, h: int, w: int):
         r = max(1, round(self.feather * w))
-        pts = np.round(self.poly * [w - 1, h - 1]).astype(np.int32)
-        x0, y0 = np.maximum(pts.min(0) - 3 * r, 0)
-        x1, y1 = np.minimum(pts.max(0) + 3 * r + 1, [w, h])
-        mask = np.zeros((y1 - y0, x1 - x0), np.float32)
-        cv2.fillPoly(mask, [pts - [x0, y0]], 1.0)
-        self.mask = cv2.GaussianBlur(mask, (0, 0), r)
+        pts = self.poly * [w - 1, h - 1]
+        x0, y0 = np.maximum(np.floor(pts.min(0)).astype(int) - 2 * r, 0)
+        x1, y1 = np.minimum(np.ceil(pts.max(0)).astype(int) + 2 * r + 1, [w, h])
         self.box, self._shape = (slice(y0, y1), slice(x0, x1)), (h, w)
+        s = self.SCALE
+        self.small = (max(1, (x1 - x0) // s), max(1, (y1 - y0) // s))  # cv2 (width, height)
+        mask = np.zeros(self.small[::-1], np.float32)
+        cv2.fillPoly(mask, [np.round((pts - [x0, y0]) / s).astype(np.int32)], 1.0)
+        self.mask = cv2.GaussianBlur(mask, (0, 0), r / s)
+        self.sigma, self.tint_sigma = max(0.5, self.SIGMA * w / s), max(0.5, self.TINT_SIGMA * w / s)
+        self.recon = max(0.5, self.RECON_DEPTH * w / s)
 
     def __call__(self, img: np.ndarray, frame_luma: float) -> np.ndarray:
         night = night_weight(frame_luma)
@@ -98,12 +114,48 @@ class LightDimmer:
             return img
         if self._shape != img.shape[:2]:
             self._build(*img.shape[:2])
-        roi = img[self.box].astype(np.float32)
-        y = np.maximum(cv2.cvtColor(roi, cv2.COLOR_BGR2GRAY), 1.0)
-        compressed = np.where(y > self.KNEE, self.KNEE + (y - self.KNEE) * (1.0 - self.strength), y)
-        f = 1.0 - night * self.mask * (1.0 - compressed / y)
+        roi8 = img[self.box]
+        rh, rw = roi8.shape[:2]
+        small = cv2.resize(roi8, self.small, interpolation=cv2.INTER_AREA).astype(np.float32)
+        ys = cv2.cvtColor(small, cv2.COLOR_BGR2GRAY)
+
+        # clipped blobs lost their falloff: estimate it, one stop brighter per RECON_DEPTH of depth into the blob
+        # (capped), so big glare fades toward its source instead of becoming a flat wall; small lamps barely change
+        clip_s = (np.max(small, axis=2) >= 250).astype(np.uint8)
+        depth = cv2.distanceTransform(clip_s, cv2.DIST_L2, 3) if clip_s.any() else np.zeros_like(ys)
+        boost = np.exp2(np.minimum(cv2.GaussianBlur(depth, (0, 0), 1.5) / self.recon, self.RECON_STOPS))
+        ys = ys * boost ** self.RECON_LOCAL
+
+        # gain from the local brightness: log2(local) - strength * softplus(log2(local) - log2(knee))
+        excess = np.log2(cv2.GaussianBlur(ys, (0, 0), self.sigma) + 1.0) - math.log2(self.KNEE + 1.0)
+        soft = self.SOFT * np.logaddexp2(0.0, excess / self.SOFT)
+        gain = 1.0 - night * self.mask * (1.0 - np.exp2(-self.strength * soft))
+
+        # colour of the unclipped glow nearby, per channel relative to luminance (1 = neutral where there is none)
+        wgt = ((ys > 40) & (ys < 230)).astype(np.float32)
+        num = cv2.GaussianBlur(small * wgt[..., None], (0, 0), self.tint_sigma)
+        den = cv2.GaussianBlur(ys * wgt, (0, 0), self.tint_sigma)
+        tint = (num + 2.0) / (den[..., None] + 2.0)
+        tint /= np.maximum(tint @ np.float32([0.114, 0.587, 0.299]), 1e-3)[..., None]
+        tint = np.clip(tint, 0.35, 1.8)
+
+        gain = cv2.resize(gain, (rw, rh), interpolation=cv2.INTER_LINEAR)
+        out = cv2.multiply(roi8.astype(np.float32), cv2.merge([gain, gain, gain]))
+        # clipped pixels (few): as they are dimmed, use the reconstructed brightness and the glow's colour (theirs
+        # is lost). The tint is smooth, so it is sampled nearest from the small grid; the boost is interpolated.
+        mx = cv2.max(cv2.max(roi8[..., 0], roi8[..., 1]), roi8[..., 2])
+        yy, xx = np.nonzero(mx > 235)
+        if yy.size:
+            g = gain[yy, xx]
+            amount = (np.clip((mx[yy, xx] - 235.0) / 20.0, 0.0, 1.0) * np.clip((1.0 - g) * 2.5, 0.0, 1.0))[:, None]
+            sh, sw = boost.shape
+            si, sj = np.minimum(yy * sh // rh, sh - 1), np.minimum(xx * sw // rw, sw - 1)
+            b = cv2.resize(boost, (rw, rh), interpolation=cv2.INTER_LINEAR)[yy, xx]
+            o = out[yy, xx]
+            y = o @ np.float32([0.114, 0.587, 0.299])
+            out[yy, xx] = o + amount * ((y * b)[:, None] * tint[si, sj] - o)
         img = img.copy()
-        img[self.box] = np.clip(roi * f[..., None], 0, 255).astype(np.uint8)
+        img[self.box] = cv2.convertScaleAbs(out)  # rounds and saturates to uint8
         return img
 
 

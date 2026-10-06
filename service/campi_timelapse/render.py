@@ -4,10 +4,14 @@ from __future__ import annotations
 import json
 import logging
 import os
+import queue
 import shutil
 import statistics
 import subprocess
+import threading
 import time
+from collections import deque
+from concurrent.futures import ThreadPoolExecutor
 from datetime import date, datetime, timedelta
 from pathlib import Path
 
@@ -29,6 +33,10 @@ class EncodeError(RuntimeError):
 
 class Skip(Exception):
     pass
+
+
+class Aborted(Exception):
+    """Another render stage failed; this one stops quietly."""
 
 
 # ---------------------------------------------------------------- encoding
@@ -95,7 +103,31 @@ def replace_retry(src: Path, dst: Path, tries=5) -> None:
 
 # ---------------------------------------------------------------- core
 
-def render_frames(cfg, frames: list[fr.Frame], out_path: Path, job_name: str, encoder: str) -> dict:
+CHUNK_MIN, CHUNK_MAX = 120, 300  # frames per RIFE run: each run costs ~1.2 s to start (measured: 2 chunks per
+                                 # 300-frame clip beat 3 or 4)
+
+
+def chunk_size(n: int) -> int:
+    """About half the segment, so prep, RIFE and the encode overlap even for a single-segment clip."""
+    return max(CHUNK_MIN, min(CHUNK_MAX, -(-n // 2)))
+
+
+def read_ahead(paths, pool: ThreadPoolExecutor, depth: int = 8):
+    """cv2.imread each path in order, keeping up to `depth` reads in flight on the pool (cv2 releases the GIL), so
+    reading RIFE's output overlaps the overlay and the encode without holding a whole segment in memory."""
+    pending = deque()
+    for p in paths:
+        pending.append(pool.submit(cv2.imread, str(p), cv2.IMREAD_COLOR))
+        if len(pending) >= depth:
+            yield pending.popleft().result()
+    while pending:
+        yield pending.popleft().result()
+
+
+def render_frames(cfg, frames: list[fr.Frame], out_path: Path, job_name: str, encoder: str,
+                  progress=None) -> dict:
+    """progress(fraction) is called every few seconds (custom renders show a bar): half for preparing the source
+    frames, half for encoding."""
     t0 = time.monotonic()
     o = cfg.output
     factor = int(o.interp_factor)
@@ -121,6 +153,7 @@ def render_frames(cfg, frames: list[fr.Frame], out_path: Path, job_name: str, en
     dim = LightDimmer(getattr(cfg.image, "dim_region", []), getattr(cfg.image, "dim_strength", 0.0))
     denoise_radius = max(0, int(getattr(cfg.night, "denoise_frames", 1)) - 1) // 2
 
+    pool = ThreadPoolExecutor(4, thread_name_prefix="read")
     job = cfg.paths.work / job_name
     shutil.rmtree(job, ignore_errors=True)
     job.mkdir(parents=True)
@@ -133,47 +166,138 @@ def render_frames(cfg, frames: list[fr.Frame], out_path: Path, job_name: str, en
     proc = subprocess.Popen(ffmpeg_cmd(cfg, encoder, w, h, fps, part), stdin=subprocess.PIPE,
                             stdout=subprocess.DEVNULL, stderr=ff_log, creationflags=NO_WINDOW)
     written = interpolated = 0
+    n_prepared = 0
+    last_progress = 0.0
+    progress_lock = threading.Lock()
+
+    def report():
+        nonlocal last_progress
+        with progress_lock:  # called from the prep thread and the encode loop
+            if progress and time.monotonic() - last_progress > 2:
+                last_progress = time.monotonic()
+                progress((n_prepared + written / factor) / (2 * len(frames)))
+
+    # Three stages overlap: the prep thread writes chunks of prepared frames, the RIFE thread interpolates each chunk
+    # while the next one is prepared, and this thread encodes the previous one. Chunks of a segment share their
+    # boundary frame, which gives exactly the frames RIFE would make for the whole segment (each in-between frame
+    # depends only on its two neighbours); the outputs of a non-final chunk's boundary frame are dropped.
+    abort = threading.Event()
+    q_prep: queue.Queue = queue.Queue(maxsize=1)
+    q_rife: queue.Queue = queue.Queue(maxsize=1)
+
+    def put(q, item):
+        while not abort.is_set():
+            try:
+                q.put(item, timeout=0.5)
+                return
+            except queue.Full:
+                pass
+
+    def get(q):
+        while True:
+            try:
+                return q.get(timeout=0.5)
+            except queue.Empty:
+                if abort.is_set():
+                    raise Aborted() from None
+
+    def prep_stage():
+        nonlocal n_prepared
+        try:
+            for si, seg in enumerate(segs):
+                gains = (deflicker_gains([f.luma for f in seg], cfg.deflicker.window, cfg.deflicker.min_gain,
+                                         cfg.deflicker.max_gain)
+                         if cfg.deflicker.mode == "luma" else np.ones(len(seg)))
+                size = chunk_size(len(seg))
+
+                def prepared(seg=seg, gains=gains):
+                    for f, g in zip(seg, gains):
+                        img = cv2.imread(str(f.path), cv2.IMREAD_COLOR)
+                        if img is None:
+                            log.warning("unreadable frame skipped: %s", f.path)
+                            continue
+                        img = dim(img, f.luma)
+                        img = level(img, cfg.image.rotation, cfg.image.level_deg, w, h)
+                        if img.shape[1] != cw:  # a frame with a different source size slipped in
+                            img = cv2.resize(img, (cw, ch), interpolation=cv2.INTER_AREA)
+                        if pre_scale:
+                            img = cv2.resize(img, (w, h), interpolation=cv2.INTER_AREA)
+                        yield f, apply_gain(img, float(g))
+
+                chunk_no = 0
+                cur: list[fr.Frame] = []
+                cur_dir = None
+                last_img = None
+
+                def start_chunk():
+                    nonlocal chunk_no, cur, cur_dir
+                    cur_dir = job / f"seg{si:03d}_{chunk_no:03d}"
+                    (cur_dir / "in").mkdir(parents=True)
+                    cur, chunk_no = [], chunk_no + 1
+
+                def add(f, img):
+                    cv2.imwrite(str(cur_dir / "in" / f"{len(cur):08d}.bmp"), img)  # uncompressed: 25x faster than PNG
+                    cur.append(f)
+
+                start_chunk()
+                # Within a segment only: never average across a capture gap
+                for f, img in temporal_denoise(prepared(), denoise_radius, lambda f: night_weight(f.luma)):
+                    if len(cur) == size + 1:  # full: hand it on; the next chunk starts with its last frame
+                        put(q_prep, (cur_dir, cur, False))
+                        boundary = cur[-1]
+                        start_chunk()
+                        add(boundary, last_img)
+                    add(f, img)
+                    last_img = img
+                    n_prepared += 1
+                    report()
+                    if abort.is_set():
+                        return
+                if cur:
+                    put(q_prep, (cur_dir, cur, True))
+            put(q_prep, None)
+        except BaseException as e:
+            put(q_prep, e)
+
+    def rife_stage():
+        nonlocal interpolated
+        try:
+            while True:
+                item = get(q_prep)
+                if item is None or isinstance(item, BaseException):
+                    put(q_rife, item)
+                    return
+                cdir, kept, final = item
+                n = len(kept)
+                if rife and n >= 2:
+                    outs = rife.interpolate(cdir / "in", cdir / "out", n * factor)
+                    items = [(p, kept[min(k // factor, n - 1)].ts) for k, p in enumerate(outs)]
+                    interpolated += len(outs)
+                else:  # single frame (or RIFE off): hold it for the same duration
+                    items = [(cdir / "in" / f"{i:08d}.bmp", f.ts) for i, f in enumerate(kept) for _ in range(factor)]
+                if not final:  # its last frame opens the next chunk
+                    items, kept = items[:(n - 1) * factor], kept[:-1]
+                put(q_rife, (cdir, kept, items))
+        except Aborted:
+            pass
+        except BaseException as e:
+            put(q_rife, e)
+
+    workers = [threading.Thread(target=prep_stage, name="render-prep", daemon=True),
+               threading.Thread(target=rife_stage, name="render-rife", daemon=True)]
+    for t in workers:
+        t.start()
     encoded_ts: list[float] = []  # source frames actually encoded, in order (the render index)
     try:
-        for si, seg in enumerate(segs):
-            gains = (deflicker_gains([f.luma for f in seg], cfg.deflicker.window, cfg.deflicker.min_gain,
-                                     cfg.deflicker.max_gain)
-                     if cfg.deflicker.mode == "luma" else np.ones(len(seg)))
-            sdir = job / f"seg{si:03d}"
-            ind = sdir / "in"
-            ind.mkdir(parents=True)
-            kept = []
-
-            def prepared(seg=seg, gains=gains):
-                for f, g in zip(seg, gains):
-                    img = cv2.imread(str(f.path), cv2.IMREAD_COLOR)
-                    if img is None:
-                        log.warning("unreadable frame skipped: %s", f.path)
-                        continue
-                    img = dim(img, f.luma)
-                    img = level(img, cfg.image.rotation, cfg.image.level_deg, w, h)
-                    if img.shape[1] != cw:  # a frame with a different source size slipped in
-                        img = cv2.resize(img, (cw, ch), interpolation=cv2.INTER_AREA)
-                    if pre_scale:
-                        img = cv2.resize(img, (w, h), interpolation=cv2.INTER_AREA)
-                    yield f, apply_gain(img, float(g))
-
-            # Within a segment only: never average across a capture gap
-            for f, img in temporal_denoise(prepared(), denoise_radius, lambda f: night_weight(f.luma)):
-                cv2.imwrite(str(ind / f"{len(kept):08d}.png"), img, [cv2.IMWRITE_PNG_COMPRESSION, 1])
-                kept.append(f)
-            n = len(kept)
-            if n == 0:
-                continue
+        while True:
+            item = get(q_rife)
+            if item is None:
+                break
+            if isinstance(item, BaseException):
+                raise item
+            cdir, kept, items = item
             encoded_ts += [f.ts for f in kept]
-            if rife and n >= 2:
-                outs = rife.interpolate(ind, sdir / "out", n * factor)
-                items = [(p, kept[min(k // factor, n - 1)].ts) for k, p in enumerate(outs)]
-                interpolated += len(outs)
-            else:  # single frame (or RIFE off): hold it for the same duration
-                items = [(ind / f"{i:08d}.png", f.ts) for i, f in enumerate(kept) for _ in range(factor)]
-            for p, ts in items:
-                img = cv2.imread(str(p), cv2.IMREAD_COLOR)
+            for img, (_, ts) in zip(read_ahead([p for p, _ in items], pool), items):
                 if img.shape[1] != w or img.shape[0] != h:
                     img = cv2.resize(img, (w, h), interpolation=cv2.INTER_LANCZOS4)
                 if cfg.overlay.enabled:
@@ -183,12 +307,17 @@ def render_frames(cfg, frames: list[fr.Frame], out_path: Path, job_name: str, en
                 except OSError as e:
                     raise EncodeError(f"ffmpeg pipe closed: {e}") from e
                 written += 1
-            shutil.rmtree(sdir, ignore_errors=True)
+                report()
+            shutil.rmtree(cdir, ignore_errors=True)
         proc.stdin.close()
         rc = proc.wait(timeout=600)
         if rc != 0:
             raise EncodeError(f"ffmpeg exited {rc}")
     except BaseException:
+        abort.set()
+        if rife and rife.proc_pid:
+            subprocess.run(["taskkill", "/T", "/F", "/PID", str(rife.proc_pid)], capture_output=True,
+                           creationflags=NO_WINDOW)
         proc.kill()
         ff_log.seek(0)
         err = ff_log.read()[-1500:]
@@ -197,6 +326,10 @@ def render_frames(cfg, frames: list[fr.Frame], out_path: Path, job_name: str, en
         part.unlink(missing_ok=True)
         raise
     finally:
+        abort.set()
+        for t in workers:
+            t.join(timeout=30)
+        pool.shutdown(cancel_futures=True)
         mon.stop()
         ff_log.close()
 
@@ -227,18 +360,18 @@ def render_frames(cfg, frames: list[fr.Frame], out_path: Path, job_name: str, en
     return result
 
 
-def render_with_fallback(cfg, frames, out_path: Path, job_name: str) -> dict:
+def render_with_fallback(cfg, frames, out_path: Path, job_name: str, progress=None) -> dict:
     want = cfg.output.encoder
     encoder = "x264" if want == "x264" else ("nvenc" if nvenc_available(cfg) else "x264")
     if want != "x264" and encoder == "x264":
         log.warning("NVENC unavailable, falling back to libx264")
     try:
-        return render_frames(cfg, frames, out_path, job_name, encoder)
+        return render_frames(cfg, frames, out_path, job_name, encoder, progress)
     except EncodeError as e:
         if encoder != "nvenc":
             raise
         log.warning("NVENC encode failed (%s); retrying with libx264", e)
-        return render_frames(cfg, frames, out_path, job_name, "x264")
+        return render_frames(cfg, frames, out_path, job_name, "x264", progress)
 
 
 # ---------------------------------------------------------------- entry points
@@ -261,7 +394,7 @@ def render_clip(cfg, end_ts: float | None = None, minutes: float | None = None) 
         if len(frames) < need:
             res = {"status": "skipped", "window_start": start.isoformat(timespec="seconds"),
                    "reason": f"{len(frames)} usable of {len(all_frames)} captured "
-                             f"(need {need}; night threshold {cfg.night.luma_threshold})"}
+                             f"(need {need}; camera offline?)"}
             log.info("clip %s skipped: %s", out.name, res["reason"])
         else:
             log.info("rendering %s from %d frames (%d captured)", out.name, len(frames), len(all_frames))
@@ -317,5 +450,54 @@ def render_daily(cfg, day: date | None = None) -> dict:
         write_json(done_path, done)
         write_json(cfg.paths.state / "last_daily.json", res)
         return res
+    finally:
+        lock.release()
+
+
+def render_custom(cfg, job_id: str) -> dict:
+    """A custom timelapse (custom_jobs): the job's range sampled down to its speed / length. When there are fewer
+    usable frames than that needs (slower than native, or a thinned day) all of them are used, so the video is
+    shorter and the actual speed is reported."""
+    from . import custom_jobs as cj
+    job = cj.read_job(cfg, job_id)
+    if job is None:
+        raise ValueError(f"no custom job {job_id}")
+    lock = FileLock(cfg.paths.state / "render-custom.lock")
+    if not lock.acquire():
+        raise BlockingIOError("another custom render is running")
+    try:
+        start_ts, end_ts = job["start_ts"], job["end_ts"]
+        frames = fr.usable(cfg, fr.frames_between(cfg, start_ts, end_ts))
+        sel = fr.sample_evenly(frames, cj.target_frames(job, int(cfg.output.base_fps)))
+        job.update(status="rendering", progress=0.0, frames_available=len(frames), frames_used=len(sel),
+                   started=time.time())
+        cj.write_job(cfg, job)
+        if len(sel) < 2:
+            job.update(status="skipped", reason=f"only {len(frames)} frames were captured in that range "
+                                                "(the camera was offline)")
+            log.info("custom %s skipped: %s", job_id, job["reason"])
+        else:
+            out = cfg.paths.custom / cj.file_name(job)
+
+            def progress(frac):
+                job["progress"] = round(min(0.99, frac), 3)
+                cj.write_job(cfg, job)
+
+            log.info("rendering custom %s: %d of %d usable frames", out.name, len(sel), len(frames))
+            try:
+                res = render_with_fallback(cfg, sel, out, f"custom_{job_id}_{os.getpid()}", progress)
+            except Exception as e:
+                job.update(status="failed", reason=f"{type(e).__name__}: {e}"[:300], finished=time.time())
+                cj.write_job(cfg, job)
+                raise
+            render_index.write(cfg, out, start_ts, end_ts, res.pop("frame_ts"))
+            duration = res.get("duration_s") or len(sel) / cfg.output.base_fps
+            job.update(status="ok", progress=1.0, output=out.name, duration_s=duration,
+                       actual_speed=round((end_ts - start_ts) / duration, 1) if duration else None,
+                       elapsed_s=res.get("elapsed_s"))
+            log.info("custom done: %s", json.dumps(res))
+        job["finished"] = time.time()
+        cj.write_job(cfg, job)
+        return job
     finally:
         lock.release()

@@ -47,7 +47,9 @@ def frames_between(cfg, start_ts: float, end_ts: float) -> list[Frame]:
 
 
 def usable(cfg, frames: list[Frame]) -> list[Frame]:
-    return [f for f in frames if f.luma >= cfg.night.luma_threshold]
+    """Frames the renders use: all of them, night included, unless [render] min_luma drops near-black ones."""
+    min_luma = float(getattr(cfg.render, "min_luma", 0) or 0)
+    return [f for f in frames if f.luma >= min_luma] if min_luma > 0 else frames
 
 
 def sample_evenly(frames: list[Frame], n: int) -> list[Frame]:

@@ -61,7 +61,7 @@ CREATE TABLE IF NOT EXISTS pushes (
     PRIMARY KEY (sighting_id, type)
 );
 """
-STAR_KINDS = ("sighting", "clip", "daily")
+STAR_KINDS = ("sighting", "clip", "daily", "custom")
 DEFAULT_PREFS = {"new_catch": True, "rare": False, "discovered": True, "service_alerts": True}
 DEVICE_COLS = ("id", "name", "platform", "created_at", "last_seen_at", "revoked_at", "apns_token", "apns_env", "prefs")
 

@@ -171,8 +171,9 @@ custom headers.)*
 | GET | `/live.mjpg` | MJPEG stream (§8) |
 | GET | `/live.jpg` | JPEG (§8) |
 
-Desktop-only endpoints (e.g. "show in folder") may exist. They aren't part of this contract, must be refused for
-every device except `desktop`, and must never be needed by the phone.
+Desktop-only endpoints (e.g. "show in folder", custom timelapses at `/api/desktop/renders*` with their
+`/media/custom/` files) may exist. They aren't part of this contract, must be refused for every device except
+`desktop`, and must never be needed by the phone.
 
 ### 4.1 `POST /api/pair`
 Body: `{"code": "K3J9-Q2M8", "device_name": "Braxton's iPhone", "platform": "ios"}`

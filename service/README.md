@@ -68,7 +68,8 @@ the background session (session 0), where the Intel iGPU is Vulkan device 0, so 
 separate low-priority process, so a failed render never touches capture. All children belong to a Job Object, so
 stopping the supervisor kills them too.
 
-Pipeline: q90 JPEG snapshots from the Pi saved as-is -> drop night frames -> split at capture gaps (hard cuts) ->
+Pipeline: q90 JPEG snapshots from the Pi saved as-is (night included; `[render] min_luma` can drop near-black
+frames, off by default) -> split at capture gaps (hard cuts) ->
 night light taming in `[image] dim_region` (glare compressed by local brightness, lamps kept as points,
 clipped highlights rebuilt and re-tinted) -> no leveling (level_deg 0,
 so the full 1920x1440 frame is used) -> luminance deflicker ->
@@ -224,14 +225,16 @@ next/previous, `Space` play/pause, `S` star, `Enter` open, `Esc` close.
   **View in timelapse**, star, hide, and **correct label** (to any label in the collection; stored in `ui.db` and
   applied everywhere, including counts and the collection).
 - **View in timelapse** opens the video covering the middle of the pass, paused there (see Seek below); if there
-  is none it says why (not rendered yet, skipped, night, or expired).
+  is none it says why (not rendered yet, skipped, camera offline, or expired).
 - **Collection**: every label in `sightings_labels.txt` as a tile, caught or not, with count, first and last seen and
   a tier from the counts (rare 1-3, uncommon 4-20, common 21+; rare tiles shimmer), plus cars Gemini named that
   aren't in the list (*discovered*) and labels only in your history (*retired*). The dial: X of Y list labels caught.
 - **Cards**: every car model as a Pokémon-style trading card with a live 3D model in the art window (see
   [Cards](#cards) below).
-- **Timelapse**: the 10-minute clips grouped by hour, the daily videos and the archive parts (all playable except the
-  part still being written), each with **Show in folder**.
+- **Timelapse**: **Make a timelapse** (any range up to 7 days at a chosen speed or length, see
+  [Custom timelapses](#custom-timelapses)), your custom timelapses, the 10-minute clips grouped by hour, the daily
+  videos and the archive parts (all playable except the part still being written), each with **Show in folder**.
+- Every player has a speed button (0.25× to 8×, remembered); `[` and `]` step it.
 - **Live**: the camera through `/live.mjpg`, leveled like the renders. Connected only while this view is showing
   and the window isn't minimized: every viewer is another full stream over the Pi's Wi-Fi.
 
@@ -241,6 +244,21 @@ Motion: new sightings "drive by" across the Today hero in the direction the car 
 confetti, stars burst, numbers count up, cards tilt toward the cursor, rare collection tiles shimmer, and Live
 looks like a camera viewfinder. All of it is off when Windows animations are off (Settings > Accessibility > Visual
 effects), via `prefers-reduced-motion`.
+
+### Custom timelapses
+**Make a timelapse** on the Timelapse tab renders any range (presets: last hour / 6 h / 24 h, today, yesterday, or
+From/To) either at a **speed** (60× = every frame at the default 2 s interval and 30 fps; 300×, 900×, 3600× or any
+number) or to a **length** (2 s to 10 min). Frames are sampled evenly over the range, night included, and
+gaps become cuts, as in the daily video. Slower than 60× isn't possible (there are no more frames), and ranges older
+than `retention.raw_hours` are thinned to about one frame a minute, so they top out at about 1800×; the video is then
+shorter than asked and the tile shows the actual speed.
+- The API never writes service files (contract A.2): it drops a request in `CampiTimelapse\ui\render_requests\`.
+  The supervisor queues it (`state\custom\<id>.json`, which also holds progress and the result) and runs
+  `render-custom` at below-normal priority, one at a time, waiting while you game like the other renders.
+- Videos go to `<output dir>\custom\campi_custom_<start>-<end>_<id>.mp4` and are kept until you delete them from
+  the tile (click the x twice); housekeeping never expires them. Star and **Show in folder** work as for clips.
+- From a console: `.venv-service\Scripts\python -m campi_timelapse render-custom --start 2026-10-05T06:00
+  --end 2026-10-05T18:00 --speed 900` (or `--seconds 30`; times are local).
 
 ### Cards
 Each label is a trading card: make in the stage pill, model as the name, **SEEN ×N** where the HP goes, a type
@@ -337,8 +355,9 @@ headers.
 | `GET/HEAD /media/{clips,daily,archive,sightings,posters}/...` | files with Range, ETag, 304; posters made by ffmpeg on first request |
 | `GET /live.mjpg?max_fps=N`, `GET /live.jpg?w=N` | the Pi's stream (at most `max_live_viewers`), the newest saved frame |
 
-Desktop-only extras (`/api/today`, `/api/activity`, `/api/clips/newest`, `/api/desktop/*`) answer only the `desktop`
-device. Errors are `{"error": {"code", "message"}}`; times carry the PC's UTC offset (`2026-10-03T14:05:12.345-05:00`).
+Desktop-only extras (`/api/today`, `/api/activity`, `/api/clips/newest`, `/api/desktop/*`, including
+`GET/POST /api/desktop/renders` and `POST /api/desktop/renders/{id}/star|delete` for custom timelapses, served from
+`/media/custom/...`) answer only the `desktop` device. Errors are `{"error": {"code", "message"}}`; times carry the PC's UTC offset (`2026-10-03T14:05:12.345-05:00`).
 
 Seek: with a render index (`state\render_index\<video>.json`, written by every clip and daily render: the real
 window and the timestamps of the frames actually encoded) the position is exact: frames before the instant /

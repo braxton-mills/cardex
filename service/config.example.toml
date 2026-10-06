@@ -26,6 +26,7 @@ delay_s = 15                 # wait after the window closes so the last frame is
 min_usable_frac = 0.5        # skip the clip if fewer usable frames than this fraction of expected
 gap_factor = 3.0             # frames further apart than gap_factor * spacing = hard cut, no interpolation
 timeout_min = 9              # kill a stuck render after this long
+min_luma = 0                 # skip frames darker than this mean brightness (0-255); 0 = keep every frame, night too
 
 [output]
 dir = "{home}\\Videos\\campi"   # 10-min clips, latest.mp4, daily\
@@ -52,8 +53,8 @@ min_gain = 0.8
 max_gain = 1.25
 
 [night]
-luma_threshold = 10          # frames with mean brightness (0-255) below this are skipped (the Pi's night
-                             # exposure keeps nights at ~30; only a black frame falls under 10)
+luma_threshold = 10          # sightings pause below this mean brightness (0-255) when pause_at_night is on
+                             # (the Pi's night exposure keeps nights at ~30); renders use [render] min_luma
 denoise_frames = 3           # night frames are averaged with their neighbours (odd count; 1 = off). Cuts
                              # sensor-noise shimmer ~sqrt(n); fades out at dawn like dim_region
 

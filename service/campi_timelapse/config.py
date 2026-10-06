@@ -131,6 +131,7 @@ def load_config(path: Path | None = None) -> SimpleNamespace:
         out=Path(_expand(cfg.output.dir)),
     )
     cfg.paths.daily = cfg.paths.out / "daily"
+    cfg.paths.custom = cfg.paths.out / "custom"  # custom timelapses from the desktop UI (kept until deleted)
     # [archive] dir: keep the long archive elsewhere (e.g. off a synced folder: each append rewrites the part)
     adir = getattr(cfg.archive, "dir", "")
     cfg.paths.archive = Path(_expand(adir)) if adir else cfg.paths.out / "archive"

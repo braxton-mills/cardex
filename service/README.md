@@ -42,8 +42,10 @@ Renders run RIFE (and NVENC) on the RTX 5070, so they wait while you play:
 - **Game detection** (`[gaming]`, every 15 s): a process counts as a game when its exe is under one of `game_dirs`
   (or matches `extra_exes`), isn't in `ignore_exes` (launchers, anti-cheat, crash handlers; globs, case-insensitive),
   and has kept the RTX card's 3D engine above `gpu_busy_pct` for `gpu_busy_s`. GPU use per process comes from the
-  same Windows "GPU Engine" counters as Task Manager; a launcher idling in the tray never qualifies. If the counters
-  can't be read, it falls back to the path match and `campi status` says so.
+  same Windows "GPU Engine" counters as Task Manager; a launcher idling in the tray never qualifies. Once a process
+  qualifies it stays a game until it exits, even if its GPU use drops (menus, minimized, display switched away by a
+  KVM). If the counters can't be read, it falls back to the path match (`campi status` says so) and retries them
+  every 5 minutes; a driver reset that changes the adapter's LUID is picked up the same way.
 - While a game runs (`defer_renders`, when `rife_gpu` is the NVIDIA card): clip and daily renders wait; capture
   never pauses. Renders resume 2 minutes after the last game exits and catch up in order. `pause_sightings`
   (off by default; the openvino worker doesn't touch the RTX card) also stops the sightings worker.

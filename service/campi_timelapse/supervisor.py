@@ -217,13 +217,14 @@ class Supervisor:
         was = bool(self.game_state.get("active"))
         if st.get("active") and not was:
             self.game_active_since = now
-            log.info("paused: gaming (%s, %s)%s%s", st.get("exe"), st.get("source"),
+            log.info("paused: gaming (%s pid %s, %s)%s%s", st.get("exe"), st.get("pid"), st.get("source"),
                      "; renders deferred" if self.renders_defer_enabled() else "",
                      "; sightings stopped" if self.cfg.gaming.pause_sightings else "")
         elif was and not st.get("active"):
             self.game_resume_at = now + 120
             self.game_active_since = None
-            log.info("game ended (%s); renders resume in 2 min", self.game_state.get("exe"))
+            log.info("game ended (%s pid %s exited); renders resume in 2 min", self.game_state.get("exe"),
+                     self.game_state.get("pid"))
         self.game_state = {**st, "since": self.game_active_since}
         self.apply_sightings_pause(bool(st.get("active")))
 

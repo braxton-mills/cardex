@@ -13,14 +13,22 @@ from threading import Condition, Lock
 from urllib.parse import parse_qs, urlparse
 
 import simplejpeg
+from libcamera import controls
 from picamera2 import Picamera2
 from picamera2.encoders import MJPEGEncoder, Quality
 from picamera2.outputs import FileOutput
 
 SNAPSHOT_QUALITY = 90
-# Night: once gain reaches 8, auto-exposure may stretch a frame up to this long (the stream's fps drops to match;
-# daylight and dusk stay at 30 fps). At the stock 1/30 s cap night frames were black (mean luma ~1).
-NIGHT_MAX_EXPOSURE_US = 1_000_000
+# Night: once gain reaches 4, auto-exposure stretches a frame up to this long before raising the gain further (the
+# stream's fps drops to match; daylight stays at 30 fps). At the stock 1/30 s cap night frames were black (mean luma
+# ~1); at 1 s the gain sat at 16 and only the brightest stars showed. 8 s collects 8x the starlight; the timelapse
+# then gets a frame every 8 s at night (stars move about 2 arcminutes in that time, under a pixel at 80 deg wide).
+NIGHT_MAX_EXPOSURE_US = 8_000_000
+NIGHT_STRETCH_GAIN = 4.0  # gain held while the exposure stretches (8 before: AE stopped at 2 s x gain 8)
+# Above this exposure the ISP's spatial noise reduction drops to Minimal: it averages neighbouring pixels, which wipes
+# out faint stars that are a pixel or two wide (the PC stacks frames over time instead). Daylight and dusk keep Fast,
+# and sightings (paused below 4 fps) never see the difference.
+NIGHT_NR_EXPOSURE_US = 250_000
 SENSOR = "imx477"  # HQ camera; named here because asking libcamera starts it with the stock tuning first
 # White balance is locked to daylight so timelapses don't shift color as auto WB chases clouds, dusk and streetlights
 # (night scenes come out warm, as they look). Gains come from the sensor's calibrated ct_curve at this temperature.
@@ -51,10 +59,12 @@ class StreamingOutput(io.BufferedIOBase):
 
 
 snapshot_lock = Lock()
+nr_mode = None  # the NoiseReductionMode last set (None until the first snapshot)
 
 
 def snapshot(quality):
     """Grab the next frame from the running camera and JPEG-encode it in software."""
+    global nr_mode
     with snapshot_lock:
         request = picam2.capture_request()
         try:
@@ -62,10 +72,17 @@ def snapshot(quality):
             meta = request.get_metadata()
         finally:
             request.release()
+        # the timelapse polls this every frame, so noise reduction follows the light within a frame or two
+        nr = (controls.draft.NoiseReductionModeEnum.Minimal if meta.get('ExposureTime', 0) > NIGHT_NR_EXPOSURE_US
+              else controls.draft.NoiseReductionModeEnum.Fast)
+        if nr != nr_mode:
+            picam2.set_controls({"NoiseReductionMode": nr})
+            nr_mode = nr
     # XBGR8888 arrives as [R, G, B, 255] per pixel.
     jpeg = simplejpeg.encode_jpeg(arr, quality=quality, colorspace="RGBX", colorsubsampling="420")
     r, b = meta.get('ColourGains', (0, 0))
-    return jpeg, f"{meta.get('ExposureTime', 0)} us, gain {meta.get('AnalogueGain', 0):.2f}, wb {r:.2f}/{b:.2f}"
+    return jpeg, (f"{meta.get('ExposureTime', 0)} us, gain {meta.get('AnalogueGain', 0):.2f}, wb {r:.2f}/{b:.2f}, "
+                  f"nr {nr_mode.name if nr_mode is not None else '-'}")
 
 
 class StreamingHandler(server.BaseHTTPRequestHandler):
@@ -136,13 +153,15 @@ class StreamingServer(socketserver.ThreadingMixIn, server.HTTPServer):
 
 
 def night_tuning():
-    """The sensor's stock tuning with the normal exposure mode extended to NIGHT_MAX_EXPOSURE_US."""
+    """The sensor's stock tuning with the normal exposure mode extended to NIGHT_MAX_EXPOSURE_US, and strong
+    defective-pixel correction: at night gain hot pixels otherwise survive and demosaic into ~10 px coloured blobs."""
     tuning = Picamera2.load_tuning_file(SENSOR + ".json")
+    Picamera2.find_tuning_algo(tuning, "rpi.dpc")["strength"] = 2  # 0 off, 1 normal (stock), 2 strong
     agc = Picamera2.find_tuning_algo(tuning, "rpi.agc")
     for ch in agc.get("channels", [agc]):
         ch["exposure_modes"]["normal"] = {
             "shutter": [100, 10000, 30000, 33333, NIGHT_MAX_EXPOSURE_US, NIGHT_MAX_EXPOSURE_US],
-            "gain": [1.0, 2.0, 4.0, 8.0, 8.0, 16.0]}
+            "gain": [1.0, 2.0, 4.0, NIGHT_STRETCH_GAIN, NIGHT_STRETCH_GAIN, 16.0]}
     return tuning
 
 

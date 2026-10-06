@@ -2,7 +2,8 @@
 
 Every /api request needs `Authorization: Bearer <token>` (also from 127.0.0.1: `tailscale serve` traffic arrives
 from loopback), except POST /api/pair. /media and /live accept a bearer token or a signed URL. Endpoints outside the
-contract (/api/today, /api/activity, /api/cards, /api/clips/newest, /api/desktop/*) answer only the `desktop` device.
+contract (/api/today, /api/activity, /api/cards, /api/clips/newest, /api/desktop/*, including the custom timelapse
+requests at /api/desktop/renders) answer only the `desktop` device.
 """
 from __future__ import annotations
 
@@ -12,6 +13,7 @@ import os
 import re
 import socket
 import subprocess
+import time
 from typing import Any
 
 from fastapi import Body, Depends, FastAPI, Request
@@ -20,7 +22,8 @@ from fastapi.responses import FileResponse, JSONResponse, Response
 from fastapi.staticfiles import StaticFiles
 from starlette.exceptions import HTTPException as StarletteHTTPException
 
-from ..config import NO_WINDOW
+from .. import custom_jobs as cj
+from ..config import NO_WINDOW, write_json
 from . import media, status_api
 from .auth import Auth
 from .contract import ApiError, flag, int_param, invalid, iso, iso_from_utc, not_found, one, parse_instant
@@ -297,7 +300,9 @@ def create_app(cfg) -> FastAPI:
                 "base_fps": int(cfg.output.base_fps), "interp_factor": int(cfg.output.interp_factor),
                 "interval_min": int(cfg.render.interval_min), "window_min": int(cfg.render.window_min),
                 "clips_hours": float(cfg.retention.clips_hours), "keep_clips_days": float(cfg.sightings.keep_clips_days),
-                "sightings_enabled": bool(cfg.sightings.enabled), "reveal_here": in_console_session()}
+                "sightings_enabled": bool(cfg.sightings.enabled), "reveal_here": in_console_session(),
+                "interval_s": float(cfg.capture.interval_s), "raw_hours": float(cfg.retention.raw_hours),
+                "custom_max_range_h": cj.MAX_RANGE_S / 3600, "custom_seconds": [cj.MIN_OUT_S, cj.MAX_OUT_S]}
 
     @app.post("/api/desktop/reveal")
     def reveal(payload: Any = Body(None), dev: dict = Depends(desktop)):
@@ -311,6 +316,57 @@ def create_app(cfg) -> FastAPI:
             raise invalid("the API runs in the background service; use the Campi window to show files")
         subprocess.Popen(["explorer.exe", f"/select,{p}"], creationflags=NO_WINDOW)
         return {"shown": str(p)}
+
+    # ------------------------------------------------------------ custom timelapses (desktop only)
+    # The API can't write under state\ (contract A.2): it drops requests in ui\render_requests\ for the supervisor.
+
+    def custom_request(req: dict) -> None:
+        d = cj.requests_dir(cfg)
+        d.mkdir(parents=True, exist_ok=True)
+        write_json(d / f"{req['id']}.{req['action']}.json", req)
+
+    def positive(b: dict, key: str) -> float | None:
+        v = b.get(key)
+        if v is None:
+            return None
+        if isinstance(v, bool) or not isinstance(v, (int, float)) or v <= 0:
+            raise invalid(f"{key} must be a positive number")
+        return float(v)
+
+    @app.get("/api/desktop/renders")
+    def custom_renders(dev: dict = Depends(desktop)):
+        return lib.custom(signer(dev))
+
+    @app.post("/api/desktop/renders")
+    def custom_render(payload: Any = Body(None), dev: dict = Depends(desktop)):
+        b = body_obj(payload)
+        if not b.get("start") or not b.get("end"):
+            raise invalid("body needs start and end (RFC 3339 or Unix seconds)")
+        start, end = parse_instant(str(b["start"])), parse_instant(str(b["end"]))
+        speed, seconds = positive(b, "speed"), positive(b, "seconds")
+        err = cj.validate(start, end, speed, seconds)
+        if err:
+            raise invalid(err)
+        job = cj.new_job(start, end, speed, seconds)
+        custom_request({**job, "action": "render"})
+        return {"id": job["id"], "status": "queued", "window_start": iso(start), "window_end": iso(end),
+                "speed": speed, "seconds": seconds}
+
+    @app.post("/api/desktop/renders/{rid}/delete")
+    def custom_delete(rid: str, dev: dict = Depends(desktop)):
+        if not cj.ID_RE.match(rid) or not lib.custom_exists(rid):
+            raise not_found(f"no custom timelapse {rid}")
+        custom_request({"id": rid, "action": "delete", "created": time.time()})
+        store.set_star("custom", rid, False)
+        return {"id": rid, "deleted": True}
+
+    @app.post("/api/desktop/renders/{rid}/star")
+    def custom_star(rid: str, payload: Any = Body(None), dev: dict = Depends(desktop)):
+        value = flag(payload, "starred")
+        if not cj.ID_RE.match(rid) or not lib.custom_exists(rid):
+            raise not_found(f"no custom timelapse {rid}")
+        store.set_star("custom", rid, value)
+        return {"id": rid, "starred": value}
 
     # ------------------------------------------------------------ media + live (§7, §8)
 

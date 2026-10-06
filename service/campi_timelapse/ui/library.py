@@ -10,6 +10,7 @@ import time
 from datetime import date, datetime, timedelta
 from pathlib import Path
 
+from .. import custom_jobs as cj
 from .. import frames as fr
 from .. import render_index
 from ..archive import CLIP_RE, clip_start
@@ -213,6 +214,41 @@ class Library:
         items.sort(key=lambda a: a["part"], reverse=True)
         return {"enabled": bool(self.cfg.archive.enabled), "items": items}
 
+    # ------------------------------------------------------------ custom timelapses (desktop only)
+
+    def custom(self, signer) -> dict:
+        """Jobs the supervisor knows about plus requests it hasn't picked up yet (shown as queued); a job with a
+        pending delete is already gone as far as the UI is concerned."""
+        reqs = [r for p in sorted(cj.requests_dir(self.cfg).glob("*.json")) if isinstance(r := read_json(p), dict)]             if cj.requests_dir(self.cfg).is_dir() else []
+        deleting = {r.get("id") for r in reqs if r.get("action") == "delete"}
+        jobs = cj.jobs(self.cfg)
+        known = {j["id"] for j in jobs}
+        jobs += [{**r, "status": "queued", "progress": 0.0} for r in reqs
+                 if r.get("action") == "render" and r.get("id") not in known]
+        stars = self.store.stars("custom")
+        items = []
+        for j in sorted(jobs, key=lambda j: j.get("created", 0), reverse=True):
+            if j["id"] in deleting:
+                continue
+            item = {k: j.get(k) for k in ("id", "status", "progress", "speed", "seconds", "frames_used",
+                                          "frames_available", "actual_speed", "duration_s", "reason")}
+            item.update(window_start=iso(j["start_ts"]), window_end=iso(j["end_ts"]), created=iso(j.get("created")),
+                        started=iso(j.get("started")), finished=iso(j.get("finished")), starred=j["id"] in stars, file=None, size_bytes=None,
+                        media={"video": None})
+            if j.get("status") == "ok":
+                stt = self._stat(self.cfg.paths.custom / str(j.get("output")))
+                if stt is None:
+                    continue  # deleted by hand
+                item.update(file=j["output"], size_bytes=stt.st_size,
+                            media={"video": signer(f"/media/custom/{j['output']}")})
+            items.append(item)
+        st = read_json(self.cfg.paths.state / "status.json", {}) or {}
+        return {"items": items, "service_running": time.time() - (st.get("updated") or 0) < 30,
+                "renders_deferred": bool(st.get("renders_deferred"))}
+
+    def custom_exists(self, job_id: str) -> bool:
+        return any(i["id"] == job_id for i in self.custom(lambda p: p)["items"])
+
     # ------------------------------------------------------------ seek (§6.4)
 
     def seek(self, ts: float, signer) -> dict:
@@ -224,7 +260,7 @@ class Library:
         base = {"ts": iso(ts), "target": "none", "clip_id": None, "day": None, "video": None, "offset_s": None,
                 "approximate": False, "reason": None}
 
-        # 0. night / capture gap: that day's frame index exists but nothing usable near ts
+        # 0. capture gap: that day's frame index exists but nothing usable near ts
         days = {local_day(ts - win), local_day(ts), local_day(ts + win)}
         indexed = {d: self.usable_day(d) for d in days}
         if indexed.get(local_day(ts)) is not None:

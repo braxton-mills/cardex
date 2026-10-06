@@ -12,6 +12,7 @@ import { material, proceduralCar, scannedCar } from './car.js';
 export const W = CARD_W / CARD_H; // card width when height = 1
 const MM = 1 / CARD_H;
 const THICK = 0.0045;
+const GRID_DIST = 2.6; // grid camera distance: where fit() put it for a resting card (fov 26, card ~83% of its viewport)
 
 function tex(canvas, renderer, srgb = true) {
   const t = new THREE.CanvasTexture(canvas);
@@ -245,6 +246,17 @@ export class Card3D {
     const half = THREE.MathUtils.degToRad(cam.fov / 2);
     cam.position.set(0, 0, (0.5 / fill) / Math.tan(half));
     cam.near = 0.05; cam.far = Math.max(cam.position.z + 5, 8); // the inspector backdrop sits up to 6.6 out
+    cam.updateProjectionMatrix();
+  }
+
+  // Grid framing: the camera stays at a fixed distance and the field of view widens with the padded viewport, so the
+  // card is the same size and the diorama keeps the same perspective however much padding a tilt needs.
+  fitWindow(aspect, fill) {
+    const cam = this.camera;
+    cam.aspect = aspect;
+    cam.fov = THREE.MathUtils.radToDeg(2 * Math.atan(0.5 / (fill * GRID_DIST)));
+    cam.position.set(0, 0, GRID_DIST);
+    cam.near = 0.05; cam.far = 8;
     cam.updateProjectionMatrix();
   }
 

@@ -291,6 +291,23 @@ counted AS (SELECT * FROM eff WHERE NOT hidden AND label IS NOT NULL AND label !
             return out
         return self._cached("card_stats", build)
 
+    def mesh_candidates(self) -> dict:
+        """Per counted label: every sighting with a crop, for card_meshes to choose its source photo from."""
+        def build():
+            out: dict[str, list] = {}
+            with self._open() as (con, eff):
+                if con is None:
+                    return out
+                rows = con.execute(f"WITH {eff} SELECT id, label, raw_direction, raw_crop_path, raw_frame_path, "
+                                   "raw_max_box_px, raw_color FROM counted WHERE raw_crop_path IS NOT NULL").fetchall()
+            for r in rows:
+                out.setdefault(r["label"].lower(), []).append(
+                    {"id": r["id"], "crop": r["raw_crop_path"], "frame": r["raw_frame_path"],
+                     "box_px": r["raw_max_box_px"] or 0, "direction": r["raw_direction"],
+                     "color": (r["raw_color"] or "").strip().lower() or None})
+            return out
+        return self._cached("mesh_candidates", build)
+
     def mesh_manifest(self) -> dict:
         """card_meshes' manifest.json ({label lower: {file, sighting_id, box_px, generated_at}}), re-read on change."""
         p = self.cfg.paths.card_meshes / "manifest.json"

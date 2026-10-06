@@ -402,10 +402,27 @@ export function tierSegments(items) {
 
 // ---------------------------------------------------------------- video player (amber controls)
 
-// Wraps a <video> with the app's controls: scrubber with knob, times, prev / play / next, mute, full screen.
+// Playback speed, shared by every player and remembered: [ and ] step it, the speed button cycles it.
+const RATES = [0.25, 0.5, 1, 2, 4, 8];
+const rateLabel = (r) => `${r < 1 ? String(r).replace(/^0/, '') : r}×`;
+function savedRate() {
+  const r = prefs.get('rate', 1);
+  return RATES.includes(r) ? r : 1;
+}
+export function stepRate(video, d) {
+  const i = RATES.indexOf(savedRate());
+  const r = RATES[Math.max(0, Math.min(RATES.length - 1, i + d))];
+  prefs.set('rate', r);
+  if (video) { video.defaultPlaybackRate = r; video.playbackRate = r; }
+  return r;
+}
+
+// Wraps a <video> with the app's controls: scrubber with knob, times, prev / play / next, mute, speed, full screen.
 export function player(video, { onPrev = null, onNext = null, compact = false } = {}) {
   video.controls = false;
   video.playsInline = true;
+  video.defaultPlaybackRate = savedRate();
+  video.playbackRate = savedRate();
   const fillBar = h('div', { class: 'scrub-fill' });
   const knob = h('div', { class: 'scrub-knob' });
   const bar = h('div', { class: 'scrub', title: 'Seek' }, h('div', { class: 'scrub-track' }, fillBar), knob);
@@ -413,6 +430,12 @@ export function player(video, { onPrev = null, onNext = null, compact = false } 
   const dur = h('span', { class: 't num' }, '0:00');
   const playBtn = h('button', { class: 'play-btn', title: 'Play / pause (Space)', 'aria-label': 'Play / pause' }, icon('play', 22));
   const muteBtn = iconButton(video.muted ? 'mute' : 'volume', 'Mute', () => { video.muted = !video.muted; });
+  const rateBtn = h('button', { class: 'rate-btn num', title: 'Playback speed ([ slower, ] faster)', 'aria-label': 'Playback speed' });
+  rateBtn.addEventListener('click', (e) => {
+    e.stopPropagation();
+    const i = RATES.indexOf(savedRate());
+    stepRate(video, i === RATES.length - 1 ? -i : 1); // cycle, wrapping back to the slowest
+  });
   const wrap = h('div', { class: `player ${compact ? 'compact' : ''}` }, video,
     h('div', { class: 'controls' },
       h('div', { class: 'scrub-row' }, bar),
@@ -420,7 +443,7 @@ export function player(video, { onPrev = null, onNext = null, compact = false } 
         onPrev ? iconButton('prev', 'Previous', onPrev, 'ghost') : null,
         playBtn,
         onNext ? iconButton('next', 'Next', onNext, 'ghost') : null,
-        h('div', { class: 'grow' }), muteBtn,
+        h('div', { class: 'grow' }), rateBtn, muteBtn,
         iconButton('maximize', 'Full screen', () => (document.fullscreenElement ? document.exitFullscreen() : wrap.requestFullscreen?.()), 'ghost'),
         dur)));
   const toggle = () => (video.paused ? video.play().catch(() => {}) : video.pause());
@@ -440,6 +463,12 @@ export function player(video, { onPrev = null, onNext = null, compact = false } 
     wrap.classList.toggle('playing', !video.paused);
   };
   const vol = () => fill(muteBtn, icon(video.muted ? 'mute' : 'volume', 18));
+  const rate = () => {
+    rateBtn.textContent = rateLabel(video.playbackRate);
+    rateBtn.classList.toggle('on', video.playbackRate !== 1);
+  };
+  video.addEventListener('ratechange', rate);
+  video.addEventListener('loadedmetadata', () => { video.playbackRate = savedRate(); });
   ['timeupdate', 'durationchange', 'seeked', 'loadedmetadata'].forEach((ev) => video.addEventListener(ev, paint));
   ['play', 'pause', 'ended'].forEach((ev) => video.addEventListener(ev, state));
   video.addEventListener('volumechange', vol);
@@ -462,6 +491,7 @@ export function player(video, { onPrev = null, onNext = null, compact = false } 
   });
   state();
   paint();
+  rate();
   return wrap;
 }
 
@@ -504,7 +534,7 @@ export function openPlayer({ url, title, offset = 0, pause = false, note = null,
 const SEEK_WHY = {
   pending_render: 'That window hasn\'t been rendered yet; try again in a few minutes.',
   not_rendered: 'No video covers that time (that 10-minute window was skipped).',
-  no_frames: 'Nothing was recorded around then (night, or the camera was offline).',
+  no_frames: 'Nothing was recorded around then (the camera was offline).',
   expired: 'No video covers that time anymore: 10-minute clips are kept 24 h, and that day has no daily video.',
 };
 

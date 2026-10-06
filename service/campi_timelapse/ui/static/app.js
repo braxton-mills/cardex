@@ -2,7 +2,7 @@
 // Each view module exports mount(el, params, ctx) -> {unmount, onVisible?, video?}.
 import {
   $, api, closeDetail, closeModal, detailOpen, detailStep, detailVideo, epoch, fill, fmt, h, icon, iconButton, modalVideo,
-  prefs, reduceMotion, selection, starDetail,
+  prefs, reduceMotion, selection, starDetail, stepRate, toast,
 } from './lib.js';
 import * as today from './views/today.js';
 import * as highlights from './views/highlights.js';
@@ -169,6 +169,10 @@ document.addEventListener('keydown', (e) => {
   } else if (e.key === 'Enter') {
     if (t instanceof HTMLButtonElement || t instanceof HTMLAnchorElement) return;
     selection.open();
+  } else if (e.key === '[' || e.key === ']') {
+    const r = stepRate(activeVideo(), e.key === ']' ? 1 : -1);
+    toast(`Playback speed ${r}×`);
+    e.preventDefault();
   } else if (e.key === ' ') {
     if (t instanceof HTMLButtonElement) return; // native handling
     const v = activeVideo();

@@ -171,6 +171,30 @@ def cmd_samples(cfg) -> int:
     return 0
 
 
+def new_custom_job(cfg, args) -> str:
+    """render-custom without --id: write a job for --start/--end and --speed/--seconds, return its id."""
+    from datetime import datetime
+    from . import custom_jobs as cj
+
+    def instant(v):
+        try:
+            return float(v)
+        except ValueError:
+            return datetime.fromisoformat(v).timestamp()
+    if not args.start:
+        raise SystemExit("render-custom needs --id, or --start (plus --speed or --seconds)")
+    start, end = instant(args.start), instant(args.end) if args.end else time.time()
+    speed, seconds = args.speed, args.seconds
+    if speed is None and seconds is None:
+        seconds = 30.0
+    err = cj.validate(start, end, speed, seconds)
+    if err:
+        raise SystemExit(err)
+    job = cj.new_job(start, end, speed, seconds)
+    cj.write_job(cfg, job)
+    return job["id"]
+
+
 def main(argv=None) -> int:
     ap = argparse.ArgumentParser(prog="campi_timelapse")
     ap.add_argument("--config")
@@ -183,6 +207,13 @@ def main(argv=None) -> int:
     rc.add_argument("--end", type=float, help="window end (epoch seconds); default now")
     rd = sub.add_parser("render-daily")
     rd.add_argument("--date", type=date.fromisoformat)
+    rcu = sub.add_parser("render-custom", help="custom timelapse: a queued job (--id) or a new one (--start/--end)")
+    rcu.add_argument("--id", help="job in state\\custom (the supervisor runs these)")
+    rcu.add_argument("--start", help="range start: ISO local time or epoch seconds")
+    rcu.add_argument("--end", help="range end (default now)")
+    sp = rcu.add_mutually_exclusive_group()
+    sp.add_argument("--speed", type=float, help="e.g. 300 for 300x real time")
+    sp.add_argument("--seconds", type=float, help="output length instead of a speed")
     sub.add_parser("housekeep")
     sub.add_parser("archive", help="append any clips not yet in the long archive video (also backfills)")
     sub.add_parser("status")
@@ -212,9 +243,12 @@ def main(argv=None) -> int:
     api.add_argument("--port", type=int, help="default: [api] port")
     sub.add_parser("pair", help="pair a phone: prints a QR code and a one-time code (venv-ui)")
     ms = sub.add_parser("meshes", help="3D card meshes from crops with TripoSR (venv-mesh; install.ps1 -Meshes)")
-    ms.add_argument("--label", help="only this label")
+    ms.add_argument("--label", action="append", help="only this label (repeatable)")
     ms.add_argument("--force", action="store_true", help="regenerate even if the label already has a mesh")
     ms.add_argument("--limit", type=int, help="at most N labels (default: [cards] meshes_per_pass)")
+    ms.add_argument("--trial", help="write to cards\\meshes-trials\\TRIAL instead (live meshes untouched; implies --force)")
+    ms.add_argument("--set", dest="settings", metavar="K=V,...",
+                    help="mesh settings, e.g. paint=1,sym=1,width=1,sigma=2.5,smooth=8 (see card_meshes.Settings)")
     dv = sub.add_parser("devices", help="list paired devices; `devices revoke ID` unpairs one (venv-ui)")
     dv.add_argument("action", nargs="?", choices=["revoke"])
     dv.add_argument("device_id", nargs="?")
@@ -236,7 +270,7 @@ def main(argv=None) -> int:
     if args.cmd in ("pair", "devices"):
         return cmd_ui_cli(cfg, args)
 
-    log_name = {"run": "supervisor", "render-clip": "render", "render-daily": "daily",
+    log_name = {"run": "supervisor", "render-clip": "render", "render-daily": "daily", "render-custom": "custom",
                 "sightings-worker": "sightings"}.get(args.cmd, args.cmd)
     log = setup_logging(cfg, log_name)
     side_log(cfg, "gaps")
@@ -254,6 +288,9 @@ def main(argv=None) -> int:
         elif args.cmd == "render-daily":
             from .render import render_daily
             res = render_daily(cfg, args.date)
+        elif args.cmd == "render-custom":
+            from .render import render_custom
+            res = render_custom(cfg, args.id or new_custom_job(cfg, args))
         elif args.cmd == "archive":
             from .archive import append_pending
             res = append_pending(cfg)
@@ -282,7 +319,8 @@ def main(argv=None) -> int:
             return cmd_rife_bench(cfg)
         elif args.cmd == "meshes":
             from .card_meshes import run as run_meshes
-            res = run_meshes(cfg, args.label, args.force, args.limit)
+            res = run_meshes(cfg, args.label, args.force, args.limit, trial=args.trial,
+                             settings=args.settings)
         elif args.cmd == "housekeep":
             from . import housekeeping
             housekeeping.run(cfg)

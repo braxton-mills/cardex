@@ -221,15 +221,21 @@ export class CardEngine {
         card.lightTarget.set(Math.sin(this.t * 0.4 + rec.phase) * 0.8, 0.7 + Math.cos(this.t * 0.3 + rec.phase) * 0.4, 1.4);
       }
       card.update(dt, this.t, { spin: !this.reduceMotion() });
+      // The padding grows with the card's tilt, so the viewport changes size every frame. Keep its centre on a whole
+      // device pixel and its size an even number of them: otherwise three.js rounds x and width separately and the
+      // card jitters by half a pixel as it sways.
       const pad = b.width * (0.14 + 0.4 * (el === lifted ? 1 : card.activity()));
-      const vx = b.left - pad, vy = H - b.bottom - pad, vw = b.width + pad * 2, vh = b.height + pad * 2;
+      const pr = this.size.pr;
+      const hw = Math.ceil((b.width / 2 + pad) * pr), hh = Math.ceil((b.height / 2 + pad) * pr);
+      const vx = (Math.round((b.left + b.width / 2) * pr) - hw) / pr, vy = (Math.round((H - b.bottom + b.height / 2) * pr) - hh) / pr;
+      const vw = (hw * 2) / pr, vh = (hh * 2) / pr;
       const sx = Math.max(vx, mr.left), sy = Math.max(vy, H - mr.bottom);
       const ex = Math.min(vx + vw, mr.right), ey = Math.min(vy + vh, H - mr.top);
       if (ex <= sx || ey <= sy) continue;
       r.setViewport(vx, vy, vw, vh);
       r.setScissor(sx, sy, ex - sx, ey - sy);
       r.clear(false, true, true);
-      card.fit(vw / vh, b.height / vh);
+      card.fitWindow(vw / vh, b.height / vh);
       r.render(card.scene, card.camera);
     }
     r.setScissorTest(false);

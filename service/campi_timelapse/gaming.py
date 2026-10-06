@@ -93,6 +93,11 @@ class PdhArray:
             raise OSError(f"PdhAddEnglishCounter({path}) failed: 0x{rc & 0xFFFFFFFF:08X}")
         self.pdh.PdhCollectQueryData(self.query)  # rates need a first sample
 
+    def close(self) -> None:
+        if self.query:
+            self.pdh.PdhCloseQuery(self.query)
+            self.query = ctypes.c_void_p()
+
     def read(self) -> dict[str, float]:
         rc = self.pdh.PdhCollectQueryData(self.query) & 0xFFFFFFFF
         if rc != 0:
@@ -119,8 +124,12 @@ def counter_nvidia_luid() -> tuple[int, int] | None:
     (an iGPU has none). Needed in session 0, where DXGI reports a different LUID than the counters use."""
     mem = PdhArray("\\GPU Adapter Memory(*)\\Dedicated Usage")
     time.sleep(0.2)
+    try:
+        usage = mem.read()
+    finally:
+        mem.close()
     best, used = None, 64 * 2**20
-    for name, v in mem.read().items():
+    for name, v in usage.items():
         m = ADAPTER.search(name)
         if m and v > used:
             best, used = (int(m.group(1), 16), int(m.group(2), 16)), v
@@ -158,13 +167,30 @@ class GameDetector:
         self.extra = [e.lower() for e in self.g.extra_exes]
         self.ignore = [e.lower() for e in self.g.ignore_exes]
         self.busy_since: dict[int, float] = {}
+        # pid -> exe of processes that passed the GPU check: they stay games until they exit, whatever their GPU
+        # use later (a game in a menu, minimized, or with its display switched away by a KVM draws next to nothing)
+        self.games: dict[int, str] = {}
         self.counters_error = ""
-        self.gpu = None
+        self.gpu: Gpu3D | None = None
+        self.gpu_failures = 0
+        self.reopen_at = 0.0
+        self.open_counters(time.time())
+
+    def open_counters(self, now: float) -> None:
+        """(Re)open the GPU Engine counters. The adapter's LUID changes when the driver resets, so it is looked up
+        each time; while the counters can't be opened, detection uses the path match and retries every 5 min."""
+        if self.gpu:
+            self.gpu.close()
+            self.gpu = None
+        self.gpu_failures = 0
         try:
             dxgi = nvidia_luid()
             probe = Gpu3D(dxgi or (0, 0))
-            time.sleep(0.2)
-            present = probe.luids()
+            try:
+                time.sleep(0.2)
+                present = probe.luids()
+            finally:
+                probe.close()
             if dxgi in present:
                 luid, how = dxgi, "DXGI"
             else:  # session 0: DXGI's LUID differs from the counters'; use the adapter with dedicated memory
@@ -172,11 +198,14 @@ class GameDetector:
             if luid is None or luid not in present:
                 raise OSError(f"NVIDIA adapter not found in the GPU Engine counters (DXGI said {dxgi})")
             self.gpu = Gpu3D(luid)
+            self.counters_error = ""
             log.info("game detection: NVIDIA LUID 0x%08X_0x%08X (from %s), GPU Engine counters OK", *luid, how)
         except Exception as e:  # session 0 / missing counters: path match only
-            self.counters_error = f"{type(e).__name__}: {e}"
-            log.warning("game detection: GPU counters unavailable (%s); using the path match alone",
-                        self.counters_error)
+            err = f"{type(e).__name__}: {e}"
+            if err != self.counters_error:  # retries every 5 min: log each new error once
+                log.warning("game detection: GPU counters unavailable (%s); using the path match alone", err)
+            self.counters_error = err
+            self.reopen_at = now + 300
 
     def mode(self) -> str:
         try:
@@ -204,34 +233,43 @@ class GameDetector:
             return {**base, "active": True, "exe": "manual (campi game on)", "source": "manual"}
         if mode == "off" or not self.g.auto:
             self.busy_since.clear()
+            self.games.clear()
             return {**base, "source": "off" if mode == "off" else "auto disabled"}
-        util: dict[int, float] = {}
+        if self.gpu is None and now >= self.reopen_at:
+            self.open_counters(now)
+        util: dict[int, float] | None = None
         if self.gpu:
             try:
                 util = self.gpu.sample()
-            except OSError as e:
-                self.gpu, self.counters_error = None, str(e)
-                log.warning("game detection: GPU counters failed (%s); using the path match alone", e)
+                self.gpu_failures = 0
+            except OSError as e:  # one-offs happen (an instance vanishing mid-read): skip this poll, reopen after 3
+                self.gpu_failures += 1
+                if self.gpu_failures >= 3:
+                    log.warning("game detection: GPU counters failed %d polls in a row (%s); reopening",
+                                self.gpu_failures, e)
+                    self.open_counters(now)
         best = None
-        alive = set()
+        alive: dict[int, str] = {}
         for p in psutil.process_iter(["pid", "exe"]):
             exe = p.info.get("exe")
             if not exe or not self.is_candidate(exe):
                 continue
             pid = p.info["pid"]
-            alive.add(pid)
-            if self.gpu is None:  # fallback: a matching process alone counts
+            alive[pid] = exe
+            if self.games.get(pid) == exe or self.gpu is None:  # a confirmed game, or fallback: path match alone
                 best = best or (pid, exe)
+            elif util is None:  # the counters failed this poll: keep the timers, decide next poll
                 continue
-            if util.get(pid, 0.0) > self.g.gpu_busy_pct:
+            elif util.get(pid, 0.0) > self.g.gpu_busy_pct:
                 self.busy_since.setdefault(pid, now)
                 if now - self.busy_since[pid] >= self.g.gpu_busy_s:
+                    self.games[pid] = exe
                     best = best or (pid, exe)
             else:
                 self.busy_since.pop(pid, None)
-        for pid in list(self.busy_since):
-            if pid not in alive:
-                del self.busy_since[pid]
+        for d in (self.busy_since, self.games):
+            for pid in [pid for pid in d if pid not in alive]:
+                del d[pid]
         if best:
             return {**base, "active": True, "pid": best[0], "exe": Path(best[1]).name,
                     "source": "gpu counters" if self.gpu else "path match"}

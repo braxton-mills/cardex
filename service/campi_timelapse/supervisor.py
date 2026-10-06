@@ -10,6 +10,8 @@ import sys
 import time
 from datetime import date, datetime, timedelta
 
+from . import custom_jobs as cj
+from . import render_index
 from .config import BELOW_NORMAL, NO_WINDOW, PROJECT, FileLock, read_json, write_json
 
 log = logging.getLogger("supervisor")
@@ -69,6 +71,10 @@ class Supervisor:
         self.meshes = None        # optional card meshes pass ([cards] meshes_enabled; TripoSR on the RTX card)
         self.meshes_missing_logged = False
         self.daily_queue: list[date] = []
+        # custom timelapses asked for from the desktop UI (custom_jobs); unfinished ones resume after a restart
+        self.custom = None
+        self.custom_id: str | None = None
+        self.custom_queue: list[str] = [j["id"] for j in reversed(cj.jobs(cfg)) if j.get("status") in cj.ACTIVE]
         # optional sightings worker (only touched when [sightings] enabled)
         self.sightings = None
         self.sightings_restarts = 0
@@ -217,13 +223,14 @@ class Supervisor:
         was = bool(self.game_state.get("active"))
         if st.get("active") and not was:
             self.game_active_since = now
-            log.info("paused: gaming (%s, %s)%s%s", st.get("exe"), st.get("source"),
+            log.info("paused: gaming (%s pid %s, %s)%s%s", st.get("exe"), st.get("pid"), st.get("source"),
                      "; renders deferred" if self.renders_defer_enabled() else "",
                      "; sightings stopped" if self.cfg.gaming.pause_sightings else "")
         elif was and not st.get("active"):
             self.game_resume_at = now + 120
             self.game_active_since = None
-            log.info("game ended (%s); renders resume in 2 min", self.game_state.get("exe"))
+            log.info("game ended (%s pid %s exited); renders resume in 2 min", self.game_state.get("exe"),
+                     self.game_state.get("pid"))
         self.game_state = {**st, "since": self.game_active_since}
         self.apply_sightings_pause(bool(st.get("active")))
 
@@ -321,10 +328,99 @@ class Supervisor:
                 self.meshes_missing_logged = True
             return now + 3600
         gaming = bool(self.game_state.get("active")) or now < self.game_resume_at
-        if gaming or self.clip or self.daily:
+        if gaming or self.clip or self.daily or self.custom:
             return now + 300
         self.meshes = (self.spawn("meshes", low_priority=True, exe=str(exe)), now, "card meshes")
         return now + self.cfg.cards.mesh_interval_min * 60
+
+    # -- custom timelapses -------------------------------------------------
+    def take_custom_requests(self) -> None:
+        """Requests the API dropped in ui\\render_requests\\ (it never writes under state\\ itself). A request
+        file is removed once handled; a delete that can't finish yet (file in use) stays for the next pass."""
+        d = cj.requests_dir(self.cfg)
+        if not d.is_dir():
+            return
+        try:
+            reqs = sorted(d.glob("*.json"), key=lambda p: p.stat().st_mtime)
+        except OSError:
+            return  # one vanished between glob and stat; next pass
+        for p in reqs:
+            r = read_json(p)
+            done = True
+            if not isinstance(r, dict) or not cj.ID_RE.match(str(r.get("id"))):
+                log.warning("ignoring bad render request %s", p.name)
+            elif r.get("action") == "render":
+                self.queue_custom(r)
+            elif r.get("action") == "delete":
+                done = self.delete_custom(r["id"])
+            if done:
+                p.unlink(missing_ok=True)
+
+    def queue_custom(self, r: dict) -> None:
+        try:
+            start, end = float(r["start_ts"]), float(r["end_ts"])
+            speed = float(r["speed"]) if r.get("speed") is not None else None
+            seconds = float(r["seconds"]) if r.get("seconds") is not None else None
+        except (KeyError, TypeError, ValueError):
+            log.warning("ignoring malformed custom render request %s", r.get("id"))
+            return
+        err = cj.validate(start, end, speed, seconds)
+        if err or cj.read_job(self.cfg, r["id"]):
+            log.warning("ignoring custom render request %s: %s", r["id"], err or "already queued")
+            return
+        job = {**cj.new_job(start, end, speed, seconds), "id": r["id"], "created": r.get("created") or time.time()}
+        cj.write_job(self.cfg, job)
+        self.custom_queue.append(job["id"])
+        log.info("custom render %s queued (%s -> %s, %s)", job["id"], datetime.fromtimestamp(start).isoformat(
+            timespec="minutes"), datetime.fromtimestamp(end).isoformat(timespec="minutes"),
+            f"{speed:g}x" if speed else f"{seconds:g} s")
+
+    def delete_custom(self, job_id: str) -> bool:
+        """Cancel (queued / running) and remove a custom timelapse. False if its video is still in use."""
+        if job_id in self.custom_queue:
+            self.custom_queue.remove(job_id)
+        if self.custom and self.custom_id == job_id:
+            subprocess.run(["taskkill", "/T", "/F", "/PID", str(self.custom[0].pid)], capture_output=True,
+                           creationflags=NO_WINDOW)
+            try:
+                self.custom[0].wait(10)
+            except subprocess.TimeoutExpired:
+                return False
+            self.custom = self.custom_id = None
+        for v in self.cfg.paths.custom.glob(f"campi_custom_*_{job_id}*.mp4"):  # the video and any .part
+            try:
+                v.unlink()
+            except FileNotFoundError:
+                pass
+            except OSError as e:
+                log.warning("custom render %s: could not delete %s yet (%s)", job_id, v.name, e)
+                return False
+            render_index.delete(self.cfg, v.name)
+        cj.job_path(self.cfg, job_id).unlink(missing_ok=True)
+        for d in self.cfg.paths.work.glob(f"custom_{job_id}_*"):  # left behind when a running render was killed
+            shutil.rmtree(d, ignore_errors=True)
+        log.info("custom render %s deleted", job_id)
+        return True
+
+    def check_custom(self, now: float) -> None:
+        running = self.custom_id if self.custom else None
+        if not self.reap("custom", 3 * 3600, now):
+            return
+        if running:
+            self.custom_id = None
+            job = cj.read_job(self.cfg, running)
+            if job and job.get("status") in cj.ACTIVE:  # killed, crashed or timed out before it could say so
+                job.update(status="failed", reason="the render stopped unexpectedly (see custom.log)",
+                           finished=time.time())
+                cj.write_job(self.cfg, job)
+        if not self.custom_queue or self.renders_deferred(now):
+            return
+        job_id = self.custom_queue.pop(0)
+        if cj.read_job(self.cfg, job_id) is None:
+            return  # deleted meanwhile
+        p = self.spawn("render-custom", "--id", job_id, low_priority=True)
+        self.custom, self.custom_id = (p, now, f"custom render {job_id}"), job_id
+        log.info("custom render %s started (pid %d)", job_id, p.pid)
 
     # -- schedule ---------------------------------------------------------
     def next_boundary(self, now: float) -> float:
@@ -356,6 +452,8 @@ class Supervisor:
             "render_queue": len(self.render_queue),
             "render_queue_oldest": (datetime.fromtimestamp(self.render_queue[0]).isoformat(timespec="minutes")
                                     if self.render_queue else None),
+            "custom_running": self.custom_id if self.custom else None,
+            "custom_queue": len(self.custom_queue),
             "renders_deferred": self.deferred_logged,
             "gaming": self.game_state,
         })
@@ -431,6 +529,9 @@ class Supervisor:
                     self.daily = (p, now, f"daily render {d}")
                     log.info("daily render for %s started (pid %d)", d, p.pid)
 
+                self.take_custom_requests()
+                self.check_custom(now)
+
                 if self.reap("housekeep", 1800, now) and now >= next_house:
                     next_house = now + 3600
                     self.housekeep = (self.spawn("housekeep", low_priority=True), now, "housekeeping")
@@ -449,7 +550,7 @@ class Supervisor:
                 if child and child.poll() is None:
                     subprocess.run(["taskkill", "/T", "/F", "/PID", str(child.pid)], capture_output=True,
                                    creationflags=NO_WINDOW)
-            for slot in ("clip", "daily", "housekeep", "meshes"):
+            for slot in ("clip", "daily", "custom", "housekeep", "meshes"):
                 cur = getattr(self, slot)
                 if cur and cur[0].poll() is None:
                     subprocess.run(["taskkill", "/T", "/F", "/PID", str(cur[0].pid)], capture_output=True,

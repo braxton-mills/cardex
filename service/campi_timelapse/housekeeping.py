@@ -9,7 +9,7 @@ import time
 from datetime import date, datetime, timedelta
 
 from . import render_index
-from .frames import INDEX_HEADER
+from .frames import INDEX_HEADER, row_exposure
 
 log = logging.getLogger("housekeep")
 
@@ -39,7 +39,8 @@ def expire_clips(cfg, now: float) -> int:
         if old and _unlink(p, "clip"):
             render_index.delete(cfg, p.name)
             n += 1
-    for p in list(cfg.paths.out.glob("*.part.mp4")) + list(cfg.paths.daily.glob("*.part.mp4")):
+    for p in [*cfg.paths.out.glob("*.part.mp4"), *cfg.paths.daily.glob("*.part.mp4"),
+              *cfg.paths.custom.glob("*.part.mp4")]:
         try:
             old = p.stat().st_mtime < now - 3600
         except OSError:
@@ -57,13 +58,14 @@ def expire_clips(cfg, now: float) -> int:
 
 
 def expire_orphan_indexes(cfg) -> None:
-    """Render indexes whose clip / daily video no longer exists (deleted by hand, or a crash mid-expiry)."""
+    """Render indexes whose clip / daily / custom video no longer exists (deleted by hand, or a crash mid-expiry)."""
     idir = render_index.index_dir(cfg)
     if not idir.is_dir():
         return
     for p in idir.glob("*.json"):
         name = p.stem + ".mp4"
-        video = cfg.paths.daily / name if name.startswith("campi_daily_") else cfg.paths.out / name
+        video = (cfg.paths.daily if name.startswith("campi_daily_") else
+                 cfg.paths.custom if name.startswith("campi_custom_") else cfg.paths.out) / name
         if not video.exists():
             _unlink(p, "render index")
 
@@ -98,7 +100,7 @@ def thin_day(cfg, ddir, cutoff: float) -> tuple[int, int]:
         with open(tmp, "w", encoding="utf-8", newline="") as f:
             f.write(INDEX_HEADER + "\n")
             for r in kept:
-                f.write(f"{r['ts']},{r['file']},{r['luma']},{r['sha1']},{r['bytes']}\n")
+                f.write(f"{r['ts']},{r['file']},{r['luma']},{r['sha1']},{r['bytes']},{row_exposure(r)}\n")
         os.replace(tmp, idx)
         for h in ddir.iterdir():
             if h.is_dir() and not any(h.iterdir()):

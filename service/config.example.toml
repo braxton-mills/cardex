@@ -7,7 +7,7 @@ url = "http://campi.local:8000/stream.mjpg"
 snapshot_url = "http://campi.local:8000/snapshot.jpg"   # high-quality JPEG per request (added to the Pi server)
 pi_mac = ""                  # Pi wlan0 MAC, e.g. "AA-BB-CC-DD-EE-FF": if the host stops answering, capture finds
                              # the Pi on the LAN by this ("" = off)
-timeout_s = 10               # connect timeout, and no data for this long = stream dropped
+timeout_s = 20               # connect timeout, and no data for this long = stream dropped (night frames are 8 s)
 backoff_initial_s = 1
 backoff_max_s = 60
 
@@ -26,6 +26,7 @@ delay_s = 15                 # wait after the window closes so the last frame is
 min_usable_frac = 0.5        # skip the clip if fewer usable frames than this fraction of expected
 gap_factor = 3.0             # frames further apart than gap_factor * spacing = hard cut, no interpolation
 timeout_min = 9              # kill a stuck render after this long
+min_luma = 0                 # skip frames darker than this mean brightness (0-255); 0 = keep every frame, night too
 
 [output]
 dir = "{home}\\Videos\\campi"   # 10-min clips, latest.mp4, daily\
@@ -52,10 +53,20 @@ min_gain = 0.8
 max_gain = 1.25
 
 [night]
-luma_threshold = 10          # frames with mean brightness (0-255) below this are skipped (the Pi's night
-                             # exposure keeps nights at ~30; only a black frame falls under 10)
+luma_threshold = 10          # sightings pause below this mean brightness (0-255) when pause_at_night is on
+                             # (the Pi's night exposure keeps nights at ~30); renders use [render] min_luma
 denoise_frames = 3           # night frames are averaged with their neighbours (odd count; 1 = off). Cuts
                              # sensor-noise shimmer ~sqrt(n); fades out at dawn like dim_region
+
+[sky]
+# Night sky above the treeline, so faint stars survive. Renders only, like dim_region; all of it fades out at dawn.
+region = []                  # polygon, 0-1 of the camera frame, everything above the treeline; [] = off
+                             # e.g. [[0, 0], [1, 0], [1, 0.5], [0, 0.45]]
+stack_frames = 9             # the sky is averaged over this many frames (odd; [night] denoise_frames elsewhere).
+                             # Capped at ~24 s so stars don't trail (thinned or sampled frames: no extra stacking)
+flatten = 0.8                # share of the smooth sky glow (town, floodlights, haze) removed above the darkest sky
+hot_pixels = true            # replace sensor hot pixels (lit in every night frame) in the sky; the map is rebuilt
+                             # from each render's night frames, kept in state\hot_pixels.png
 
 [overlay]
 enabled = true
@@ -146,6 +157,8 @@ meshes_enabled = false
 mesh_interval_min = 60         # how often a pass runs
 meshes_per_pass = 10           # new cars first, then crops at least 1.3x bigger than the one a scan came from
 mesh_timeout_min = 30
+mesh_avoid = []   # polygons (0-1 of the frame) in front of the road, e.g. a street tree:
+                               # scans prefer photos of the car clear of them (also sharp, in daylight)
 
 [api]
 # The HTTP API for the Campi iPhone app (and the desktop UI): see README "API". Needs `install.ps1 -UI`.

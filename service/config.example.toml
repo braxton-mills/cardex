@@ -7,7 +7,7 @@ url = "http://campi.local:8000/stream.mjpg"
 snapshot_url = "http://campi.local:8000/snapshot.jpg"   # high-quality JPEG per request (added to the Pi server)
 pi_mac = ""                  # Pi wlan0 MAC, e.g. "AA-BB-CC-DD-EE-FF": if the host stops answering, capture finds
                              # the Pi on the LAN by this ("" = off)
-timeout_s = 10               # connect timeout, and no data for this long = stream dropped
+timeout_s = 20               # connect timeout, and no data for this long = stream dropped (night frames are 8 s)
 backoff_initial_s = 1
 backoff_max_s = 60
 
@@ -57,6 +57,16 @@ luma_threshold = 10          # sightings pause below this mean brightness (0-255
                              # (the Pi's night exposure keeps nights at ~30); renders use [render] min_luma
 denoise_frames = 3           # night frames are averaged with their neighbours (odd count; 1 = off). Cuts
                              # sensor-noise shimmer ~sqrt(n); fades out at dawn like dim_region
+
+[sky]
+# Night sky above the treeline, so faint stars survive. Renders only, like dim_region; all of it fades out at dawn.
+region = []                  # polygon, 0-1 of the camera frame, everything above the treeline; [] = off
+                             # e.g. [[0, 0], [1, 0], [1, 0.5], [0, 0.45]]
+stack_frames = 9             # the sky is averaged over this many frames (odd; [night] denoise_frames elsewhere).
+                             # Capped at ~24 s so stars don't trail (thinned or sampled frames: no extra stacking)
+flatten = 0.8                # share of the smooth sky glow (town, floodlights, haze) removed above the darkest sky
+hot_pixels = true            # replace sensor hot pixels (lit in every night frame) in the sky; the map is rebuilt
+                             # from each render's night frames, kept in state\hot_pixels.png
 
 [overlay]
 enabled = true

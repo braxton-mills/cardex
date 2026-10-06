@@ -9,7 +9,7 @@ import time
 from datetime import date, datetime, timedelta
 
 from . import render_index
-from .frames import INDEX_HEADER
+from .frames import INDEX_HEADER, row_exposure
 
 log = logging.getLogger("housekeep")
 
@@ -100,7 +100,7 @@ def thin_day(cfg, ddir, cutoff: float) -> tuple[int, int]:
         with open(tmp, "w", encoding="utf-8", newline="") as f:
             f.write(INDEX_HEADER + "\n")
             for r in kept:
-                f.write(f"{r['ts']},{r['file']},{r['luma']},{r['sha1']},{r['bytes']}\n")
+                f.write(f"{r['ts']},{r['file']},{r['luma']},{r['sha1']},{r['bytes']},{row_exposure(r)}\n")
         os.replace(tmp, idx)
         for h in ddir.iterdir():
             if h.is_dir() and not any(h.iterdir()):

@@ -70,10 +70,12 @@ stopping the supervisor kills them too.
 
 Pipeline: q90 JPEG snapshots from the Pi saved as-is (night included; `[render] min_luma` can drop near-black
 frames, off by default) -> split at capture gaps (hard cuts) ->
+night sky hot pixels removed in `[sky] region` (the map is rebuilt from each render's night frames) ->
 night light taming in `[image] dim_region` (glare compressed by local brightness, lamps kept as points,
 clipped highlights rebuilt and re-tinted) -> no leveling (level_deg 0,
 so the full 1920x1440 frame is used) -> luminance deflicker ->
-scale to 1440x1080 -> night temporal denoise (`[night] denoise_frames`, a 3-frame mean on dark frames) ->
+scale to 1440x1080 -> night temporal denoise (`[night] denoise_frames`, a 3-frame mean on dark frames;
+`[sky] stack_frames`, 9, in the sky) -> sky glow flattened toward the darkest sky (`[sky] flatten`) ->
 RIFE 2x on the RTX 5070 (rife-ncnn-vulkan, Vulkan) per segment -> timestamp ->
 h264_nvenc CQ 19, yuv420p, bt709, +faststart.
 
@@ -85,10 +87,14 @@ Setup from scratch: `powershell -ExecutionPolicy Bypass -File install.ps1` (crea
   mode, `/stream.mjpg` (hardware MJPEG, 30 fps, quality HIGH; the Pi 4 encoder caps at 25 Mbps) and
   `/snapshot.jpg` (software JPEG, q90 by default, `?q=NN` to override), which the timelapse uses.
   1920 is the widest the Pi 4 hardware JPEG encoder can produce (2028 came out as a cropped 1920x1520).
-- Night exposure: the IMX477's normal AE mode is extended so that, once gain reaches 8, exposures stretch up to
-  1 s (`NIGHT_MAX_EXPOSURE_US`) and then gain rises to 16. Daylight and dusk are unchanged at 30 fps; in the dark the
-  stream slows to match (about 1 fps). At the stock 1/30 s cap night frames had a mean luma of about 1 (black);
-  with it, an overcast night is about 30. `/snapshot.jpg` reports exposure, gain and WB in an `X-Exposure` header.
+- Night exposure: the IMX477's normal AE mode is extended so that, once gain reaches 4 (`NIGHT_STRETCH_GAIN`),
+  exposures stretch up to 8 s (`NIGHT_MAX_EXPOSURE_US`) and then gain rises to 16. Daylight is unchanged at 30 fps;
+  in the dark the stream slows to match (one frame per 8 s, so the timelapse gets one too, and sightings pause a
+  little earlier at dusk). Above 250 ms the ISP's spatial noise reduction drops to Minimal (it erases faint stars;
+  the PC stacks over time instead), and defective-pixel correction runs at strength 2 (strong) all the time. At the stock 1/30 s cap night frames were black; at 1 s the gain sat at 16 and only the
+  brightest stars showed. `/snapshot.jpg` reports exposure, gain and WB in an `X-Exposure` header; capture records
+  exposure x gain in the `exposure` column of `index.csv`, and renders judge night by brightness at a fixed
+  exposure (1 s x 16) so long exposures and overcast nights still get the night fixes.
 - White balance is locked to daylight (`WB_KELVIN` 5600, gains from the sensor's calibrated `ct_curve`, about
   3.10/1.43) so timelapses don't shift color as auto WB chases clouds, dusk and streetlights. Nights come out amber.
 - Runs as a systemd user service (no sudo; starts at boot because linger is enabled):

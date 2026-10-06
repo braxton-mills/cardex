@@ -9,9 +9,11 @@ import http.client
 import logging
 import os
 import random
+import re
 import socket
 import time
 import urllib.request
+from collections import deque
 from datetime import datetime
 from pathlib import Path
 from urllib.parse import urlparse
@@ -21,7 +23,7 @@ import numpy as np
 
 from . import discover
 from .config import read_json, write_json
-from .frames import INDEX_HEADER, day_dir
+from .frames import INDEX_HEADER, day_dir, is_gap
 
 log = logging.getLogger("capture")
 
@@ -55,6 +57,9 @@ class StreamSource:
         self.resp.close()
 
 
+EXPOSURE_RE = re.compile(r"\s*(\d+) us, gain ([\d.]+)")
+
+
 class SnapshotSource:
     """One GET per frame, only when a frame is due."""
     lazy = True
@@ -66,6 +71,7 @@ class SnapshotSource:
         # Resolve IPv4 once: trying IPv6 first makes every .local request take seconds.
         self.ip = socket.getaddrinfo(self.host, self.port, socket.AF_INET, socket.SOCK_STREAM)[0][4][0]
         self.desc = f"snapshots {url} ({self.ip})"
+        self.exposure = None  # seconds x gain of the last frame (the Pi's X-Exposure header)
 
     def get(self):
         conn = http.client.HTTPConnection(self.ip, self.port, timeout=self.timeout)
@@ -77,6 +83,8 @@ class SnapshotSource:
             if r.status != 200:
                 raise StreamError(f"snapshot HTTP {r.status}")
             length = r.getheader("Content-Length")
+            m = EXPOSURE_RE.match(r.getheader("X-Exposure") or "")
+            self.exposure = int(m[1]) / 1e6 * float(m[2]) if m else None
             return r.read(), int(length) if length else None
         finally:
             conn.close()
@@ -144,7 +152,7 @@ class FrameWriter:
         self.day = None
         self.index = None
 
-    def save(self, data: bytes, ts: float, luma: float, sha1: str) -> Path:
+    def save(self, data: bytes, ts: float, luma: float, sha1: str, exposure: float | None = None) -> Path:
         dt = datetime.fromtimestamp(ts)
         ddir = day_dir(self.cfg, dt.date())
         if self.day != dt.date():
@@ -164,7 +172,8 @@ class FrameWriter:
         with open(tmp, "wb") as f:
             f.write(data)
         os.replace(tmp, path)
-        self.index.write(f"{ts:.3f},{rel},{luma:.1f},{sha1},{len(data)}\n")
+        exp = f"{exposure:.6g}" if exposure else ""
+        self.index.write(f"{ts:.3f},{rel},{luma:.1f},{sha1},{len(data)},{exp}\n")
         self.index.flush()
         return path
 
@@ -179,6 +188,7 @@ def run(cfg, stop=lambda: False) -> None:
     # wall time of last saved frame; carried over from the previous run so restarts/reboots log their gap too
     last_saved = (read_json(state_path, {}) or {}).get("last_frame_ts")
     last_hash, dupes = None, 0
+    spacings: deque = deque(maxlen=5)  # recent frame spacings: night exposures slow the cadence without a gap
     saved = rejected = reconnects = gaps_logged = 0
     last_error = ""
     host = discover.current_host(cfg)
@@ -226,7 +236,7 @@ def run(cfg, stop=lambda: False) -> None:
                     continue
                 dupes, last_hash = 0, sha1
                 ts = time.time()
-                if last_saved and ts - last_saved > gap_limit:
+                if last_saved and is_gap(ts - last_saved, gap_limit, cfg.render.gap_factor, list(spacings)):
                     if not last_error and gaps_logged == 0 and saved == 0:
                         last_error = "capture not running (service stopped / PC off or asleep)"
                     gaps_logged += 1
@@ -236,7 +246,10 @@ def run(cfg, stop=lambda: False) -> None:
                               ts - last_saved, last_error or "-")
                     log.warning("gap of %.0fs ended", ts - last_saved)
                     last_error = ""
-                writer.save(data, ts, luma, sha1)
+                    spacings.clear()
+                elif last_saved:
+                    spacings.append(ts - last_saved)
+                writer.save(data, ts, luma, sha1, getattr(src, "exposure", None))
                 last_saved = ts
                 saved += 1
                 backoff = s.backoff_initial_s

@@ -21,7 +21,8 @@ import numpy as np
 from . import frames as fr
 from . import render_index
 from .config import NO_WINDOW, FileLock, read_json, side_log, write_json
-from .imageproc import LightDimmer, apply_gain, crop_dims, deflicker_gains, level, night_weight, temporal_denoise
+from .imageproc import (LightDimmer, NightSky, apply_gain, crop_dims, deflicker_gains, level, night_weight,
+                        scene_luma, temporal_denoise)
 from .rife import GpuMonitor, Rife, gpu_sample, summarize
 
 log = logging.getLogger("render")
@@ -124,6 +125,33 @@ def read_ahead(paths, pool: ThreadPoolExecutor, depth: int = 8):
         yield pending.popleft().result()
 
 
+def dark(f: fr.Frame) -> float:
+    """The brightness the night fixes go by (see scene_luma)."""
+    return scene_luma(f.luma, f.exposure)
+
+
+def load_hot_pixels(cfg, sky: NightSky, frames: list[fr.Frame]) -> None:
+    """Hot-pixel map for this render: from its own night frames when they span long enough for every star to have
+    moved on (saved for the next render), else the last saved one."""
+    night = [f for f in frames if night_weight(dark(f)) >= 1.0]
+    if not sky.hot_pixels or not night:
+        return
+    path = cfg.paths.state / "hot_pixels.png"
+    sample = fr.sample_evenly(night, 20)
+    if sample[-1].ts - sample[0].ts >= sky.HOT_MIN_SPAN_S:
+        imgs = [img for f in sample if (img := cv2.imread(str(f.path), cv2.IMREAD_COLOR)) is not None]
+        hot = sky.find_hot_pixels(imgs)
+        if hot is not None:
+            sky.hot = hot
+            tmp = path.with_name(f"hot_pixels.{os.getpid()}.tmp.png")
+            if cv2.imwrite(str(tmp), hot.astype(np.uint8) * 255):
+                replace_retry(tmp, path)
+            return
+    saved = cv2.imread(str(path), cv2.IMREAD_GRAYSCALE)
+    if saved is not None:
+        sky.hot = saved > 0
+
+
 def render_frames(cfg, frames: list[fr.Frame], out_path: Path, job_name: str, encoder: str,
                   progress=None) -> dict:
     """progress(fraction) is called every few seconds (custom renders show a bar): half for preparing the source
@@ -137,7 +165,7 @@ def render_frames(cfg, frames: list[fr.Frame], out_path: Path, job_name: str, en
     deltas = [b.ts - a.ts for a, b in zip(frames, frames[1:])]
     spacing = max(cfg.capture.interval_s, statistics.median(deltas) if deltas else 0)
     max_gap = cfg.render.gap_factor * spacing
-    segs = fr.segment(frames, max_gap)
+    segs = fr.segment(frames, max_gap, cfg.render.gap_factor)
 
     probe = cv2.imread(str(frames[0].path))
     src_h, src_w = probe.shape[:2]
@@ -152,6 +180,14 @@ def render_frames(cfg, frames: list[fr.Frame], out_path: Path, job_name: str, en
     pre_scale = cw > w
     dim = LightDimmer(getattr(cfg.image, "dim_region", []), getattr(cfg.image, "dim_strength", 0.0))
     denoise_radius = max(0, int(getattr(cfg.night, "denoise_frames", 1)) - 1) // 2
+    sky = NightSky(cfg.sky.region, cfg.sky.stack_frames, cfg.sky.flatten, cfg.sky.hot_pixels)
+    sky_mask, sky_radius = None, 0
+    if sky.enabled:
+        load_hot_pixels(cfg, sky, frames)
+        sky_mask = level(sky.raw_mask(*probe.shape[:2]), cfg.image.rotation, cfg.image.level_deg, w, h)
+        if pre_scale:
+            sky_mask = cv2.resize(sky_mask, (w, h), interpolation=cv2.INTER_AREA)
+        sky_radius = min(sky.stack_radius, int(sky.STACK_MAX_S / (2 * spacing)))  # sampled frames: stars would trail
 
     pool = ThreadPoolExecutor(4, thread_name_prefix="read")
     job = cfg.paths.work / job_name
@@ -216,7 +252,7 @@ def render_frames(cfg, frames: list[fr.Frame], out_path: Path, job_name: str, en
                         if img is None:
                             log.warning("unreadable frame skipped: %s", f.path)
                             continue
-                        img = dim(img, f.luma)
+                        img = dim(sky.fix_hot(img, dark(f)), dark(f))
                         img = level(img, cfg.image.rotation, cfg.image.level_deg, w, h)
                         if img.shape[1] != cw:  # a frame with a different source size slipped in
                             img = cv2.resize(img, (cw, ch), interpolation=cv2.INTER_AREA)
@@ -241,7 +277,10 @@ def render_frames(cfg, frames: list[fr.Frame], out_path: Path, job_name: str, en
 
                 start_chunk()
                 # Within a segment only: never average across a capture gap
-                for f, img in temporal_denoise(prepared(), denoise_radius, lambda f: night_weight(f.luma)):
+                for f, img in temporal_denoise(prepared(), denoise_radius, lambda f: night_weight(dark(f)),
+                                               sky_radius, sky_mask):
+                    if sky_mask is not None:
+                        img = sky.flatten(img, dark(f), sky_mask)
                     if len(cur) == size + 1:  # full: hand it on; the next chunk starts with its last frame
                         put(q_prep, (cur_dir, cur, False))
                         boundary = cur[-1]
@@ -389,7 +428,9 @@ def render_clip(cfg, end_ts: float | None = None, minutes: float | None = None) 
     try:
         all_frames = fr.frames_between(cfg, start_ts, end_ts)
         frames = fr.usable(cfg, all_frames)
-        expected = minutes * 60 / cfg.capture.interval_s
+        # long night exposures slow the Pi below interval_s: judge coverage by the cadence the frames actually have
+        deltas = [b.ts - a.ts for a, b in zip(all_frames, all_frames[1:])]
+        expected = minutes * 60 / max(cfg.capture.interval_s, statistics.median(deltas) if deltas else 0)
         need = max(2, int(cfg.render.min_usable_frac * expected))
         if len(frames) < need:
             res = {"status": "skipped", "window_start": start.isoformat(timespec="seconds"),

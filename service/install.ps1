@@ -97,7 +97,7 @@ if ($Meshes) {
     if (-not (Test-Path $tsr)) { git clone --depth 1 https://github.com/VAST-AI-Research/TripoSR $tsr }
     if (-not (Test-Path $mpy)) { uv venv $mv --python 3.12 }
     uv pip install --python $mpy torch torchvision --index-url https://download.pytorch.org/whl/cu128
-    uv pip install --python $mpy 'transformers==4.46.3' 'rembg[gpu]' onnxruntime trimesh PyMCubes omegaconf einops huggingface_hub scipy pillow
+    uv pip install --python $mpy 'transformers==4.46.3' 'rembg[gpu]' onnxruntime trimesh PyMCubes fast_simplification omegaconf einops huggingface_hub scipy pillow
     Write-Host 'mesh env ready: campi meshes --limit 1 tries it (TripoSR downloads on the first run)'
 }
 

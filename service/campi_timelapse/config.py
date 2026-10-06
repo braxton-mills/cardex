@@ -43,7 +43,8 @@ API_DEFAULTS = {
     "enabled": False, "port": 8765, "public_url": "", "max_live_viewers": 3, "media_url_ttl_h": 12,
 }
 # [cards] defaults: the Cards tab works without them; only the 3D mesh job (TripoSR on the RTX card) is opt-in.
-CARDS_DEFAULTS = {"meshes_enabled": False, "mesh_interval_min": 60, "meshes_per_pass": 10, "mesh_timeout_min": 30}
+CARDS_DEFAULTS = {"meshes_enabled": False, "mesh_interval_min": 60, "meshes_per_pass": 10, "mesh_timeout_min": 30,
+                  "mesh_avoid": []}
 PUSH_DEFAULTS = {
     "enabled": False, "key_file": "{home}\\CampiTimelapse\\secrets\\apns_AuthKey.p8", "key_id": "", "team_id": "",
     "bundle_id": "com.braxtonmills.campi",

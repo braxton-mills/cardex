@@ -212,9 +212,12 @@ def main(argv=None) -> int:
     api.add_argument("--port", type=int, help="default: [api] port")
     sub.add_parser("pair", help="pair a phone: prints a QR code and a one-time code (venv-ui)")
     ms = sub.add_parser("meshes", help="3D card meshes from crops with TripoSR (venv-mesh; install.ps1 -Meshes)")
-    ms.add_argument("--label", help="only this label")
+    ms.add_argument("--label", action="append", help="only this label (repeatable)")
     ms.add_argument("--force", action="store_true", help="regenerate even if the label already has a mesh")
     ms.add_argument("--limit", type=int, help="at most N labels (default: [cards] meshes_per_pass)")
+    ms.add_argument("--trial", help="write to cards\\meshes-trials\\TRIAL instead (live meshes untouched; implies --force)")
+    ms.add_argument("--set", dest="settings", metavar="K=V,...",
+                    help="mesh settings, e.g. paint=1,sym=1,width=1,sigma=2.5,smooth=8 (see card_meshes.Settings)")
     dv = sub.add_parser("devices", help="list paired devices; `devices revoke ID` unpairs one (venv-ui)")
     dv.add_argument("action", nargs="?", choices=["revoke"])
     dv.add_argument("device_id", nargs="?")
@@ -282,7 +285,8 @@ def main(argv=None) -> int:
             return cmd_rife_bench(cfg)
         elif args.cmd == "meshes":
             from .card_meshes import run as run_meshes
-            res = run_meshes(cfg, args.label, args.force, args.limit)
+            res = run_meshes(cfg, args.label, args.force, args.limit, trial=args.trial,
+                             settings=args.settings)
         elif args.cmd == "housekeep":
             from . import housekeeping
             housekeeping.run(cfg)

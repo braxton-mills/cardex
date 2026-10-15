@@ -23,8 +23,12 @@ export async function mount(el, _params, ctx) {
   let show = prefs.get('cardsShow', 'caught');
   let sort = prefs.get('cardsSort', 'rarest');
   let only = prefs.get('cardsFinish', null);
-  let scanned = prefs.get('cardsScanned', false);
   const meshes = c.items.filter((i) => i.mesh).length;
+  const models = c.items.filter((i) => i.sketchfab).length;
+  // preferred car: Sketchfab model, scan, or procedural; one this set has none of shows (and draws) procedural, so the
+  // picker and the cards agree, without forgetting the preference for when models arrive
+  let source = prefs.get('cardsCar', 'model');
+  if ((source === 'model' && !models) || (source === 'scanned' && !meshes)) source = 'procedural';
   const byFinish = Object.fromEntries(FINISH_ORDER.map((f) => [f, c.items.filter((i) => i.finish === f).length]));
   const finishInfo = Object.fromEntries(c.finishes.map((f) => [f.finish, f]));
 
@@ -57,7 +61,7 @@ export async function mount(el, _params, ctx) {
       onPresetChange: (k) => prefs.set('cardsPreset', k),
     });
     engine.total = c.set_total;
-    engine.scanned = scanned;
+    engine.source = source;
     fill(presetSel, Object.entries(PRESETS).map(([k, p]) => h('option', { value: k, selected: k === engine.presetKey }, p.label)));
     fill(gpuLine, 'Rendering on ', h('b', {}, engine.gpu.raw.replace(/^ANGLE \(|\)$/g, '').split(',').slice(-2, -1)[0]?.trim() || engine.gpu.raw));
     engine.attachGrid(grid, (item) => item && open(item));
@@ -83,9 +87,11 @@ export async function mount(el, _params, ctx) {
     fill(head,
       tabs(SHOWS, (k) => show === k, (k) => { show = k; prefs.set('cardsShow', k); draw(); }),
       h('div', { class: 'grow' }),
-      meshes ? h('label', { class: 'pill-toggle', title: `${meshes} model(s) have a 3D scan made from the best photo` },
-        h('input', { type: 'checkbox', checked: scanned, onchange: (e) => { scanned = e.target.checked; prefs.set('cardsScanned', scanned); if (engine) { engine.scanned = scanned; draw(); } } }),
-        h('span', {}, `Scanned models (${meshes})`)) : null,
+      models || meshes ? h('select', {
+        class: 'pill-select', title: 'Which 3D car the cards show (cards without one show the procedural car)',
+        onchange: (e) => { source = e.target.value; prefs.set('cardsCar', source); if (engine) { engine.source = source; draw(); } },
+      }, [['model', `Sketchfab models (${models})`, models], ['scanned', `Photo scans (${meshes})`, meshes], ['procedural', 'Procedural cars', 1]]
+        .filter(([, , n]) => n).map(([k, l]) => h('option', { value: k, selected: source === k }, l))) : null,
       h('select', { class: 'pill-select', onchange: (e) => { sort = e.target.value; prefs.set('cardsSort', sort); draw(); } },
         SORTS.map(([k, l]) => h('option', { value: k, selected: sort === k }, l))));
     let items = c.items.filter((i) => (show === 'all' || (show === 'caught' ? i.count > 0 : !i.count)) && (!only || i.finish === only));
@@ -118,24 +124,37 @@ export async function mount(el, _params, ctx) {
     if (!item) return;
     if (!engine) { if (item.count) location.hash = `#/sightings${qs({ label: item.label })}`; return; }
     close();
-    engine.openInspector(item, { scanned });
+    engine.openInspector(item, { source });
     const finish = item.count ? item.finish : null;
     // input layer (below the WebGL canvas, which is click-through) + chrome layer (above the canvas)
     const stage = h('div', { class: 'cards-insp' });
     const ui = h('div', { class: 'cards-insp-ui', role: 'dialog', 'aria-label': `${item.label} card` });
     const autoBtn = iconButton('play', 'Auto tilt (A)', () => { engine.insp.auto = !engine.insp.auto; autoBtn.classList.toggle('on', engine.insp.auto); });
     autoBtn.classList.toggle('on', !!engine.insp?.auto);
-    const modelBtn = item.mesh ? h('button', {
-      class: 'pill-btn', title: 'Switch between the procedural model and the 3D scan',
-      onclick: () => { const c3 = engine.insp.card; c3.setCar(c3.carKind === 'scanned' ? 'procedural' : 'scanned'); modelBtn.textContent = c3.carKind === 'scanned' ? 'Scan' : 'Procedural'; },
-    }, scanned ? 'Scan' : 'Procedural') : null;
+    // the car: cycle through the kinds this card has; attribution for a Sketchfab model; the model picker
+    const kinds = () => ['model', 'scanned', 'procedural'].filter((k) => k === 'procedural' || (k === 'model' ? item.sketchfab : item.mesh));
+    const kindName = { model: 'Model', scanned: 'Scan', procedural: 'Procedural' };
+    const credit = h('span', { class: 'ci-credit muted' });
+    const modelBtn = h('button', {
+      class: 'pill-btn', title: 'Switch the car: Sketchfab model, photo scan or procedural',
+      onclick: () => { const c3 = engine.insp.card, ks = kinds(); c3.setCar(ks[(ks.indexOf(c3.carKind) + 1) % ks.length]); syncCar(); },
+    });
+    const syncCar = () => {
+      const k = engine.insp?.card.carKind;
+      modelBtn.textContent = kindName[k] || 'Procedural';
+      modelBtn.hidden = kinds().length < 2;
+      const m = item.sketchfab;
+      fill(credit, k === 'model' && m ? ['3D model ', h('a', { href: m.page, target: '_blank', rel: 'noopener' }, m.name),
+        ` by ${m.author}`, m.license ? [' · ', m.license_url ? h('a', { href: m.license_url, target: '_blank', rel: 'noopener' }, m.license) : m.license] : null] : []);
+    };
+    const pickBtn = !item.generic ? h('button', { class: 'pill-btn', title: 'Choose the Sketchfab model for this car', onclick: () => togglePicker() }, 'Choose model…') : null;
     ui.append(
       h('div', { class: 'ci-top' },
         h('div', { class: 'ci-title' },
           h('span', { class: `fbadge f-${finish || 'none'}` }, finish ? (finishInfo[finish]?.label || FINISH_SHORT[finish]) : 'Not caught yet'),
           h('h2', {}, item.label)),
         h('div', { class: 'grow' }),
-        modelBtn, autoBtn,
+        modelBtn, pickBtn, autoBtn,
         iconButton('refresh', 'Flip (F or double-click)', () => engine.flip()),
         iconButton('x', 'Close (Esc)', close)),
       h('div', { class: 'ci-bottom' },
@@ -145,16 +164,81 @@ export async function mount(el, _params, ctx) {
           stat('Paint', item.color ? `${item.color.name}${item.color.known ? '' : ' (guess)'}` : '—'),
           item.year_range ? stat('Years', item.year_range) : null),
         h('div', { class: 'grow' }),
+        credit,
         h('span', { class: 'muted ci-hint' }, 'Drag to tilt · double-click to flip · scroll to zoom · click outside or Esc to close'),
         item.count ? h('a', { class: 'pill-btn', href: `#/sightings${qs({ label: item.label })}` }, 'Sightings', icon('arrowRight', 16)) : null));
     document.body.append(stage, ui);
     engine.attachInspector(stage, close);
     requestAnimationFrame(() => { stage.classList.add('in'); ui.classList.add('in'); });
-    insp = { stage, ui };
+    insp = { stage, ui, picker: null, poll: null };
+    syncCar();
+
+    // ---- model picker: Sketchfab candidates (scored by `campi models`), orientation and paint fixes
+    const route = `/api/cards/models/${encodeURIComponent(item.label)}`;
+    async function togglePicker() {
+      if (insp.picker) { closePicker(); return; }
+      const panel = h('div', { class: 'ci-models', onpointerdown: (e) => e.stopPropagation(), onwheel: (e) => e.stopPropagation() });
+      insp.picker = panel;
+      ui.append(panel);
+      fill(panel, h('div', { class: 'muted' }, 'Loading candidates…'));
+      try { render(await api(route)); } catch (e) { fill(panel, h('div', { class: 'muted' }, `Could not load: ${e.message}`)); }
+    }
+    function closePicker() {
+      clearTimeout(insp?.poll);
+      insp?.picker?.remove();
+      if (insp) insp.picker = null;
+    }
+    async function send(body) {
+      try { render(await api(route, { method: 'POST', body })); } catch (e) { toast(e.message, 'error'); }
+    }
+    function render(r) {
+      const panel = insp?.picker;
+      if (!panel) return;
+      const cur = r.current;
+      // a model that changed (picked, rotated) or a paint fix: show it on the card now
+      const changed = cur?.url?.split('?')[0] !== item.sketchfab?.url?.split('?')[0] || JSON.stringify(cur?.paint) !== JSON.stringify(item.sketchfab?.paint);
+      item.sketchfab = cur;
+      if (changed) { engine.insp?.card.setCar(cur ? 'model' : 'procedural'); syncCar(); }
+      clearTimeout(insp.poll);
+      if (r.pending) insp.poll = setTimeout(() => api(route).then(render).catch(() => {}), 4000);
+      const inUse = cur?.uid || null;
+      const status = r.pick?.rejected ? 'None: this card shows the procedural car.'
+        : r.pending ? (r.enabled ? 'Queued: the models pass applies it within a minute.' : 'Queued: run campi models (or turn on [cards] models_enabled).')
+          : cur ? `${cur.picked === 'user' ? 'Your pick' : 'Picked automatically'}.` : r.candidates.length ? 'No model yet.' : 'No candidates yet: run campi models.';
+      const yaw = Number(r.pick?.yaw || 0);
+      fill(panel,
+        h('div', { class: 'cm-head' }, h('b', {}, '3D model'), h('div', { class: 'grow' }), iconButton('x', 'Close', closePicker)),
+        h('p', { class: 'muted cm-status' }, status),
+        h('div', { class: 'cm-actions' },
+          cur ? [
+            h('button', { class: 'pill-btn', title: 'Turn the model a quarter (when it sits sideways)', onclick: () => send({ yaw: (yaw + 90) % 360 }) }, 'Rotate 90°'),
+            h('button', { class: 'pill-btn', title: 'Turn the model around (when it faces backwards)', onclick: () => send({ yaw: (yaw + 180) % 360 }) }, 'Flip'),
+            h('button', { class: 'pill-btn', title: 'No Sketchfab model for this car: show the procedural one', onclick: () => send({ rejected: true }) }, 'None'),
+          ] : null,
+          r.pick && Object.keys(r.pick).length ? h('button', { class: 'pill-btn ghost', title: 'Forget your choices for this car', onclick: () => send({ clear: true }) }, 'Automatic') : null),
+        cur?.materials?.length ? h('div', { class: 'cm-paint' }, h('span', { class: 'cap' }, 'Body paint (card colour)'),
+          h('div', { class: 'cm-chips' }, cur.materials.map((name) => {
+            const on = cur.paint.includes(name);
+            return h('button', {
+              class: `cm-chip ${on ? 'on' : ''}`, title: on ? 'Painted in the card colour' : 'Paint this part in the card colour',
+              onclick: () => send({ paint: on ? cur.paint.filter((x) => x !== name) : [...cur.paint, name] }),
+            }, name);
+          }))) : null,
+        h('span', { class: 'cap' }, `Candidates${r.searched_at ? ` · searched ${fmt.date(new Date(r.searched_at * 1000).toISOString())}` : ''}`),
+        h('div', { class: 'cm-list' }, r.candidates.map((cand) => h('div', { class: `cm-cand ${cand.uid === inUse ? 'on' : ''}` },
+          cand.thumbnail ? h('img', { src: cand.thumbnail, alt: '', loading: 'lazy', draggable: 'false' }) : h('div', { class: 'cm-noimg' }, icon('car', 28)),
+          h('div', { class: 'cm-info' },
+            h('a', { href: cand.url, target: '_blank', rel: 'noopener', title: 'Open on Sketchfab' }, cand.name),
+            h('span', { class: 'muted' }, `${cand.author} · ${(cand.license || '').replace('CC Attribution', 'CC BY')}`),
+            h('span', { class: 'muted' }, `${cand.faces ? `${Math.round(cand.faces / 1000)}k faces · ` : ''}score ${Math.round(cand.score)}`)),
+          cand.uid === inUse ? h('span', { class: 'cm-use' }, 'In use')
+            : h('button', { class: 'pill-btn', onclick: () => send({ uid: cand.uid }) }, r.pick?.uid === cand.uid ? 'Queued' : 'Use')))));
+    }
   }
   const stat = (k, v) => h('div', {}, h('span', { class: 'cap' }, k), h('b', {}, v));
   function close() {
     if (!insp) return;
+    clearTimeout(insp.poll);
     insp.stage.remove();
     insp.ui.remove();
     insp = null;

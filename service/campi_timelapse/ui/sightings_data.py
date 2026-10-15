@@ -308,14 +308,13 @@ counted AS (SELECT * FROM eff WHERE NOT hidden AND label IS NOT NULL AND label !
             return out
         return self._cached("mesh_candidates", build)
 
-    def mesh_manifest(self) -> dict:
-        """card_meshes' manifest.json ({label lower: {file, sighting_id, box_px, generated_at}}), re-read on change."""
-        p = self.cfg.paths.card_meshes / "manifest.json"
+    def _json_file(self, name: str, p) -> dict:
+        """A JSON object file written by a job, re-read when its mtime changes ({} when missing or invalid)."""
         try:
             mtime = p.stat().st_mtime_ns
         except OSError:
             return {}
-        hit = self._cache.get("mesh_manifest")
+        hit = self._cache.get(name)
         if hit and hit[0] == mtime:
             return hit[1]
         try:
@@ -323,8 +322,33 @@ counted AS (SELECT * FROM eff WHERE NOT hidden AND label IS NOT NULL AND label !
             val = val if isinstance(val, dict) else {}
         except (OSError, ValueError):
             val = {}
-        self._cache["mesh_manifest"] = (mtime, val)
+        self._cache[name] = (mtime, val)
         return val
+
+    def mesh_manifest(self) -> dict:
+        """card_meshes' manifest.json ({label lower: {file, sighting_id, box_px, generated_at}}), re-read on change."""
+        return self._json_file("mesh_manifest", self.cfg.paths.card_meshes / "manifest.json")
+
+    def model_manifest(self) -> dict:
+        """card_models' manifest.json ({label lower: {file, uid, name, author, license, paint, ...}})."""
+        return self._json_file("model_manifest", self.cfg.paths.card_models / "manifest.json")
+
+    def model_picks(self) -> dict:
+        """The inspector's model choices (ui\\card_model_picks.json, written by POST /api/cards/models/{label})."""
+        return self._json_file("model_picks", self.cfg.paths.ui / "card_model_picks.json")
+
+    def card_model(self, key: str, signer) -> dict | None:
+        """A card's Sketchfab model: file URL, attribution, paint materials (the inspector's choice wins)."""
+        m = self.model_manifest().get(key)
+        pick = self.model_picks().get(key) or {}
+        if not m or pick.get("rejected") or not (self.cfg.paths.card_models / m["file"]).is_file():
+            return None
+        return {"url": signer(f"/media/models/{m['file']}"), "uid": m.get("uid"), "name": m.get("name"),
+                "author": m.get("author"), "author_url": m.get("author_url"), "page": m.get("url"),
+                "license": m.get("license"), "license_url": m.get("license_url"),
+                "paint": pick["paint"] if "paint" in pick else m.get("paint") or [],
+                "materials": m.get("materials") or [], "picked": m.get("picked"),
+                "generated_at": m.get("generated_at")}
 
     def cards(self, signer) -> dict:
         """GET /api/cards: the collection as trading cards. Finishes are percentiles of count among labels seen at
@@ -360,6 +384,7 @@ counted AS (SELECT * FROM eff WHERE NOT hidden AND label IS NOT NULL AND label !
                 "mesh": ({"url": signer(f"/media/cards/{m['file']}"), "generated_at": m.get("generated_at"),
                           "source_sighting": m.get("sighting_id")}
                          if m and (self.cfg.paths.card_meshes / m["file"]).is_file() else None),
+                "sketchfab": None if i["generic"] else self.card_model(key, signer),
             })
         return {"generated_at": iso(datetime.now().timestamp()), "set_total": len(items),
                 "caught": sum(1 for i in items if i["count"] > 0), "finishes": FINISHES, "items": items}

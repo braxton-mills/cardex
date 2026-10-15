@@ -70,6 +70,8 @@ class Supervisor:
         self.housekeep = None
         self.meshes = None        # optional card meshes pass ([cards] meshes_enabled; TripoSR on the RTX card)
         self.meshes_missing_logged = False
+        self.models = None        # optional Sketchfab card models pass ([cards] models_enabled; node, network)
+        self.models_picks_seen = 0.0
         self.daily_queue: list[date] = []
         # custom timelapses asked for from the desktop UI (custom_jobs); unfinished ones resume after a restart
         self.custom = None
@@ -333,6 +335,28 @@ class Supervisor:
         self.meshes = (self.spawn("meshes", low_priority=True, exe=str(exe)), now, "card meshes")
         return now + self.cfg.cards.mesh_interval_min * 60
 
+    def models_picked(self) -> bool:
+        """The Cards inspector changed a model pick since the last models pass wrote its manifest (once per change,
+        so a pass that fails doesn't restart every few seconds)."""
+        try:
+            picks = (self.cfg.paths.ui / "card_model_picks.json").stat().st_mtime
+        except OSError:
+            return False
+        if picks <= self.models_picks_seen:
+            return False
+        try:
+            newer = picks > (self.cfg.paths.card_models / "manifest.json").stat().st_mtime
+        except OSError:
+            newer = True
+        if newer:
+            self.models_picks_seen = picks
+        return newer
+
+    def start_models(self, now: float) -> float:
+        """Start a card models pass (Sketchfab search + download, node prepares; no GPU); returns when to look again."""
+        self.models = (self.spawn("models", low_priority=True), now, "card models")
+        return now + self.cfg.cards.models_interval_min * 60
+
     # -- custom timelapses -------------------------------------------------
     def take_custom_requests(self) -> None:
         """Requests the API dropped in ui\\render_requests\\ (it never writes under state\\ itself). A request
@@ -486,6 +510,7 @@ class Supervisor:
         next_clip = self.next_boundary(now)
         next_house = now + 60
         next_meshes = now + 300
+        next_models, next_picks_check = now + 600, now
         hh, mm = (int(x) for x in cfg.daily.run_at.split(":"))
         last_daily_check = None
         if cfg.daily.enabled:  # catch up anything missed while the PC was off
@@ -538,6 +563,13 @@ class Supervisor:
 
                 if cfg.cards.meshes_enabled and self.reap("meshes", cfg.cards.mesh_timeout_min * 60, now)                         and now >= next_meshes:
                     next_meshes = self.start_meshes(now)
+                if cfg.cards.models_enabled and self.reap("models", cfg.cards.models_timeout_min * 60, now):
+                    if now >= next_picks_check:  # an inspector pick is applied within a minute
+                        next_picks_check = now + 15
+                        if self.models_picked():
+                            next_models = now
+                    if now >= next_models:
+                        next_models = self.start_models(now)
 
                 if now - last_status >= 5:
                     self.status(now, next_clip)
@@ -550,7 +582,7 @@ class Supervisor:
                 if child and child.poll() is None:
                     subprocess.run(["taskkill", "/T", "/F", "/PID", str(child.pid)], capture_output=True,
                                    creationflags=NO_WINDOW)
-            for slot in ("clip", "daily", "custom", "housekeep", "meshes"):
+            for slot in ("clip", "daily", "custom", "housekeep", "meshes", "models"):
                 cur = getattr(self, slot)
                 if cur and cur[0].poll() is None:
                     subprocess.run(["taskkill", "/T", "/F", "/PID", str(cur[0].pid)], capture_output=True,

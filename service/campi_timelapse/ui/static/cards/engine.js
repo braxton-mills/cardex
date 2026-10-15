@@ -43,6 +43,7 @@ export class CardEngine {
   constructor({ main, preset = null, reduceMotion = () => false, onPresetChange = null }) {
     this.main = main;
     this.reduceMotion = reduceMotion;
+    this.source = 'model';        // preferred car: 'model' | 'scanned' | 'procedural' (carKind falls back)
     this.canvas = document.createElement('canvas');
     this.canvas.className = 'cards-gl';
     document.body.append(this.canvas);
@@ -114,7 +115,7 @@ export class CardEngine {
   build(rec) {
     rec.card = new Card3D(rec.item, {
       renderer: this.renderer, env: this.env, quality: this.quality(false), gpu: this.gpu.short, total: this.total,
-      px: this.preset.facePx, styleOf: bodyStyle, scanned: this.scanned,
+      px: this.preset.facePx, styleOf: bodyStyle, source: this.source,
     });
   }
 
@@ -247,12 +248,12 @@ export class CardEngine {
 
   // ---------------------------------------------------------------- inspector
 
-  openInspector(item, { scanned = this.scanned } = {}) {
+  openInspector(item, { source = this.source } = {}) {
     this.closeInspector();
     const p = this.preset;
     const card = new Card3D(item, {
       renderer: this.renderer, env: this.env, quality: this.quality(true), gpu: this.gpu.short, total: this.total,
-      px: p.inspFacePx, styleOf: bodyStyle, scanned,
+      px: p.inspFacePx, styleOf: bodyStyle, source,
     });
     card.camera.fov = 30;
     const scene = card.scene;

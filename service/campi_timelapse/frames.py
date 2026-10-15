@@ -1,6 +1,7 @@
 """Frame index (one index.csv per day), selection, night filtering and gap segmentation."""
 from __future__ import annotations
 
+import bisect
 import csv
 import statistics
 from dataclasses import dataclass
@@ -65,6 +66,25 @@ def sample_evenly(frames: list[Frame], n: int) -> list[Frame]:
         return frames
     step = (len(frames) - 1) / (n - 1)
     return [frames[round(i * step)] for i in range(n)]
+
+
+def sample_by_time(frames: list[Frame], n: int, max_step_s: float = 120.0) -> list[Frame]:
+    """n frames spread evenly over the captured time rather than over the frame count, so a thinned day (a frame a
+    minute) runs at the same pace as a full one and nights (long exposures, fewer frames) aren't skipped. A gap
+    counts as at most max_step_s, so an offline stretch doesn't freeze the video."""
+    if len(frames) <= n:
+        return frames
+    clock = [0.0]
+    for a, b in zip(frames, frames[1:]):
+        clock.append(clock[-1] + min(b.ts - a.ts, max_step_s))
+    out = []
+    for i in range(n):
+        t = clock[-1] * i / (n - 1)
+        j = min(bisect.bisect_left(clock, t), len(frames) - 1)
+        if j and t - clock[j - 1] < clock[j] - t:
+            j -= 1
+        out.append(frames[j])
+    return out
 
 
 def is_gap(delta: float, max_gap_s: float, ratio: float = 0.0, *around: list[float]) -> bool:

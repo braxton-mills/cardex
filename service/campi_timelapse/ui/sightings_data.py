@@ -226,6 +226,7 @@ counted AS (SELECT * FROM eff WHERE NOT hidden AND label IS NOT NULL AND label !
     def collection(self, signer) -> dict:
         cat = self.catalog()
         known, by = cat["known"], cat["by"]
+        meshes = self.mesh_manifest()
         items = []
         for key, k in known.items():
             rows = by.get(key, [])
@@ -241,6 +242,7 @@ counted AS (SELECT * FROM eff WHERE NOT hidden AND label IS NOT NULL AND label !
                 "tier": tier(len(rows)),
                 "cover": ({"sighting_id": best["id"], "crop": signer(self.media_path(best["crop"]))}
                           if best and best["crop"] else None),
+                "mesh": self.mesh(key, meshes.get(key), signer),
                 "_sort": (rows[0]["ts"] if rows else utc_to_ts(k.get("first_seen")) or float("inf")),
             })
         order = {"labels_file": 0, "discovered": 1, "other": 2}
@@ -349,6 +351,15 @@ counted AS (SELECT * FROM eff WHERE NOT hidden AND label IS NOT NULL AND label !
                 "paint": pick["paint"] if "paint" in pick else m.get("paint") or [],
                 "materials": m.get("materials") or [], "picked": m.get("picked"),
                 "generated_at": m.get("generated_at")}
+
+    def mesh(self, key: str, m: dict | None, signer) -> dict | None:
+        """A label's 3D scan for the app (api-contract §5.6), with its source photo's colour so the app can repaint
+        it in another sighting's colour; None while there's no scan file."""
+        if not m or not (self.cfg.paths.card_meshes / m["file"]).is_file():
+            return None
+        src = next((c for c in self.mesh_candidates().get(key, []) if c["id"] == m.get("sighting_id")), None)
+        return {"url": signer(f"/media/cards/{m['file']}"), "sighting_id": m.get("sighting_id"),
+                "color": src["color"] if src else None}
 
     def cards(self, signer) -> dict:
         """GET /api/cards: the collection as trading cards. Finishes are percentiles of count among labels seen at

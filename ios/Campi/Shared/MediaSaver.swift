@@ -41,9 +41,12 @@ final class MediaSaver {
         } download: { try await self.download(path, fileName: fileName, app: app) }
     }
 
-    func share(_ path: MediaPath, fileName: String, app: AppModel) {
+    /// `present` shows the share sheet; by default the root view does, which can't while a full-screen cover is up.
+    func share(_ path: MediaPath, fileName: String, app: AppModel,
+               present: (@MainActor (ShareItem) -> Void)? = nil) {
         run(app: app, label: "Preparing \(fileName)") { url in
-            self.shareItem = ShareItem(url: url)
+            let item = ShareItem(url: url)
+            if let present { present(item) } else { self.shareItem = item }
             return nil
         } download: { try await self.download(path, fileName: fileName, app: app) }
     }
@@ -154,6 +157,8 @@ private final class DownloadTracker: NSObject, URLSessionTaskDelegate, @unchecke
 /// Bottom banner for download / saved / failed.
 struct SaveStatusBanner: View {
     let saver: MediaSaver
+    /// `.top` over a full-screen player, where the bottom has the playback controls.
+    var edge: VerticalEdge = .bottom
 
     var body: some View {
         Group {
@@ -184,8 +189,8 @@ struct SaveStatusBanner: View {
             .background(.regularMaterial, in: .rect(cornerRadius: 16))
             .shadow(radius: 6, y: 2)
             .padding(.horizontal)
-            .padding(.bottom, 70)   // above the tab bar
-            .transition(.move(edge: .bottom).combined(with: .opacity))
+            .padding(edge == .bottom ? .bottom : .top, edge == .bottom ? 70 : 8)   // above the tab bar
+            .transition(.move(edge: edge == .bottom ? .bottom : .top).combined(with: .opacity))
     }
 }
 

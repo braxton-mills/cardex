@@ -59,16 +59,29 @@ enum CardexGenerator {
     }
 
     static func generate(for item: CollectionItem) async throws(Failure) -> CardexText {
+        try await generate(prompt: CardexPrompt.prompt(for: item), label: item.label, make: item.make, model: item.model)
+    }
+
+    /// One sighting's own card: written for its color and when it passed.
+    static func generate(for sighting: Sighting, item: CollectionItem?) async throws(Failure) -> CardexText {
+        try await generate(prompt: CardexPrompt.prompt(for: sighting, item: item),
+                           label: sighting.label ?? item?.label ?? sighting.displayLabel,
+                           make: sighting.make ?? item?.make, model: sighting.model ?? item?.model)
+    }
+
+    /// `label`/`make`/`model` guess the body style if the model's isn't one we know.
+    private static func generate(prompt: String, label: String, make: String?,
+                                 model: String?) async throws(Failure) -> CardexText {
         if let why = unavailableReason { throw .unavailable(why) }
         // A fresh session per card: one request each, no shared transcript to grow or to run concurrently.
         let session = LanguageModelSession(instructions: CardexPrompt.instructions)
         do {
-            let card = try await session.respond(to: CardexPrompt.prompt(for: item), generating: GeneratedCard.self).content
+            let card = try await session.respond(to: prompt, generating: GeneratedCard.self).content
             return CardexText(displayName: card.displayName, type: card.type,
                               ratings: card.ratings.map { .init(name: $0.name, value: $0.value) },
                               flavor: card.flavor,
                               bodyStyle: CarBodyStyle(rawValue: card.bodyStyle.rawValue)
-                                  ?? CarBodyStyle.guess(label: item.label, make: item.make, model: item.model),
+                                  ?? CarBodyStyle.guess(label: label, make: make, model: model),
                               generated: true).sanitized()
         } catch let e as LanguageModelSession.GenerationError {
             switch e {

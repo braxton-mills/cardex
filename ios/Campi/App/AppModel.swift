@@ -151,6 +151,7 @@ final class AppModel {
     }
 
     private func forget(reason: String?) {
+        if let connection { InsightsCache(serverURL: connection.baseURL).clear() }
         store.clear()
         connection = nil
         client = nil
@@ -162,6 +163,9 @@ final class AppModel {
         WidgetStore().clear()
         WidgetCenter.shared.reloadAllTimelines()
         unpairedReason = reason
-        Task { await ImageLoader.shared.clear() }
+        Task {
+            await ImageLoader.shared.clear()
+            await CarScanLoader.shared.clear()
+        }
     }
 }

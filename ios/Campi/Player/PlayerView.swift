@@ -14,14 +14,23 @@ struct VideoTarget: Identifiable, Hashable {
     /// The start position is an estimate (daily-video fallback).
     var approximate = false
     var note: String?
+    /// What Save and Share download; nil hides them (archive parts are too big to save to Photos).
+    var file: SavableFile?
+}
+
+struct SavableFile: Hashable {
+    var path: MediaPath
+    var fileName: String
 }
 
 /// Full-screen player that seeks precisely to `target.start` once the item is ready.
 struct PlayerView: View {
     let target: VideoTarget
+    @Environment(AppModel.self) private var app
     @Environment(\.dismiss) private var dismiss
     @State private var player: AVPlayer?
     @State private var failed: String?
+    @State private var shareItem: MediaSaver.ShareItem?
 
     /// Start a little before the position, so the moment isn't missed.
     static let leadIn = 1.0
@@ -55,13 +64,36 @@ struct PlayerView: View {
                     .padding()
                 }
             }
+            // the root view's banner is hidden under this cover; below the nav bar, clear of the playback controls
+            .overlay(alignment: .top) { SaveStatusBanner(saver: app.saver, edge: .top) }
             .navigationTitle(target.title)
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
+                if let file = target.file {
+                    ToolbarItem(placement: .cancellationAction) {
+                        Menu {
+                            Button("Save to Photos", systemImage: "square.and.arrow.down") {
+                                app.saver.saveVideo(file.path, fileName: file.fileName, app: app)
+                            }
+                            Button("Share…", systemImage: "square.and.arrow.up") {
+                                app.saver.share(file.path, fileName: file.fileName, app: app) { shareItem = $0 }
+                            }
+                        } label: {
+                            Image(systemName: "square.and.arrow.down")
+                        }
+                        .disabled(app.saver.isBusy)
+                        .accessibilityLabel("Save")
+                        .accessibilityIdentifier("player.save")
+                    }
+                }
                 ToolbarItem(placement: .confirmationAction) {
                     Button("Done") { dismiss() }.accessibilityIdentifier("player.done")
                 }
             }
+        }
+        // the root view's share sheet can't present over this cover
+        .sheet(item: $shareItem) { item in
+            ShareSheet(url: item.url).presentationDetents([.medium, .large])
         }
         .task { await start() }
         .onDisappear { player?.pause() }
@@ -214,8 +246,14 @@ enum Timelapse {
         case .daily: "Daily video, \(seek.day?.text(timeZone: timeZone) ?? "")"
         default: "Timelapse around \(seek.ts.timeText)"
         }
+        // same names as Clip.fileName / Daily.fileName
+        let fileName = switch seek.target {
+        case .clip: seek.clipId.map { "campi_\($0).mp4" }
+        default: seek.day.map { "campi_daily_\($0.rawValue).mp4" }
+        }
         return .play(VideoTarget(url: url, start: offset, title: title, approximate: seek.approximate,
-                                 note: "Captures are 2 s apart, so a fast car may fall between frames."))
+                                 note: "Captures are 2 s apart, so a fast car may fall between frames.",
+                                 file: fileName.map { SavableFile(path: video, fileName: $0) }))
     }
 }
 

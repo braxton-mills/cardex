@@ -22,6 +22,12 @@ The PC side (`campi ui` API, see [`api/api-contract.md`](../api/api-contract.md)
 ## What the app does
 - **Today:** service health (same data as `campi status`), today's counts, newest clip, latest sightings,
   today's highlights. Refreshes every 30 s while open.
+- **Insights** (from Today): a weekday × hour heatmap of average sightings, left-to-right vs right-to-left
+  traffic over a typical day (with the morning/evening lean), the most common colors (Gemini's) and makes, and the
+  busiest day ever (from the daily videos' counts; "Watch That Day" plays it). 7/30/90 days or all time. Counted
+  like the PC counts (§6.1), fetched one day at a time and cached per finished day in Caches, so a range downloads
+  once; today, days still waiting on the cloud and days you edited in the app are refetched. ⋯ → Recount Every Day
+  after corrections on the PC.
 - **Highlights:** new catches, rare labels, busiest 10-minute windows, daily videos and anything starred.
 - **Sightings:** grid by day with filters (dates, type, make, who decided the label, starred, unsure, parked,
   hidden). Detail: crop, full frame, clip, runner-up guesses, star, hide, correct the label, and
@@ -36,11 +42,19 @@ The PC side (`campi ui` API, see [`api/api-contract.md`](../api/api-contract.md)
   and drag to tilt it: the foil (`Campi/Cardex/Foil.metal`) and glare follow. Each car is built on the phone from
   its shape (`CampiKit/Cardex/CarShape.swift`): tuned proportions for well-known models (a Wrangler, a Mustang
   and a Model 3 each get their own silhouette), else the body style's preset, which the on-device model picks.
-- **Cardex cards** (collection item page and sighting detail): a trading card per label, written on the phone by
+- **Cardex cards** (collection item page): a trading card per label, written on the phone by
   Apple's on-device model (Foundation Models): name, type (Commuter, Work Truck, JDM, ...), three playful 1–10
   ratings and a line of flavor text, never specs. Generated once per label and cached (SwiftData); "Regenerate
   Card" from the card's context menu or the detail's ⋯ menu. Without Apple Intelligence it shows a plain card
   and says why.
+- **Sighting cards** (sighting detail): each sighting gets its own card. The 3D car is painted in that car's color
+  and shaped from its make and model, and the text is written for that car (its color, the time of day, parked or
+  not). It's on the label's finish and cached per sighting, label and color, so a correction or Gemini's answer
+  rewrites it. Tap it to tilt it in the inspector, which links to the label's card.
+- **Scanned cars:** when the PC has a 3D scan of a label (`[cards] meshes_enabled`, `CollectionItem.mesh`), cards
+  draw it instead of the built shape. The GLB is read on the phone (`CampiKit/Cardex/CarScan.swift`) and split into
+  flat color regions, because RealityKit materials don't take vertex colors. A sighting card repaints the body
+  regions in its own color. A label card keeps the photo's colors. Scans are cached in Caches/CampiScans.
 - **Timelapse:** last 24 h of clips by hour (with expiry), daily videos, archive parts; save to Photos or share.
 - **Notifications** (sent by the PC over APNs): new catches, rare (2nd/3rd) sightings, Gemini discoveries and
   service alerts, each toggled in Settings and stored on the PC. A notification extension attaches the crop,

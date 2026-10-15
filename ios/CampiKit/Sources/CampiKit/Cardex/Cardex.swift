@@ -74,6 +74,50 @@ public enum CardexPrompt {
         return lines.joined(separator: "\n")
     }
 
+    /// The request for one sighting's own card: the label's facts plus what this car looked like and when it passed.
+    /// No year range: the instructions forbid years, so the model isn't shown one.
+    public static func prompt(for sighting: Sighting, item: CollectionItem?) -> String {
+        let label = sighting.label ?? item?.label ?? sighting.displayLabel
+        var lines = ["Vehicle: \(label)"]
+        if let make = sighting.make ?? item?.make { lines.append("Make: \(make)") }
+        if let model = sighting.model ?? item?.model { lines.append("Model: \(model)") }
+        if item?.generic == true { lines.append("This is a general vehicle type, not a specific make and model.") }
+        if item?.origin == .discovered { lines.append("A rare find: the camera's AI named it, it wasn't on the watch list.") }
+        if let color = sighting.color { lines.append("Color: \(color)") }
+        lines.append("Seen: in the \(timeOfDay(sighting.startedAt))")
+        if sighting.stationary { lines.append("It was parked, not driving past.") }
+        lines.append("Write the card for this particular car."
+                     + (sighting.color == nil ? "" : " Work its color into the name."))
+        return lines.joined(separator: "\n")
+    }
+
+    /// The plain card for one sighting: the label's, named with the car's color when it has one.
+    public static func fallback(for sighting: Sighting, item: CollectionItem?) -> CardexText {
+        let label = sighting.label ?? item?.label ?? sighting.displayLabel
+        var text = item.map(fallback(for:)) ?? CardexText(
+            displayName: label, type: sighting.make ?? "Vehicle", ratings: [], flavor: nil,
+            bodyStyle: CarBodyStyle.guess(label: label, make: sighting.make, model: sighting.model), generated: false)
+        text.displayName = sighting.color.map { "\($0.capitalized) \(label)" } ?? label
+        return text
+    }
+
+    /// The cache key of a sighting's card. It includes the label and color, so a correction (or Gemini's answer
+    /// arriving) writes a new card. Can't collide with a collection label.
+    public static func sightingKey(_ sighting: Sighting) -> String {
+        "sighting:\(sighting.id)|\(sighting.label ?? "")|\(sighting.color ?? "")"
+    }
+
+    static func timeOfDay(_ at: PCDate) -> String {
+        var cal = Calendar(identifier: .gregorian)
+        cal.timeZone = at.timeZone
+        return switch cal.component(.hour, from: at.date) {
+        case 5..<12: "morning"
+        case 12..<17: "afternoon"
+        case 17..<21: "evening"
+        default: "night"
+        }
+    }
+
     /// The plain card when on-device generation isn't available or fails.
     public static func fallback(for item: CollectionItem) -> CardexText {
         let type: String = if item.generic {

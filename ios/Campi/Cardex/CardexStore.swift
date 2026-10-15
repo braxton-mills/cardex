@@ -3,7 +3,8 @@ import Foundation
 import Observation
 import SwiftData
 
-/// A generated card, cached on the phone: one per label, kept until regenerated or the prompt version changes.
+/// A generated card, cached on the phone: one per label (or per sighting, keyed by `CardexPrompt.sightingKey`), kept
+/// until regenerated or the prompt version changes.
 @Model
 final class CardexRecord {
     @Attribute(.unique) var label: String
@@ -127,48 +128,82 @@ final class CardexStore {
 
     /// Makes sure `item` has a card: cached, generated, or the fallback.
     func load(_ item: CollectionItem) async {
-        if let c = cards[item.label], c.text.generated || generating.contains(item.label) { return }
-        if let record = record(for: item.label), record.promptVersion == CardexPrompt.version {
-            cards[item.label] = Card(text: record.text)
-            return
-        }
-        await generate(item)
+        await load(key: item.label) { try await CardexGenerator.generate(for: item) }
+            fallback: { CardexPrompt.fallback(for: item) }
     }
 
     /// Writes the card again, replacing the cached one.
     func regenerate(_ item: CollectionItem) async {
-        await generate(item, force: true)
+        await generate(key: item.label, force: true) { try await CardexGenerator.generate(for: item) }
+            fallback: { CardexPrompt.fallback(for: item) }
     }
 
-    private func generate(_ item: CollectionItem, force: Bool = false) async {
-        let label = item.label
-        if let running = inflight[label] {
+    // MARK: sighting cards
+
+    /// One sighting's own card, written for that car (its color, when it passed). Cached like label cards.
+    func card(for s: Sighting) -> Card? { cards[CardexPrompt.sightingKey(s)] }
+    func isGenerating(_ s: Sighting) -> Bool { generating.contains(CardexPrompt.sightingKey(s)) }
+
+    /// The sighting's own paint: its color, else neutral.
+    func paint(for s: Sighting) -> PaintColor { PaintColor.from(s.color) ?? .neutral }
+
+    func load(_ s: Sighting, item: CollectionItem?) async {
+        await load(key: CardexPrompt.sightingKey(s)) { try await CardexGenerator.generate(for: s, item: item) }
+            fallback: { CardexPrompt.fallback(for: s, item: item) }
+    }
+
+    func regenerate(_ s: Sighting, item: CollectionItem?) async {
+        await generate(key: CardexPrompt.sightingKey(s), force: true) {
+            try await CardexGenerator.generate(for: s, item: item)
+        } fallback: {
+            CardexPrompt.fallback(for: s, item: item)
+        }
+    }
+
+    // MARK: generation
+
+    /// `key` is a collection label or a `CardexPrompt.sightingKey`.
+    private func load(key: String, write: @escaping @MainActor () async throws -> CardexText,
+                      fallback: @escaping @MainActor () -> CardexText) async {
+        if let c = cards[key], c.text.generated || generating.contains(key) { return }
+        if let record = record(for: key), record.promptVersion == CardexPrompt.version {
+            cards[key] = Card(text: record.text)
+            return
+        }
+        await generate(key: key, write: write, fallback: fallback)
+    }
+
+    private func generate(key: String, force: Bool = false,
+                          write: @escaping @MainActor () async throws -> CardexText,
+                          fallback: @escaping @MainActor () -> CardexText) async {
+        if let running = inflight[key] {
             await running.value
             return
         }
-        if cards[label] == nil || force { generating.insert(label) }
+        if cards[key] == nil || force { generating.insert(key) }
         let task = Task { @MainActor in
             defer {
-                generating.remove(label)
-                inflight[label] = nil
+                generating.remove(key)
+                inflight[key] = nil
             }
             await acquire()
             defer { release() }
-            do throws(CardexGenerator.Failure) {
-                let text = try await CardexGenerator.generate(for: item)
-                cards[label] = Card(text: text)
-                save(text, label: label)
+            do {
+                let text = try await write()
+                cards[key] = Card(text: text)
+                save(text, label: key)
             } catch {
-                let note: String = switch error {
+                let note: String = switch error as? CardexGenerator.Failure {
                 case .unavailable(let why), .failed(let why): why
+                case nil: "Couldn't write this card."
                 }
                 // keep a good card we already have; otherwise show the plain one
-                if cards[label]?.text.generated != true {
-                    cards[label] = Card(text: CardexPrompt.fallback(for: item), note: note)
+                if cards[key]?.text.generated != true {
+                    cards[key] = Card(text: fallback(), note: note)
                 }
             }
         }
-        inflight[label] = task
+        inflight[key] = task
         await task.value
     }
 

@@ -167,7 +167,17 @@ public struct CarShape: Hashable, Sendable {
             known.tune(&shape)
             return shape
         }
-        return preset(style ?? CarBodyStyle.guess(label: label, make: make, model: model))
+        return preset(bodyStyle(label: label, model: model, generated: style))
+    }
+
+    /// The body style to draw and print: a known model's, else the one the label names, else the on-device model's
+    /// pick (`generated`, which can be wrong: it called a Maxima an SUV), else sedan.
+    public static func bodyStyle(label: String, model: String? = nil, generated: CarBodyStyle?) -> CarBodyStyle {
+        let text = CarBodyStyle.words(label, model)
+        if let known = known.first(where: { entry in entry.keys.contains { text.contains(" \($0) ") } }) {
+            return known.style
+        }
+        return CarBodyStyle.match(label: label, model: model) ?? generated ?? .sedan
     }
 
     private struct Known {
@@ -282,6 +292,11 @@ public struct CarShape: Hashable, Sendable {
         },
         Known(keys: ["accord", "camry", "altima", "sonata", "k5", "malibu", "fusion"], style: .sedan) { s in
             s.length = 4.9; s.width = 1.86; s.height = 1.45; s.wheelbase = 2.83
+        },
+        Known(keys: ["maxima"], style: .sedan) { s in
+            // sloping "floating" roof into a short trunk
+            s.length = 4.9; s.width = 1.86; s.height = 1.44; s.wheelbase = 2.78; s.windshield = 0.85
+            s.roofLength = 1.0; s.rear = 0.8; s.rearGlass = 0.8; s.deck = 0.64
         },
         Known(keys: ["corolla"], style: .sedan) { s in
             s.length = 4.63; s.width = 1.78; s.height = 1.44; s.wheelbase = 2.7

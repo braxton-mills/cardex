@@ -140,10 +140,12 @@ enum HighlightPlayback {
         switch h.content {
         case .clip(let clip), .window(_, clip: .some(let clip)):
             guard let url = client.url(for: clip.media.video) else { return nil }
-            return VideoTarget(url: url, title: "\(clip.windowStart.timeText)–\(clip.windowEnd.timeText)")
+            return VideoTarget(url: url, title: "\(clip.windowStart.timeText)–\(clip.windowEnd.timeText)",
+                               file: SavableFile(path: clip.media.video, fileName: clip.fileName))
         case .daily(let d):
             guard let url = client.url(for: d.media.video) else { return nil }
-            return VideoTarget(url: url, title: "Daily video, \(d.day.text(timeZone: h.at.timeZone))")
+            return VideoTarget(url: url, title: "Daily video, \(d.day.text(timeZone: h.at.timeZone))",
+                               file: SavableFile(path: d.media.video, fileName: d.fileName))
         case .window(let w, clip: nil):
             // the clip has expired: fall back to the daily video around the window
             let mid = w.start.date.addingTimeInterval(w.end.date.timeIntervalSince(w.start.date) / 2)

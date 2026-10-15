@@ -159,11 +159,11 @@ extension View {
         navigationDestination(for: Sighting.self) { SightingDetailView(initial: $0) }
             .navigationDestination(for: CollectionItem.self) { CollectionItemView(item: $0) }
             .navigationDestination(for: CardexCardRoute.self) { route in
-                if let cardZoom {
+                if let cardZoom, route.sighting == nil {
                     CardInspectorView(item: route.item)
                         .navigationTransition(.zoom(sourceID: route.item.label, in: cardZoom))
                 } else {
-                    CardInspectorView(item: route.item)
+                    CardInspectorView(item: route.item, sighting: route.sighting)
                 }
             }
     }

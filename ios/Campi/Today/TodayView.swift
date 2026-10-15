@@ -26,10 +26,12 @@ struct TodayView: View {
                         .accessibilityIdentifier("today.status")
                         CountsRow(status: status)
                         LiveTile(live: status.live) { showLive = true }
+                        if status.sightings.hasHistory { InsightsTile() }
                         if let clip = model.newestClip {
                             NewestClipCard(clip: clip) {
                                 if let url = app.client?.url(for: clip.media.video) {
-                                    video = VideoTarget(url: url, title: "\(clip.windowStart.timeText)–\(clip.windowEnd.timeText)")
+                                    video = VideoTarget(url: url, title: "\(clip.windowStart.timeText)–\(clip.windowEnd.timeText)",
+                                                        file: SavableFile(path: clip.media.video, fileName: clip.fileName))
                                 }
                             }
                         }

@@ -638,6 +638,26 @@ body.cards-inspecting .cards-gl { z-index: 61; }
 .ci-stats .cap { color: var(--muted); font-size: 11px; text-transform: uppercase; letter-spacing: .1em; }
 .ci-stats b { font: 600 16px var(--font-display); text-transform: capitalize; }
 .ci-hint { font-size: 12.5px; }
+.ci-credit { font-size: 12.5px; max-width: 420px; pointer-events: auto; }
+.ci-credit a { color: var(--text); }
+/* model picker: a panel on the right, over the canvas (inside .cards-insp-ui so it stays clickable) */
+.ci-models { position: absolute; top: 84px; right: 20px; bottom: 120px; width: 360px; z-index: 63; pointer-events: auto; display: flex; flex-direction: column; gap: 10px; padding: 16px; overflow-y: auto; border-radius: var(--r-md); background: rgba(10, 11, 22, .92); border: 1px solid var(--line-2); box-shadow: var(--shadow); backdrop-filter: blur(14px); }
+.ci-models .cap { color: var(--muted); font-size: 11px; text-transform: uppercase; letter-spacing: .1em; }
+.cm-head { display: flex; align-items: center; gap: 8px; font-size: 15px; }
+.cm-status { font-size: 12.5px; }
+.cm-actions { display: flex; flex-wrap: wrap; gap: 6px; }
+.cm-actions .pill-btn, .cm-cand .pill-btn { height: 30px; padding: 0 12px; font-size: 12.5px; }
+.cm-paint { display: flex; flex-direction: column; gap: 6px; }
+.cm-chips { display: flex; flex-wrap: wrap; gap: 5px; }
+.cm-chip { height: 24px; padding: 0 9px; border-radius: 999px; font: 12px var(--font); color: var(--muted); background: var(--tile); border: 1px solid var(--line); cursor: pointer; }
+.cm-chip.on { color: #fff; border-color: rgba(255, 77, 141, .7); background: rgba(255, 77, 141, .16); }
+.cm-list { display: flex; flex-direction: column; gap: 8px; }
+.cm-cand { display: grid; grid-template-columns: 96px 1fr auto; gap: 10px; align-items: center; padding: 6px; border-radius: 12px; background: var(--tile); border: 1px solid transparent; }
+.cm-cand.on { border-color: rgba(255, 77, 141, .6); }
+.cm-cand img, .cm-noimg { width: 96px; height: 54px; object-fit: cover; border-radius: 8px; background: #000; display: grid; place-items: center; color: var(--muted-2); }
+.cm-info { display: flex; flex-direction: column; min-width: 0; font-size: 12px; }
+.cm-info a { color: var(--text); font-size: 13px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.cm-use { font-size: 12px; color: var(--accent-2); padding-right: 6px; }
 .cards-hud { position: fixed; right: 14px; bottom: 14px; z-index: 70; padding: 10px 12px; border-radius: 12px; font: 11.5px/1.5 Consolas, monospace; color: #cfe; background: rgba(4, 6, 14, .82); border: 1px solid rgba(34, 211, 238, .35); pointer-events: none; max-width: 420px; }
 .cards-hud b { color: var(--cyan); font-size: 14px; }
 @media (max-width: 1240px) { .cards-head { grid-template-columns: 1fr; } }

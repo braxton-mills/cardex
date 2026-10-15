@@ -41,16 +41,17 @@ const lengthText = (s) => (s < 59.5 ? `${Math.round(s)} s` : `${Math.floor(Math.
 export async function mount(el) {
   const stage = h('section', { class: 'panel stage' });
   const makeSec = h('section', { class: 'panel make' });
+  const siteSec = h('section', { class: 'panel', hidden: true }); // `campi site` videos (style "site")
   const customSec = h('section', { class: 'panel' });
   const clipsSec = h('section', { class: 'panel' });
   const dailySec = h('section', { class: 'panel' });
   const archSec = h('section', { class: 'panel' });
-  el.append(stage, makeSec, customSec, clipsSec, dailySec, archSec);
+  el.append(stage, siteSec, makeSec, customSec, clipsSec, dailySec, archSec);
   let video = null;
   let alive = true;
   let poll = null;
   let current = null; // file name playing in the stage
-  let customOrder = []; // [{root, item, title}] for the custom section (rebuilt on every refresh)
+  let customOrder = []; // [{root, item, title}] for the site and custom sections (rebuilt on every refresh)
   const fixedOrder = []; // clips, daily, archive in display order
   const order = () => customOrder.concat(fixedOrder);
 
@@ -276,11 +277,16 @@ export async function mount(el) {
     const sameDay = c.window_start.slice(0, 10) === c.window_end.slice(0, 10);
     const when = sameDay ? fmt.day(c.window_start.slice(0, 10)) : `${fmt.day(c.window_start.slice(0, 10))} → ${fmt.day(c.window_end.slice(0, 10))}`;
     const asked = c.speed ? speedText(c.speed) : `${c.seconds} s`;
-    const entry = { root: 'custom', item: c, title: `Custom · ${when} · ${fmt.hm(c.window_start)}–${fmt.hm(c.window_end)}` };
-    let sub; let extra = { icon: 'sparkle' };
+    const site = c.style === 'site';
+    const entry = { root: 'custom', item: c, title: site ? `Site · ${c.subject || 'build'} · ${when}`
+      : `Custom · ${when} · ${fmt.hm(c.window_start)}–${fmt.hm(c.window_end)}` };
+    let sub; let extra = { icon: site ? 'tower' : 'sparkle' };
     if (c.status === 'ok') {
       customOrder.push(entry);
-      sub = h('span', { class: 'muted num' }, `${speedText(c.actual_speed || c.speed || 0)} · ${lengthText(c.duration_s || 0)}`);
+      const x = c.actual_speed || c.speed; // none for site / focus videos
+      sub = h('span', { class: 'muted num' }, site
+        ? `${lengthText(c.duration_s || 0)} · made ${new Date(c.finished || c.created).toLocaleDateString(undefined, { month: 'short', day: 'numeric' })}`
+        : `${x ? `${speedText(x)} · ` : ''}${lengthText(c.duration_s || 0)}`);
       extra = { ...extra, title: fmt.size(c.size_bytes) };
     } else if (c.status === 'queued' || c.status === 'rendering') {
       sub = h('span', { class: 'muted num' }, c.status === 'queued' ? `queued · ${asked}` : renderingText(c));
@@ -294,7 +300,7 @@ export async function mount(el) {
         revealButton('custom', c.file), removeButton(c)]
       : [removeButton(c)];
     return vid(entry, `custom ${c.status === 'ok' ? '' : `pending ${c.status}`}`, when,
-      `${fmt.hm(c.window_start)}–${fmt.hm(c.window_end)}`, sub, actions, extra);
+      site ? (c.subject ? c.subject[0].toUpperCase() + c.subject.slice(1) : 'Site') :`${fmt.hm(c.window_start)}–${fmt.hm(c.window_end)}`, sub, actions, extra);
   }
   async function refreshCustom(first = false) {
     clearTimeout(poll);
@@ -313,10 +319,15 @@ export async function mount(el) {
     customOrder = [];
     const note = !res.service_running && active ? badge('service stopped: renders wait until it runs', 'warn')
       : res.renders_deferred && active ? badge('waiting: gaming', 'warn') : null;
-    fill(customSec, cardHead('sparkle', 'Custom', note, badge(String(res.items.length), 'muted')));
-    if (!res.items.length) customSec.append(empty('No custom timelapses yet', 'Pick a range and a speed above.'));
-    else customSec.append(h('div', { class: 'vids wide-vids' }, res.items.map(customTile)));
-    if (first) stagger([...customSec.querySelectorAll('.vid')]);
+    const sites = res.items.filter((c) => c.style === 'site');
+    const customs = res.items.filter((c) => c.style !== 'site');
+    siteSec.hidden = !sites.length;
+    fill(siteSec, cardHead('tower', 'Site', badge(String(sites.length), 'muted')));
+    if (sites.length) siteSec.append(h('div', { class: 'vids wide-vids' }, sites.map(customTile)));
+    fill(customSec, cardHead('sparkle', 'Custom', note, badge(String(customs.length), 'muted')));
+    if (!customs.length) customSec.append(empty('No custom timelapses yet', 'Pick a range and a speed above.'));
+    else customSec.append(h('div', { class: 'vids wide-vids' }, customs.map(customTile)));
+    if (first) stagger([...siteSec.querySelectorAll('.vid'), ...customSec.querySelectorAll('.vid')]);
     markPlaying();
     refreshSelection();
     if (active) poll = setTimeout(() => refreshCustom(), 3000);

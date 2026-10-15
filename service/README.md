@@ -139,8 +139,9 @@ Cloud second opinion (`[sightings.cloud]`, off by default): Gemini (`model`) is 
 top share is below `unsure_below`, the top two are within `cloud_margin`, or it's the first-ever row with that label.
 The row is written with SigLIP's answer first; the request waits in the `cloud_queue` table (survives restarts and
 outages, retries 30 s doubling to 1 h) and the row is updated when the answer arrives (`source = 'cloud'`, flag `G`;
-SigLIP's answer stays in `siglip_label` / `siglip_confidence`; media is not renamed). Cars the cloud names that
-aren't in the label list go to `discovered_labels`. At most `cloud_max_per_day` requests (counted in the DB, reset at
+SigLIP's answer stays in `siglip_label` / `siglip_confidence`; media is not renamed). Answers are mapped onto the
+label list's naming first (aliases, "unknown dump truck" -> `dump truck`; a work-truck chassis brand like "Mack
+Granite" keeps SigLIP's generic class); cars the cloud names that still aren't in the list go to `discovered_labels`. At most `cloud_max_per_day` requests (counted in the DB, reset at
 local midnight). The key is read from `api_key_file` (outside the repo) and never logged. Note: on the free tier
 Google may use the requests (your car crops) to improve its models.
 
@@ -170,6 +171,11 @@ campi sightings-record SECONDS       # save the raw stream (.mjpg with timestamp
 campi sightings-test --source FILE [--backend cuda|openvino] [--cloud]
                                      # pipeline on a recording or any video into a test DB; prints rows + timings
 campi sightings-bench [--parity]     # detection fps fp16/int8, SigLIP ms/crop, OpenVINO vs torch parity
+campi sightings-normalize [--apply]  # after editing the label list: Gemini rows, discovered labels and your
+                                     # corrections onto the list's naming (dry run by default; backs up the DBs)
+campi sightings-rescore --old-labels FILE [--days 7] [--cloud-budget 300] [--apply]
+                                     # re-score recent SigLIP-only rows on their crop (CUDA); a row changes only to a
+                                     # label FILE didn't have; unsure ones are queued for Gemini
 ```
 `campi status` shows the worker (disabled / running / paused: gaming / CRASH-LOOPING), its backend and device (or
 CPU FALLBACK), the classify queue, cloud calls today / cap, the last sighting and today's count.
@@ -188,7 +194,8 @@ How it behaves:
   been empty for 10 minutes. Clips are capped at 60 s.
 - Media is written before the row, so a row never points at a missing file. Housekeeping deletes clips older than
   `keep_clips_days` (and clears `clip_path`); crops, frames and rows are kept forever.
-- Labels: `sightings_labels.txt` (`Make | Model` or a generic type per line). `car_id.py` is the original
+- Labels: `sightings_labels.txt` (`Make | Model` or a generic type per line; `= a, b` adds other spellings that
+  Gemini's answers are mapped onto, never shown to SigLIP). `car_id.py` is the original
   standalone script, kept for reference.
 
 ## UI (optional)
@@ -237,8 +244,9 @@ next/previous, `Space` play/pause, `S` star, `Enter` open, `Esc` close.
   aren't in the list (*discovered*) and labels only in your history (*retired*). The dial: X of Y list labels caught.
 - **Cards**: every car model as a Pokémon-style trading card with a live 3D model in the art window (see
   [Cards](#cards) below).
-- **Timelapse**: **Make a timelapse** (any range up to 7 days at a chosen speed or length, see
-  [Custom timelapses](#custom-timelapses)), your custom timelapses, the 10-minute clips grouped by hour, the daily
+- **Timelapse**: the `campi site` videos (their own **Site** section, shown once there is one), **Make a
+  timelapse** (any range up to 7 days at a chosen speed or length, see [Custom timelapses](#custom-timelapses)),
+  your custom timelapses, the 10-minute clips grouped by hour, the daily
   videos and the archive parts (all playable except the part still being written), each with **Show in folder**.
 - Every player has a speed button (0.25× to 8×, remembered); `[` and `]` step it.
 - **Live**: the camera through `/live.mjpg`, leveled like the renders. Connected only while this view is showing
@@ -254,8 +262,9 @@ effects), via `prefers-reduced-motion`.
 ### Custom timelapses
 **Make a timelapse** on the Timelapse tab renders any range (presets: last hour / 6 h / 24 h, today, yesterday, or
 From/To) either at a **speed** (60× = every frame at the default 2 s interval and 30 fps; 300×, 900×, 3600× or any
-number) or to a **length** (2 s to 10 min). Frames are sampled evenly over the range, night included, and
-gaps become cuts, as in the daily video. Slower than 60× isn't possible (there are no more frames), and ranges older
+number) or to a **length** (2 s to 10 min). Frames are sampled evenly over the range's *time*, night included (a
+thinned day runs at the same pace as a full one; an offline stretch counts as at most 2 minutes), and gaps become
+cuts, as in the daily video. Slower than 60× isn't possible (there are no more frames), and ranges older
 than `retention.raw_hours` are thinned to about one frame a minute, so they top out at about 1800×; the video is then
 shorter than asked and the tile shows the actual speed.
 - The API never writes service files (contract A.2): it drops a request in `CampiTimelapse\ui\render_requests\`.
@@ -265,6 +274,95 @@ shorter than asked and the tile shows the actual speed.
   the tile (click the x twice); housekeeping never expires them. Star and **Show in folder** work as for clips.
 - From a console: `.venv-service\Scripts\python -m campi_timelapse render-custom --start 2026-10-05T06:00
   --end 2026-10-05T18:00 --speed 900` (or `--seconds 30`; times are local).
+
+**Annotated copies**: `campi annotate <custom id | video name>` (venv-sightings) writes a copy with an overlay that says
+what's happening, for any video with a render index (custom, daily, clips):
+- a header with the weekday, date and clock, and a running count of the cars seen so far;
+- a timeline bar across the whole range: night shading, cars per hour, marks for the captions, and a playhead;
+- captions at the moment things happen: sunrise/sunset (from exposure), the busiest hour and a wrap-up of each day,
+  rare finds (labels seen exactly once), your Giulia, the camera going offline, and Gemini's notes on a frame every
+  2.5 h (weather, the road, anything unusual; `--no-ai` skips them; the answers are cached in `state\annotate\`).
+
+A custom timelapse's annotated copy becomes its own custom job, so it appears on the Timelapse tab. `--preview 8`
+renders only the first 8 seconds into `work\`, for a quick look.
+
+`--style forensic` (`forensic.py`) is the TV crime-lab version, with synthesized sound.
+- **Between moments:** a control-room feed with a monospace clock, REC, vehicles logged and the hourly rate, a live
+  detection log, scanlines and terminal-style event lines.
+- **At each moment the feed freezes:**
+  - it glitches and cuts to the moment's frame;
+  - a cursor clicks the subject and a reticle locks on;
+  - a picture-in-picture **ENHANCE**s it from blocks to sharp, then replays the sighting's own clip;
+  - a dossier types itself out.
+- **The moments:** your Giulia, the rarest cars (seen exactly once, located in their sighting frame), and Gemini's 2
+  most interesting finds, boxed by Gemini.
+- **Length:** each freeze adds 5.2 s, so a 60 s timelapse becomes about 90 s.
+
+**Subject timelapses**: `campi focus "water tower" --box 0,500,520,890 --subject 75,560,265,865` (`focus.py`,
+venv-sightings) follows one part of the scene over its whole history, in the forensic style. Both boxes are in
+camera pixels: `--box` is the 4:3 view, and `--subject` is the structure itself (x0, the highest it may reach, x1, its
+base).
+- **Frames:** daylight only, spread evenly over daylight time. Each frame is registered to a reference (SIFT on the
+  background plus an ECC refine, smoothed), so the subject holds still. Days from before the camera reached its
+  current pose are left out automatically (`camera only matches the reference from …` in `campi logs focus`).
+- **Height:** Gemini reads the top of the walls off a ruler drawn on one frame a day, and the reading is snapped to
+  the nearest edge in the pixels. The feed tracks the structure and shows its height against day 1 and an estimated
+  completion.
+- **Freezes:** one a day, with a PiP that wipes between yesterday and today and a dossier of what changed (Gemini,
+  shown both days).
+- **Ending:** day 1 against the last day, split down the middle of the subject.
+- The registrations and Gemini's answers are cached in `state\annotate\`, so a re-render is quick. The result is a
+  custom timelapse on the Timelapse tab.
+
+**The water tower build, game style**: `campi site` (`site.py`, `activity.py`, `intro.py`; venv-sightings plus
+Blender 5.2) makes about 2 minutes of video from the whole history.
+- **Intro (~45 s):** a cel-shaded 3D replay of the real build, rendered headless by `intro3d\tank_scene.py` in
+  Blender (`[tools] blender`). It plays in acts:
+  1. "THIS IS WHAT'S BEING BUILT": the finished tank as a cyan blueprint.
+  2. The site as the camera sees it. The yard, the green container, the spoil pile, the lamp post and the old water
+     tower are all placed where they are in the real view.
+  3. The replay, day by day. For each pour the detector saw, a mixer truck backs up to the boom pump, the boom
+     unfolds over the pedestal, the lift fills and the climbing form jumps up. A date ticker, pour and lift counters,
+     and short captions run over it.
+  4. "STILL TO COME": the rest of the job as a hologram.
+  5. An orbit of the finished tank with the spec cards.
+  - The replay comes from `intro.schedule()`. The pour times come from the detector. The lift count comes from each
+    midday height measurement: one lift is `site.LIFT_PX` (21 px) on the camera, the spacing of the lift lines.
+    Things the detector can't see come from Claude's day log (below), at most one a day, and from the hand-kept
+    `intro.EXTRAS`, which win on their days. Only `dig` (the excavator) and `crew` animate; the rest are captions.
+  - The facts are in `intro.SPECS`, and only known facts are listed (no height, no cost).
+  - The frames are cached in `work\intro3d\<hash of the script and schedule>\`. A new pour re-renders them (about
+    7 min); a HUD change doesn't.
+  - For quick looks, use `--intro-still 13` for one frame with its HUD, or `--intro-draft` for the whole intro at half
+    size, written to `work\site\intro_draft.mp4`.
+- **Live site feed (at most `--max-seconds`, 90 s):** only the stretches where something happened at the tower.
+  - `activity.py` maps every daylight frame onto `state\annotate\site_ref.jpg` and scores the tower box.
+  - Below the day's skyline it counts fine-detail change that survives a 1 px shift, ignoring trees in the wind. Above
+    the skyline it counts only thin dark lines, so the concrete pump's boom registers but clouds don't.
+  - Half a day's active segments make a chapter. Claude (`site_ai.py`, Claude Opus 5.5) captions all chapters in one
+    call from three frames each (start, busiest, end), the detector's notes and that day's log; Gemini is the fallback.
+    A caption stays up for max(4 s, 1.5 s + 0.35 s a word).
+  - **Day log:** Claude also looks at 6-8 frames spread over each day and notes what stands out beyond the pours
+    (the excavator working, a crew on top on a day without a pour, a delivery, a crane), plus a one-line summary that
+    the captions use. It is cached in `state\annotate\site\day_log.json`, so each past day is asked once (today again
+    as frames arrive). The key is `secrets\anthropic.key` in the data folder (else `ANTHROPIC_API_KEY`); without one,
+    the day log is skipped and Gemini captions. Each call logs its tokens and rough cost; a full first pass is well
+    under $1.
+  - The HUD counts the concrete pours seen (segments with the boom) and charts the pedestal's height, measured each
+    midday with the focus ruler.
+  - Every frame shown is held still: it is aligned to its chapter's median view on the ground below the skyline.
+    ECC runs twice, first rotation and shift at half size, then affine at full size. This removes wind shake, the
+    rolling-shutter shear, and the up-to-10 px errors of the 10-minute SIFT keyframes, leaving about 0.1 px.
+  - The box is cropped once at camera resolution and upscaled 2x by Real-ESRGAN (`upscale.py`, CUDA, about 0.15 s a
+    frame on the 5070). The weights download once into `tools\upscale\`. Use `--no-upscale` for a plain cubic resize.
+- **Ending:** the first day against the latest, then what comes next.
+- **Options:**
+  - `--sheet 2026-10-12`: a contact sheet of what the detector counted that day (red: change, yellow: boom). Use it to
+    tune the thresholds at the top of `activity.py`.
+  - `--intro-still 13`: one 3D frame with its HUD; `--intro-draft`: the whole intro, fast.
+  - `--intro-only`, `--no-intro`, `--no-ai`, `--no-upscale`, and `--preview S`.
+- **Caching:** per-day scores are cached in `state\annotate\site\`. Today's are redone while frames are still
+  arriving.
 
 ### Cards
 Each label is a trading card: make in the stage pill, model as the name, **SEEN ×N** where the HP goes, a type
@@ -293,12 +391,23 @@ supersampling: on the RTX 5070 the Ultra preset draws the inspector at 2.5x the 
 MSAA is avoided because on ANGLE/D3D11 it costs far more than supersampling). The quality preset (Ultra / High /
 Low) is picked from the GPU and can be changed in the tab. The window asks WebView2 for the high-performance GPU.
 
-The 3D car is procedural (body style from the model name, e.g. pickup, SUV, minivan, coupe, painted in the colour
-Gemini reported, else a guess). Optional **scans**: `install.ps1 -Meshes` and `[cards] meshes_enabled = true` turn
-each model's best crop into a mesh with TripoSR on the RTX card (about 5 s a car, 2.4 GB VRAM), in passes the
-supervisor runs while no game is running and no render is using the card (`campi meshes` runs one by hand; log:
-`campi logs meshes`). "Scanned models" in the tab shows them. Scans come from a single street-level photo, so they
-are lumpy, toy-like versions of the real car; the procedural model is the default.
+The 3D car is one of three kinds, chosen in the tab (a card without the chosen kind shows the procedural car):
+
+- **Sketchfab models** (the default once there are any): `install.ps1 -Models`, a Sketchfab API token in
+  `CampiTimelapse\secrets\sketchfab.token` and `[cards] models_enabled = true`. Each pass (`campi models` by hand; log:
+  `campi logs models`) searches Sketchfab for each make/model, scores the free downloadable CC-licensed results (name
+  match, years against the card's, no race/toy/game-mod/AI models or performance trims, a sane face count) and
+  downloads the best. `car_models\prepare.mjs` (node + gltf-transform) turns the car nose to +x, scales it to the
+  card frame, drops plates and studio floors, simplifies it to `models_faces` and resizes textures to WebP. The body
+  paint takes the card's colour; the inspector credits the model and its licence. **Choose model…** in the inspector
+  lists the candidates: pick another, rotate or flip one that sits wrong, mark which materials are paint, or turn it
+  off (`None`). Choices go to `ui\card_model_picks.json` and the supervisor applies them within a minute.
+- **Procedural** cars: body style from the model name (pickup, SUV, minivan, coupe, ...), painted in the colour
+  Gemini reported, else a guess.
+- **Scans**: `install.ps1 -Meshes` and `[cards] meshes_enabled = true` turn each model's best crop into a mesh with
+  TripoSR on the RTX card (about 5 s a car, 2.4 GB VRAM), in passes the supervisor runs while no game is running and
+  no render is using the card (`campi meshes` runs one by hand; log: `campi logs meshes`). Scans come from a single
+  street-level photo, so they are lumpy, toy-like versions of the real car.
 
 ## API
 The HTTP API for the [Campi iPhone app](../ios/) and the desktop UI. The contract is

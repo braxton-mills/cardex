@@ -1,4 +1,5 @@
-// Procedural PBR cars for the Cards tab, plus loading the TripoSR meshes the background job makes.
+// Procedural PBR cars for the Cards tab, plus loading the TripoSR meshes and the Sketchfab models the background jobs
+// make.
 // A style is a side silhouette (rear x=0 -> front x=L, metres, y up) with wheel arches cut out of the bottom edge, a
 // greenhouse quad [rear base, rear top, front top, front base], and a few extras. The body is lofted from
 // cross-sections along that profile (rounded plan, shoulder, tumblehome, wheel flares) with glass, pillars, seals and
@@ -8,6 +9,7 @@ import * as THREE from 'three';
 import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
 import { RoundedBoxGeometry } from 'three/addons/geometries/RoundedBoxGeometry.js';
 import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
+import { MeshoptDecoder } from 'three/addons/libs/meshopt_decoder.module.js';
 
 const S = {
   sedan: { L: 4.85, W: 1.85, wr: 0.34, axles: [0.98, 3.82], sill: 0.3, bl: 0.95,
@@ -686,7 +688,7 @@ export function proceduralCar(style, opts) {
 }
 
 // A TripoSR mesh (GLB written by card_meshes: already length 1, ground y=0, +x forward, vertex colours).
-const loader = new GLTFLoader();
+const loader = new GLTFLoader().setMeshoptDecoder(MeshoptDecoder);
 const meshCache = new Map();
 export function scannedCar(url, { stencil = false } = {}) {
   const key = url.split('?')[0];
@@ -721,4 +723,46 @@ export function scannedCar(url, { stencil = false } = {}) {
     g.userData.height = h || 0.35;
     return g;
   });
+}
+
+// A Sketchfab model (GLB written by card_models: already length 1, ground y=0, +x forward; meshopt, WebP textures).
+// The source's PBR materials are kept, except the body paint (opts.paint: material names), which becomes the
+// procedural cars' clear-coat paint: in the card's colour when it is known (opts.color), else the model's own.
+const modelCache = new Map();
+const modelMats = new Map(); // `${source uuid}|${stencil}|${paint colour}|${sir}` -> material
+export function modelCar(url, { stencil = false, color = null, paint = [], sir = false } = {}) {
+  const key = url.split('?')[0];
+  if (!modelCache.has(key)) modelCache.set(key, loader.loadAsync(url).then((gltf) => gltf.scene));
+  const paintNames = new Set(paint);
+  return modelCache.get(key).then((scene) => {
+    const g = scene.clone(true);
+    g.traverse((o) => {
+      if (!o.isMesh) return;
+      o.material = Array.isArray(o.material) ? o.material.map(adapt) : adapt(o.material);
+      o.castShadow = true;
+      o.receiveShadow = false; // self-shadowing shows as acne at card scale; the ground takes the shadow
+    });
+    g.updateMatrixWorld(true);
+    const box = new THREE.Box3().setFromObject(g);
+    g.userData.height = box.isEmpty() ? 0.35 : box.max.y;
+    return g;
+  });
+
+  function adapt(src) {
+    const isPaint = paintNames.has(src.name) && !src.map;
+    const hex = isPaint ? (color || `#${src.color.getHexString()}`) : '';
+    const mkey = `${src.uuid}|${stencil}|${hex}|${isPaint && sir}`;
+    if (modelMats.has(mkey)) return modelMats.get(mkey);
+    let m;
+    if (isPaint) {
+      m = material('paint', { color: hex, stencil, sir });
+    } else {
+      m = src.clone();
+      if (paintNames.has(src.name) && color) m.color.set(color); // textured paint (a livery): tint only
+      if (m.transparent) m.depthWrite = false;
+      if (stencil) Object.assign(m, { stencilWrite: true, stencilRef: 1, stencilFunc: THREE.EqualStencilFunc });
+    }
+    modelMats.set(mkey, m);
+    return m;
+  }
 }

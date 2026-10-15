@@ -98,6 +98,7 @@ ffprobe = "ffprobe"
 rife = "{project}\\tools\\rife-ncnn-vulkan\\rife-ncnn-vulkan.exe"
 rife_model = "rife-v4.6"     # folder next to the rife exe
 rife_gpu = "NVIDIA"         # Vulkan device: name substring (preferred; index order differs with no one logged on) or index
+blender = "C:\\Program Files\\Blender Foundation\\Blender 5.2\\blender.exe"   # campi site's 3D intro
 
 [sightings]
 # Optional vehicle "sightings": YOLO11m + ByteTrack on /stream.mjpg, SigLIP 2 make/model guess, one row per
@@ -129,10 +130,10 @@ classify_crops = 5             # best crops per vehicle kept during a pass and s
 [sightings.cloud]
 # Gemini second opinion for unsure / close / first-ever labels. The row is written first and updated later.
 enabled = false
-model = "gemini-3.1-flash-lite"
+model = "gemini-3.5-flash-lite"
 api_key_file = "{home}\\CampiTimelapse\\secrets\\gemini.key"   # outside the repo; never logged
 cloud_margin = 0.15            # also ask when top-1 minus top-2 share is below this
-cloud_max_per_day = 400        # counted in the DB, resets at local midnight
+cloud_max_per_day = 2000       # counted in the DB, resets at local midnight
 
 [gaming]
 # While a game uses the RTX card: renders wait (capture never pauses) and catch up in order afterwards.
@@ -159,6 +160,17 @@ meshes_per_pass = 10           # new cars first, then crops at least 1.3x bigger
 mesh_timeout_min = 30
 mesh_avoid = []   # polygons (0-1 of the frame) in front of the road, e.g. a street tree:
                                # scans prefer photos of the car clear of them (also sharp, in daylight)
+# models_enabled fetches a real 3D model per make/model from Sketchfab (free, CC-licensed, credited on the card) and
+# shows it as "Sketchfab models"; the inspector's "Choose model…" swaps, rotates or turns one off. Needs
+# `install.ps1 -Models` (node) and an API token (sketchfab.com > Settings > Password & API) in sketchfab_token_file.
+models_enabled = false
+models_interval_min = 360      # how often a pass runs (a pick in the inspector starts one within a minute)
+models_per_pass = 10           # downloads per pass; searches are cached for 30 days
+models_timeout_min = 60
+models_faces = 150000          # each model is simplified to about this many triangles
+models_texture = 1024          # and its textures to at most this many pixels (WebP)
+sketchfab_token_file = "{home}\\CampiTimelapse\\secrets\\sketchfab.token"   # outside the repo; never logged
+node = "node"                  # Node.js 20+ (Program Files\nodejs is tried when it isn't on PATH)
 
 [api]
 # The HTTP API for the Campi iPhone app (and the desktop UI): see README "API". Needs `install.ps1 -UI`.

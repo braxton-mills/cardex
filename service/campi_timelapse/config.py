@@ -42,9 +42,13 @@ GAMING_DEFAULTS = {
 API_DEFAULTS = {
     "enabled": False, "port": 8765, "public_url": "", "max_live_viewers": 3, "media_url_ttl_h": 12,
 }
-# [cards] defaults: the Cards tab works without them; only the 3D mesh job (TripoSR on the RTX card) is opt-in.
+# [cards] defaults: the Cards tab works without them; the 3D mesh job (TripoSR on the RTX card) and the Sketchfab
+# model job (node + gltf-transform) are opt-in.
 CARDS_DEFAULTS = {"meshes_enabled": False, "mesh_interval_min": 60, "meshes_per_pass": 10, "mesh_timeout_min": 30,
-                  "mesh_avoid": []}
+                  "mesh_avoid": [],
+                  "models_enabled": False, "models_interval_min": 360, "models_per_pass": 10,
+                  "models_timeout_min": 60, "models_faces": 150_000, "models_texture": 1024,
+                  "sketchfab_token_file": "{home}\\CampiTimelapse\\secrets\\sketchfab.token", "node": "node"}
 # [sky] defaults: no region = the night sky gets the same treatment as the rest of the scene.
 SKY_DEFAULTS = {"region": [], "stack_frames": 9, "flatten": 0.8, "hot_pixels": True}
 PUSH_DEFAULTS = {
@@ -114,6 +118,7 @@ def load_config(path: Path | None = None) -> SimpleNamespace:
     cfg = _ns(raw)
     cfg.sightings.cloud.api_key_file = _expand(cfg.sightings.cloud.api_key_file)
     cfg.api.push.key_file = _expand(cfg.api.push.key_file)
+    cfg.cards.sketchfab_token_file = _expand(cfg.cards.sketchfab_token_file)
     cfg.config_path = path
 
     if cfg.image.rotation not in (0, 90, 180, 270):
@@ -149,6 +154,8 @@ def load_config(path: Path | None = None) -> SimpleNamespace:
     # Optional card meshes (TripoSR): own venv; GLBs + manifest.json in cards\meshes\ (created by the job).
     cfg.paths.card_meshes = data / "cards" / "meshes"
     cfg.paths.mesh_python = data / "venv-mesh" / "Scripts" / "pythonw.exe"
+    # Optional Sketchfab card models: GLBs + manifest.json in cards\models\ (created by the job).
+    cfg.paths.card_models = data / "cards" / "models"
 
     cfg.tools.ffmpeg = _tool(cfg.tools.ffmpeg, "ffmpeg")
     cfg.tools.ffprobe = _tool(cfg.tools.ffprobe, "ffprobe")

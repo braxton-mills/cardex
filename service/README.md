@@ -300,12 +300,23 @@ supersampling: on the RTX 5070 the Ultra preset draws the inspector at 2.5x the 
 MSAA is avoided because on ANGLE/D3D11 it costs far more than supersampling). The quality preset (Ultra / High /
 Low) is picked from the GPU and can be changed in the tab. The window asks WebView2 for the high-performance GPU.
 
-The 3D car is procedural (body style from the model name, e.g. pickup, SUV, minivan, coupe, painted in the colour
-Gemini reported, else a guess). Optional **scans**: `install.ps1 -Meshes` and `[cards] meshes_enabled = true` turn
-each model's best crop into a mesh with TripoSR on the RTX card (about 5 s a car, 2.4 GB VRAM), in passes the
-supervisor runs while no game is running and no render is using the card (`campi meshes` runs one by hand; log:
-`campi logs meshes`). "Scanned models" in the tab shows them. Scans come from a single street-level photo, so they
-are lumpy, toy-like versions of the real car; the procedural model is the default.
+The 3D car is one of three kinds, chosen in the tab (a card without the chosen kind shows the procedural car):
+
+- **Sketchfab models** (the default once there are any): `install.ps1 -Models`, a Sketchfab API token in
+  `CampiTimelapse\secrets\sketchfab.token` and `[cards] models_enabled = true`. Each pass (`campi models` by hand; log:
+  `campi logs models`) searches Sketchfab for each make/model, scores the free downloadable CC-licensed results (name
+  match, years against the card's, no race/toy/game-mod/AI models or performance trims, a sane face count) and
+  downloads the best. `car_models\prepare.mjs` (node + gltf-transform) turns the car nose to +x, scales it to the
+  card frame, drops plates and studio floors, simplifies it to `models_faces` and resizes textures to WebP. The body
+  paint takes the card's colour; the inspector credits the model and its licence. **Choose model…** in the inspector
+  lists the candidates: pick another, rotate or flip one that sits wrong, mark which materials are paint, or turn it
+  off (`None`). Choices go to `ui\card_model_picks.json` and the supervisor applies them within a minute.
+- **Procedural** cars: body style from the model name (pickup, SUV, minivan, coupe, ...), painted in the colour
+  Gemini reported, else a guess.
+- **Scans**: `install.ps1 -Meshes` and `[cards] meshes_enabled = true` turn each model's best crop into a mesh with
+  TripoSR on the RTX card (about 5 s a car, 2.4 GB VRAM), in passes the supervisor runs while no game is running and
+  no render is using the card (`campi meshes` runs one by hand; log: `campi logs meshes`). Scans come from a single
+  street-level photo, so they are lumpy, toy-like versions of the real car.
 
 ## API
 The HTTP API for the [Campi iPhone app](../ios/) and the desktop UI. The contract is

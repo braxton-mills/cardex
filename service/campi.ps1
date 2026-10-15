@@ -22,6 +22,7 @@
     campi devices [revoke ID]   list paired devices / unpair one (its token and media links stop working at once)
     campi api             run the API in this window with live logs (debugging; Ctrl+C stops)
     campi meshes [--label L] [--force] [--limit N]   3D card scans from crops with TripoSR (install.ps1 -Meshes)
+    campi models [--label L] [--force] [--limit N] [--search-only]   Sketchfab card models (install.ps1 -Models)
 #>
 param([Parameter(Position = 0)][string]$Command = 'status',
       [Parameter(Position = 1, ValueFromRemainingArguments = $true)][string[]]$Rest)
@@ -122,6 +123,10 @@ switch ($Command) {
     { $_ -in 'sightings-record', 'sightings-test', 'sightings-bench' } {
         if (-not (Test-Path $PySightings)) { Write-Host 'sightings env not installed: run install.ps1 -Sightings'; exit 1 }
         & $PySightings -m campi_timelapse $Command @Rest
+    }
+    'models' {
+        & $Py -m campi_timelapse models @Rest
+        exit $LASTEXITCODE
     }
     'meshes' {
         if (-not (Test-Path $PyMesh)) { Write-Host 'mesh env not installed: run install.ps1 -Meshes'; exit 1 }

@@ -12,3 +12,6 @@ service/tools/
 
 # Local settings (copy service/config.example.toml); never committed
 service/config.toml
+
+# Sketchfab card models: node packages (install.ps1 -Models)
+service/car_models/node_modules/

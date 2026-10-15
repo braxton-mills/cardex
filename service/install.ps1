@@ -16,8 +16,11 @@
    - with -Meshes: the optional 3D card scans' own venv (%USERPROFILE%\CampiTimelapse\venv-mesh: CUDA torch,
      TripoSR checked out under CampiTimelapse\tools\TripoSR, rembg, trimesh, PyMCubes). Weights (about 1.7 GB)
      download on the first pass. Then set [cards] meshes_enabled = true and run `campi restart`.
+   - with -Models: the Sketchfab card models' node packages (car_models\node_modules: gltf-transform, meshoptimizer,
+     sharp; needs Node.js 20+). Put a Sketchfab API token in CampiTimelapse\secrets\sketchfab.token, then set
+     [cards] models_enabled = true and run `campi restart` (or `campi models` by hand).
 #>
-param([switch]$Sightings, [switch]$UI, [switch]$Meshes)
+param([switch]$Sightings, [switch]$UI, [switch]$Meshes, [switch]$Models)
 $ErrorActionPreference = 'Stop'
 $Project = $PSScriptRoot
 Set-Location $Project
@@ -99,6 +102,15 @@ if ($Meshes) {
     uv pip install --python $mpy torch torchvision --index-url https://download.pytorch.org/whl/cu128
     uv pip install --python $mpy 'transformers==4.46.3' 'rembg[gpu]' onnxruntime trimesh PyMCubes fast_simplification omegaconf einops huggingface_hub scipy pillow
     Write-Host 'mesh env ready: campi meshes --limit 1 tries it (TripoSR downloads on the first run)'
+}
+
+if ($Models) {
+    # Sketchfab models for the Cards tab: campi models downloads them, car_models\prepare.mjs (node) normalises them.
+    if (-not (Get-Command node -ErrorAction SilentlyContinue)) { throw 'Node.js is not installed (winget install OpenJS.NodeJS.LTS)' }
+    Push-Location (Join-Path $Project 'car_models')
+    npm ci --no-fund --no-audit
+    Pop-Location
+    Write-Host 'models ready: campi models --search-only --label "Toyota Camry" tries the search (no token needed)'
 }
 
 # The task runs whether or not you are logged on, which needs admin rights to register.

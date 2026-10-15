@@ -38,7 +38,8 @@ TYPES = {".mp4": "video/mp4", ".jpg": "image/jpeg", ".glb": "model/gltf-binary"}
 
 def roots(cfg) -> dict[str, Path]:
     return {"clips": cfg.paths.out, "daily": cfg.paths.daily, "archive": cfg.paths.archive,
-            "sightings": cfg.paths.sightings, "cards": cfg.paths.card_meshes, "custom": cfg.paths.custom}
+            "sightings": cfg.paths.sightings, "cards": cfg.paths.card_meshes, "custom": cfg.paths.custom,
+            "models": cfg.paths.card_models}
 
 
 def resolve(cfg, root: str, rel: str, current_part: int) -> Path | None:
@@ -59,7 +60,7 @@ def resolve(cfg, root: str, rel: str, current_part: int) -> Path | None:
         ok = m and int(m.group(1)) != current_part
     elif root == "custom":  # desktop UI custom timelapses (never .part files)
         ok = len(parts) == 1 and CUSTOM_RE.match(name)
-    elif root == "cards":  # <slug>-<sid8>.glb written by card_meshes (never manifest.json or *.tmp)
+    elif root in ("cards", "models"):  # <slug>-<id>.glb by card_meshes / card_models (never manifest.json, *.tmp)
         ok = len(parts) == 1 and MESH_FILE_RE.match(name)
     else:  # sightings: YYYY-MM-DD/<stem>.jpg|.mp4 written by the worker (never *.tmp.mp4, models\, recordings\)
         ok = len(parts) == 2 and DAY_RE.match(parts[0]) and SIGHTING_FILE_RE.match(name) and ".tmp" not in name

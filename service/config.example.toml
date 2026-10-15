@@ -159,6 +159,17 @@ meshes_per_pass = 10           # new cars first, then crops at least 1.3x bigger
 mesh_timeout_min = 30
 mesh_avoid = []   # polygons (0-1 of the frame) in front of the road, e.g. a street tree:
                                # scans prefer photos of the car clear of them (also sharp, in daylight)
+# models_enabled fetches a real 3D model per make/model from Sketchfab (free, CC-licensed, credited on the card) and
+# shows it as "Sketchfab models"; the inspector's "Choose model…" swaps, rotates or turns one off. Needs
+# `install.ps1 -Models` (node) and an API token (sketchfab.com > Settings > Password & API) in sketchfab_token_file.
+models_enabled = false
+models_interval_min = 360      # how often a pass runs (a pick in the inspector starts one within a minute)
+models_per_pass = 10           # downloads per pass; searches are cached for 30 days
+models_timeout_min = 60
+models_faces = 150000          # each model is simplified to about this many triangles
+models_texture = 1024          # and its textures to at most this many pixels (WebP)
+sketchfab_token_file = "{home}\\CampiTimelapse\\secrets\\sketchfab.token"   # outside the repo; never logged
+node = "node"                  # Node.js 20+ (Program Files\nodejs is tried when it isn't on PATH)
 
 [api]
 # The HTTP API for the Campi iPhone app (and the desktop UI): see README "API". Needs `install.ps1 -UI`.

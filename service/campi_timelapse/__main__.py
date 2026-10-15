@@ -259,6 +259,11 @@ def main(argv=None) -> int:
     ms.add_argument("--trial", help="write to cards\\meshes-trials\\TRIAL instead (live meshes untouched; implies --force)")
     ms.add_argument("--set", dest="settings", metavar="K=V,...",
                     help="mesh settings, e.g. paint=1,sym=1,width=1,sigma=2.5,smooth=8 (see card_meshes.Settings)")
+    mo = sub.add_parser("models", help="Sketchfab 3D models for the cards (node; install.ps1 -Models)")
+    mo.add_argument("--label", action="append", help="only this label (repeatable)")
+    mo.add_argument("--force", action="store_true", help="search again and redo the model even if it is current")
+    mo.add_argument("--limit", type=int, help="at most N downloads (default: [cards] models_per_pass)")
+    mo.add_argument("--search-only", action="store_true", help="score the candidates, download nothing")
     dv = sub.add_parser("devices", help="list paired devices; `devices revoke ID` unpairs one (venv-ui)")
     dv.add_argument("action", nargs="?", choices=["revoke"])
     dv.add_argument("device_id", nargs="?")
@@ -340,6 +345,9 @@ def main(argv=None) -> int:
             from .card_meshes import run as run_meshes
             res = run_meshes(cfg, args.label, args.force, args.limit, trial=args.trial,
                              settings=args.settings)
+        elif args.cmd == "models":
+            from .card_models import run as run_models
+            res = run_models(cfg, args.label, args.force, args.limit, args.search_only)
         elif args.cmd == "housekeep":
             from . import housekeeping
             housekeeping.run(cfg)

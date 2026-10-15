@@ -7,7 +7,7 @@ import * as THREE from 'three';
 import { CARD_H, CARD_W, drawBack, drawFace, drawGround } from './face.js';
 import { paintBackdrop } from './art.js';
 import { faceMaterial, foilMaterial } from './shaders.js';
-import { material, proceduralCar, scannedCar } from './car.js';
+import { material, modelCar, proceduralCar, scannedCar } from './car.js';
 
 export const W = CARD_W / CARD_H; // card width when height = 1
 const MM = 1 / CARD_H;
@@ -52,8 +52,16 @@ function sceneTex(renderer, typeKey, finish, variant) {
   return m.get(key);
 }
 
+// The car a card shows for a preferred source: the Sketchfab model, the scan, or the procedural car.
+export function carKind(item, source) {
+  if (source === 'model' && item.sketchfab) return 'model';
+  if (source === 'scanned' && item.mesh) return 'scanned';
+  return 'procedural';
+}
+
 export class Card3D {
-  // opts: {renderer, env, quality: {hq, shadows, shadowSize}, gpu, total, px, inspector, scanned}
+  // opts: {renderer, env, quality: {hq, shadows, shadowSize}, gpu, total, px, inspector, source}
+  //   source: the preferred car, 'model' (Sketchfab) | 'scanned' (TripoSR) | 'procedural'; a card without one falls back
   constructor(item, opts) {
     this.item = item;
     this.opts = opts;
@@ -157,7 +165,7 @@ export class Card3D {
     this.carHolder.position.set(0, groundY, -(this.carLen * 0.55 + 0.06));
     dio.add(this.carHolder);
     this.groundY = groundY;
-    this.setCar(this.opts.scanned && item.mesh ? 'scanned' : 'procedural');
+    this.setCar(carKind(item, this.opts.source));
 
     // lights for the car (environment does most of the work)
     const key = new THREE.DirectionalLight('#fff4e6', 1.7);
@@ -225,8 +233,16 @@ export class Card3D {
       this.blob.position.set(0, this.groundY + 0.001, this.carHolder.position.z);
       this.carHeight = h;
     };
-    if (kind === 'scanned' && this.item.mesh) {
-      scannedCar(this.item.mesh.url, { stencil }).then(place).catch(() => place(this.procedural()));
+    const loading = kind === 'model' && this.item.sketchfab
+      ? modelCar(this.item.sketchfab.url, {
+        stencil, sir: this.sir, paint: this.item.sketchfab.paint, color: this.item.color?.known ? this.item.color.hex : null,
+      })
+      : kind === 'scanned' && this.item.mesh ? scannedCar(this.item.mesh.url, { stencil }) : null;
+    if (loading) {
+      loading.then((car) => { if (this.carKind === kind) place(car); }).catch((e) => {
+        console.warn(`card ${this.item.label}: ${kind} car failed`, e);
+        if (this.carKind === kind) place(this.procedural());
+      });
       if (!this.car) place(this.procedural());
     } else {
       place(this.procedural());

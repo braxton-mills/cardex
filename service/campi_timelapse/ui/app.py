@@ -22,6 +22,7 @@ from fastapi.responses import FileResponse, JSONResponse, Response
 from fastapi.staticfiles import StaticFiles
 from starlette.exceptions import HTTPException as StarletteHTTPException
 
+from .. import card_models as cm
 from .. import custom_jobs as cj
 from ..config import NO_WINDOW, write_json
 from . import media, status_api
@@ -289,6 +290,51 @@ def create_app(cfg) -> FastAPI:
     def cards(dev: dict = Depends(desktop)):
         return sd.cards(signer(dev))
 
+    def card_model_review(k: dict, dev: dict) -> dict:
+        key = k["label"].lower()
+        cands = cm.load_candidates(cfg.paths.card_models, k["label"]) or {}
+        entry = sd.model_manifest().get(key)
+        pick = sd.model_picks().get(key) or {}
+        return {"label": k["label"], "searched_at": cands.get("searched_at"), "candidates": cands.get("candidates", []),
+                "current": sd.card_model(key, signer(dev)), "pick": pick, "pending": cm.pending(entry, pick),
+                "enabled": bool(cfg.cards.models_enabled)}
+
+    @app.get("/api/cards/models/{label}")
+    def card_model_get(label: str, dev: dict = Depends(desktop)):
+        return card_model_review(sd.resolve_label(label), dev)
+
+    @app.post("/api/cards/models/{label}")
+    def card_model_set(label: str, payload: Any = Body(None), dev: dict = Depends(desktop)):
+        """The inspector's model choice: {uid} | {rejected: true} | {yaw: 0/90/180/270} | {paint: [material names]}
+        | {clear: true}. The models pass applies it (the supervisor starts one soon after a change)."""
+        k = sd.resolve_label(label)
+        if k["generic"]:
+            raise invalid("generic vehicle types keep the procedural car")
+        b = body_obj(payload)
+        change = {}
+        if "uid" in b:
+            if not isinstance(b["uid"], str) or not re.fullmatch(r"[0-9a-f]{32}", b["uid"]):
+                raise invalid("uid must be a Sketchfab model uid (32 hex digits)")
+            change["uid"] = b["uid"]
+        if b.get("rejected") is True:
+            change["rejected"] = True
+        if "yaw" in b:
+            if b["yaw"] not in (0, 90, 180, 270):
+                raise invalid("yaw must be 0, 90, 180 or 270")
+            change["yaw"] = b["yaw"]
+        if "paint" in b:
+            names = b["paint"]
+            if not isinstance(names, list) or len(names) > 24 or \
+                    not all(isinstance(x, str) and len(x) <= 200 for x in names):
+                raise invalid("paint must be a list of material names")
+            change["paint"] = b["paint"]
+        if b.get("clear") is True:
+            change["clear"] = True
+        if not change:
+            raise invalid("body needs uid, rejected, yaw, paint or clear")
+        cm.set_pick(cfg, k["label"], change)
+        return card_model_review(k, dev)
+
     @app.get("/api/activity")
     def activity(request: Request, dev: dict = Depends(desktop)):
         return sd.activity(int_param(request.query_params, "days", 1, 1, 31))
@@ -381,8 +427,9 @@ def create_app(cfg) -> FastAPI:
         p = media.resolve(cfg, root, path, lib.current_part())
         if p is None:
             raise not_found(f"no media {root}/{path}")
-        cache = ("private, max-age=86400" if (root == "sightings" and p.suffix == ".jpg") or root == "cards"
-                 else "private, max-age=300")  # mesh names change with their source sighting
+        # mesh and model names change with their source (sighting; uid + yaw)
+        long = (root == "sightings" and p.suffix == ".jpg") or root in ("cards", "models")
+        cache = "private, max-age=86400" if long else "private, max-age=300"
         return media.serve(request, p, f"{root}/{path}", cache)
 
     @app.get("/live.mjpg")

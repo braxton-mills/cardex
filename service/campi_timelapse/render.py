@@ -51,9 +51,10 @@ def nvenc_available(cfg) -> bool:
         return False
 
 
-def ffmpeg_cmd(cfg, encoder: str, w: int, h: int, fps: int, out: Path) -> list[str]:
+def ffmpeg_cmd(cfg, encoder: str, w: int, h: int, fps: int, out: Path, deflicker: bool = True) -> list[str]:
+    """Encode raw BGR frames from stdin; deflicker=False for frames that are already a finished video (annotate)."""
     vf = []
-    if cfg.deflicker.mode == "ffmpeg":
+    if deflicker and cfg.deflicker.mode == "ffmpeg":
         vf.append("deflicker=mode=pm:size=10")
     vf.append("scale=out_color_matrix=bt709:out_range=tv,format=yuv420p")
     cmd = [cfg.tools.ffmpeg, "-hide_banner", "-loglevel", "error", "-y",
@@ -509,7 +510,7 @@ def render_custom(cfg, job_id: str) -> dict:
     try:
         start_ts, end_ts = job["start_ts"], job["end_ts"]
         frames = fr.usable(cfg, fr.frames_between(cfg, start_ts, end_ts))
-        sel = fr.sample_evenly(frames, cj.target_frames(job, int(cfg.output.base_fps)))
+        sel = fr.sample_by_time(frames, cj.target_frames(job, int(cfg.output.base_fps)))
         job.update(status="rendering", progress=0.0, frames_available=len(frames), frames_used=len(sel),
                    started=time.time())
         cj.write_job(cfg, job)

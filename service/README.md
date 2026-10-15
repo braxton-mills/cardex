@@ -261,8 +261,9 @@ effects), via `prefers-reduced-motion`.
 ### Custom timelapses
 **Make a timelapse** on the Timelapse tab renders any range (presets: last hour / 6 h / 24 h, today, yesterday, or
 From/To) either at a **speed** (60× = every frame at the default 2 s interval and 30 fps; 300×, 900×, 3600× or any
-number) or to a **length** (2 s to 10 min). Frames are sampled evenly over the range, night included, and
-gaps become cuts, as in the daily video. Slower than 60× isn't possible (there are no more frames), and ranges older
+number) or to a **length** (2 s to 10 min). Frames are sampled evenly over the range's *time*, night included (a
+thinned day runs at the same pace as a full one; an offline stretch counts as at most 2 minutes), and gaps become
+cuts, as in the daily video. Slower than 60× isn't possible (there are no more frames), and ranges older
 than `retention.raw_hours` are thinned to about one frame a minute, so they top out at about 1800×; the video is then
 shorter than asked and the tile shows the actual speed.
 - The API never writes service files (contract A.2): it drops a request in `CampiTimelapse\ui\render_requests\`.
@@ -272,6 +273,45 @@ shorter than asked and the tile shows the actual speed.
   the tile (click the x twice); housekeeping never expires them. Star and **Show in folder** work as for clips.
 - From a console: `.venv-service\Scripts\python -m campi_timelapse render-custom --start 2026-10-05T06:00
   --end 2026-10-05T18:00 --speed 900` (or `--seconds 30`; times are local).
+
+**Annotated copies**: `campi annotate <custom id | video name>` (venv-sightings) writes a copy with an overlay that says
+what's happening, for any video with a render index (custom, daily, clips):
+- a header with the weekday, date and clock, and a running count of the cars seen so far;
+- a timeline bar across the whole range: night shading, cars per hour, marks for the captions, and a playhead;
+- captions at the moment things happen: sunrise/sunset (from exposure), the busiest hour and a wrap-up of each day,
+  rare finds (labels seen exactly once), your Giulia, the camera going offline, and Gemini's notes on a frame every
+  2.5 h (weather, the road, anything unusual; `--no-ai` skips them; the answers are cached in `state\annotate\`).
+
+A custom timelapse's annotated copy becomes its own custom job, so it appears on the Timelapse tab. `--preview 8`
+renders only the first 8 seconds into `work\`, for a quick look.
+
+`--style forensic` (`forensic.py`) is the TV crime-lab version, with synthesized sound.
+- **Between moments:** a control-room feed with a monospace clock, REC, vehicles logged and the hourly rate, a live
+  detection log, scanlines and terminal-style event lines.
+- **At each moment the feed freezes:**
+  - it glitches and cuts to the moment's frame;
+  - a cursor clicks the subject and a reticle locks on;
+  - a picture-in-picture **ENHANCE**s it from blocks to sharp, then replays the sighting's own clip;
+  - a dossier types itself out.
+- **The moments:** your Giulia, the rarest cars (seen exactly once, located in their sighting frame), and Gemini's 2
+  most interesting finds, boxed by Gemini.
+- **Length:** each freeze adds 5.2 s, so a 60 s timelapse becomes about 90 s.
+
+**Subject timelapses**: `campi focus "water tower" --box 0,500,520,890 --subject 75,560,265,865` (`focus.py`,
+venv-sightings) follows one part of the scene over its whole history, in the forensic style. Both boxes are in
+camera pixels: `--box` is the 4:3 view, and `--subject` is the structure itself (x0, the highest it may reach, x1, its
+base).
+- **Frames:** daylight only, spread evenly over daylight time. Each frame is registered to a reference (SIFT on the
+  background plus an ECC refine, smoothed), so the subject holds still. Days from before the camera reached its
+  current pose are left out automatically (`camera only matches the reference from …` in `campi logs focus`).
+- **Height:** Gemini reads the top of the walls off a ruler drawn on one frame a day, and the reading is snapped to
+  the nearest edge in the pixels. The feed tracks the structure and shows its height against day 1 and an estimated
+  completion.
+- **Freezes:** one a day, with a PiP that wipes between yesterday and today and a dossier of what changed (Gemini,
+  shown both days).
+- **Ending:** day 1 against the last day, split down the middle of the subject.
+- The registrations and Gemini's answers are cached in `state\annotate\`, so a re-render is quick. The result is a
+  custom timelapse on the Timelapse tab.
 
 ### Cards
 Each label is a trading card: make in the stage pill, model as the name, **SEEN ×N** where the HP goes, a type

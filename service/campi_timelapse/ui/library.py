@@ -231,7 +231,7 @@ class Library:
             if j["id"] in deleting:
                 continue
             item = {k: j.get(k) for k in ("id", "status", "progress", "speed", "seconds", "frames_used",
-                                          "frames_available", "actual_speed", "duration_s", "reason")}
+                                          "frames_available", "actual_speed", "duration_s", "reason", "style", "subject")}
             item.update(window_start=iso(j["start_ts"]), window_end=iso(j["end_ts"]), created=iso(j.get("created")),
                         started=iso(j.get("started")), finished=iso(j.get("finished")), starred=j["id"] in stars, file=None, size_bytes=None,
                         media={"video": None})

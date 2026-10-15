@@ -264,6 +264,24 @@ def main(argv=None) -> int:
     mo.add_argument("--force", action="store_true", help="search again and redo the model even if it is current")
     mo.add_argument("--limit", type=int, help="at most N downloads (default: [cards] models_per_pass)")
     mo.add_argument("--search-only", action="store_true", help="score the candidates, download nothing")
+    an = sub.add_parser("annotate", help="copy of a video with an overlay saying what happened (venv-sightings)")
+    an.add_argument("video", help="custom timelapse id, video file name, or path")
+    an.add_argument("--no-ai", action="store_true", help="no Gemini scene notes (camera data only)")
+    an.add_argument("--preview", type=float, metavar="SECONDS", help="only the first SECONDS, into work\\")
+    an.add_argument("--out", help="output path (default: next to the video; a custom one becomes its own job)")
+    an.add_argument("--style", choices=["clean", "forensic"], default="clean",
+                    help="forensic: crime-lab computer (freezes, enhance, dossiers, sound)")
+    fo = sub.add_parser("focus", help="crime-lab timelapse of one part of the scene, e.g. a building going up "
+                                      "(venv-sightings)")
+    fo.add_argument("subject", help='what it is, e.g. "water tower"')
+    fo.add_argument("--box", required=True, help="x0,y0,x1,y1 in camera pixels (4:3 works best)")
+    fo.add_argument("--subject", dest="subject_box", help="x0,top,x1,base of the structure itself in camera pixels "
+                                                         "(measured and tracked; default the middle of the box)")
+    fo.add_argument("--start", help="ISO local time (default: the oldest frames)")
+    fo.add_argument("--end", help="ISO local time (default: now)")
+    fo.add_argument("--seconds", type=float, default=50.0, help="daylight footage length, before the freezes")
+    fo.add_argument("--no-ai", action="store_true", help="no Gemini survey")
+    fo.add_argument("--preview", type=float, metavar="SECONDS", help="only the first SECONDS, into work\\")
     dv = sub.add_parser("devices", help="list paired devices; `devices revoke ID` unpairs one (venv-ui)")
     dv.add_argument("action", nargs="?", choices=["revoke"])
     dv.add_argument("device_id", nargs="?")
@@ -348,6 +366,18 @@ def main(argv=None) -> int:
         elif args.cmd == "models":
             from .card_models import run as run_models
             res = run_models(cfg, args.label, args.force, args.limit, args.search_only)
+        elif args.cmd == "annotate":
+            from .annotate import run as run_annotate
+            res = run_annotate(cfg, args.video, ai=not args.no_ai, preview=args.preview, out=args.out,
+                               style=args.style)
+        elif args.cmd == "focus":
+            from datetime import datetime as _dt
+            from .focus import run as run_focus
+            box = tuple(int(v) for v in args.box.split(","))
+            res = run_focus(cfg, args.subject, box, _dt.fromisoformat(args.start).timestamp() if args.start else None,
+                            _dt.fromisoformat(args.end).timestamp() if args.end else None, args.seconds,
+                            ai=not args.no_ai, preview=args.preview,
+                            subject_box=tuple(int(v) for v in args.subject_box.split(",")) if args.subject_box else None)
         elif args.cmd == "housekeep":
             from . import housekeeping
             housekeeping.run(cfg)

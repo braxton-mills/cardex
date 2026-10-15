@@ -31,8 +31,8 @@ SIGHTINGS_DEFAULTS = {
     "ov_device": "GPU", "classify_crops": 5,
 }
 CLOUD_DEFAULTS = {
-    "enabled": False, "model": "gemini-3.1-flash-lite", "api_key_file": "{home}\\CampiTimelapse\\secrets\\gemini.key",
-    "cloud_margin": 0.15, "cloud_max_per_day": 400,
+    "enabled": False, "model": "gemini-3.5-flash-lite", "api_key_file": "{home}\\CampiTimelapse\\secrets\\gemini.key",
+    "cloud_margin": 0.15, "cloud_max_per_day": 2000,
 }
 GAMING_DEFAULTS = {
     "auto": True, "game_dirs": [], "extra_exes": [], "ignore_exes": [], "gpu_busy_pct": 20, "gpu_busy_s": 30,

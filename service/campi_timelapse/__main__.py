@@ -230,6 +230,16 @@ def main(argv=None) -> int:
     stt.add_argument("--source", required=True)
     stt.add_argument("--backend", choices=["cuda", "openvino"])
     stt.add_argument("--cloud", action="store_true", help="also ask Gemini (needs [sightings.cloud] api_key_file)")
+    sn = sub.add_parser("sightings-normalize",
+                        help="map Gemini rows, discovered labels and corrections onto the label list's naming")
+    sn.add_argument("--apply", action="store_true", help="write (default: dry run); backs up the DBs first")
+    sre = sub.add_parser("sightings-rescore",
+                         help="re-score recent SigLIP-only rows against new labels (sightings venv, CUDA)")
+    sre.add_argument("--days", type=float, default=7)
+    sre.add_argument("--old-labels", required=True, help="the label list the rows were scored with")
+    sre.add_argument("--cloud-budget", type=int, default=300, help="queue at most N unsure changes for Gemini")
+    sre.add_argument("--apply", action="store_true", help="write (default: dry run); backs up the DB first")
+    sre.add_argument("--until", help="only rows before this local time (default: when the label list changed)")
     sb = sub.add_parser("sightings-bench", help="detection FPS fp16/int8, SigLIP ms/crop (openvino)")
     sb.add_argument("--parity", action="store_true", help="also compare OpenVINO vs torch-CPU SigLIP embeddings")
     sub.add_parser("rife-bench", help="render one recent window with RIFE on the NVIDIA and the Intel GPU")
@@ -312,6 +322,15 @@ def main(argv=None) -> int:
             print("timings: " + json.dumps(timings, indent=2))
             print(f"test db + media: {cfg.paths.data / 'sightings-test' / timings['backend']}")
             return 0
+        elif args.cmd == "sightings-normalize":
+            from .sightings_relabel import normalize
+            res = normalize(cfg, args.apply)
+        elif args.cmd == "sightings-rescore":
+            from pathlib import Path
+            from .sightings_relabel import rescore
+            from datetime import datetime
+            res = rescore(cfg, args.days, Path(args.old_labels), args.apply, args.cloud_budget,
+                          datetime.fromisoformat(args.until).timestamp() if args.until else None)
         elif args.cmd == "sightings-bench":
             from .sightings import run_bench
             res = run_bench(cfg, args.parity)

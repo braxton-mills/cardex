@@ -1,6 +1,7 @@
 # Vehicle labels for the sightings worker (SigLIP 2 zero-shot). One per line; edit freely, then campi restart.
 #   Make | Model     -> stored as make + model; label is "Make Model" (or just Model if it already starts with Make)
 #   plain text       -> generic vehicle type: no make/model
+#   ... = a, b       -> other spellings of that label (Gemini's answers are mapped onto it; SigLIP never sees them)
 
 Toyota | Camry
 Toyota | Corolla
@@ -14,6 +15,12 @@ Toyota | Sequoia
 Toyota | Sienna
 Toyota | Prius
 Toyota | Crown
+Toyota | C-HR
+Toyota | Corolla Cross
+Toyota | Venza
+Toyota | Land Cruiser
+Toyota | Yaris
+Toyota | Solara
 Honda | Civic
 Honda | Accord
 Honda | CR-V
@@ -22,8 +29,9 @@ Honda | Pilot
 Honda | Passport
 Honda | Odyssey
 Honda | Ridgeline
-Ford | F-150
-Ford | F-250 Super Duty
+Honda | Fit
+Ford | F-150 = F-150 SuperCab, F-150 SuperCrew
+Ford | F-250 Super Duty = F-250, F-350, F-350 Super Duty, Super Duty, F-Series Super Duty, F-Series Super Duty Utility Truck, F-Series Super Duty Bucket Truck
 Ford | Ranger
 Ford | Maverick
 Ford | Explorer
@@ -33,9 +41,15 @@ Ford | Bronco
 Ford | Bronco Sport
 Ford | Mustang
 Ford | Mustang Mach-E
-Ford | Transit van
-Chevrolet | Silverado 1500
-Chevrolet | Silverado 2500HD
+Ford | Transit van = Transit, Transit Connect
+Ford | Fusion
+Ford | Edge
+Ford | Flex
+Ford | Focus
+Ford | Crown Victoria
+Ford | E-Series van = E-Series, E-Series Van, Econoline
+Chevrolet | Silverado 1500 = Silverado, C/K 1500
+Chevrolet | Silverado 2500HD = Silverado 2500, Silverado 3500, Silverado 3500HD, Silverado 2500/3500, Silverado HD
 Chevrolet | Colorado
 Chevrolet | Tahoe
 Chevrolet | Suburban
@@ -47,7 +61,13 @@ Chevrolet | Trailblazer
 Chevrolet | Malibu
 Chevrolet | Camaro
 Chevrolet | Corvette
-Chevrolet | Express van
+Chevrolet | Express van = Express, Express Cutaway
+Chevrolet | Cruze = Cruze Hatchback
+Chevrolet | Sonic
+Chevrolet | Spark
+Chevrolet | Bolt EV = Bolt, Bolt EUV
+Chevrolet | Avalanche
+Chevrolet | HHR = HHR Panel
 GMC | Sierra 1500
 GMC | Sierra 2500HD
 GMC | Canyon
@@ -55,20 +75,26 @@ GMC | Yukon
 GMC | Acadia
 GMC | Terrain
 Ram | 1500
-Ram | 2500
-Ram | ProMaster van
+Ram | 2500 = 3500, 2500/3500
+Ram | ProMaster van = ProMaster, ProMaster City
 Jeep | Wrangler
 Jeep | Gladiator
-Jeep | Grand Cherokee
+Jeep | Grand Cherokee = Grand Cherokee L
 Jeep | Cherokee
 Jeep | Compass
+Jeep | Renegade
+Jeep | Patriot
 Dodge | Charger
 Dodge | Challenger
 Dodge | Durango
+Dodge | Grand Caravan
+Dodge | Journey
 Chrysler | Pacifica
+Chrysler | 200
+Chrysler | Town & Country
 Nissan | Altima
 Nissan | Sentra
-Nissan | Versa
+Nissan | Versa = Versa Note, Versa Hatchback
 Nissan | Rogue
 Nissan | Kicks
 Nissan | Murano
@@ -76,6 +102,16 @@ Nissan | Pathfinder
 Nissan | Armada
 Nissan | Frontier
 Nissan | Titan
+Nissan | Maxima
+Nissan | Rogue Sport
+Nissan | Xterra
+Nissan | Leaf
+Nissan | Ariya
+Nissan | Juke
+Nissan | 370Z
+Nissan | Quest
+Nissan | NV van = NV1500, NV2500, NV3500, NV
+Nissan | Hardbody = Hardbody Pickup, D21, D21 Hardbody Pickup
 Hyundai | Elantra
 Hyundai | Sonata
 Hyundai | Tucson
@@ -85,6 +121,8 @@ Hyundai | Kona
 Hyundai | Venue
 Hyundai | Ioniq 5
 Hyundai | Santa Cruz
+Hyundai | Veloster
+Hyundai | Genesis Coupe
 Kia | Forte
 Kia | K5
 Kia | Soul
@@ -94,23 +132,29 @@ Kia | Sorento
 Kia | Telluride
 Kia | Carnival
 Kia | EV6
+Kia | Niro
 Subaru | Outback
 Subaru | Forester
 Subaru | Crosstrek
 Subaru | Ascent
 Subaru | Impreza
 Subaru | WRX
-Mazda | Mazda3
+Subaru | Legacy
+Subaru | BRZ
+Mazda | Mazda3 = Mazda3 Hatchback
 Mazda | CX-30
 Mazda | CX-5
 Mazda | CX-50
 Mazda | CX-90
 Mazda | MX-5 Miata
+Mazda | Mazda6
 Volkswagen | Jetta
 Volkswagen | Golf GTI
 Volkswagen | Tiguan
 Volkswagen | Atlas
 Volkswagen | ID.4
+Volkswagen | Taos
+Volkswagen | ID. Buzz
 Tesla | Model 3
 Tesla | Model Y
 Tesla | Model S
@@ -121,12 +165,19 @@ BMW | 5 Series
 BMW | X3
 BMW | X5
 BMW | X7
+BMW | 4 Series = 4 Series Coupe, 4 Series Gran Coupe
+BMW | X4
+BMW | X6
 Mercedes-Benz | C-Class
 Mercedes-Benz | E-Class
 Mercedes-Benz | GLC
 Mercedes-Benz | GLE
 Mercedes-Benz | G-Class
-Mercedes-Benz | Sprinter van
+Mercedes-Benz | Sprinter van = Sprinter
+Mercedes-Benz | GLS = GL-Class, GL
+Mercedes-Benz | GLK
+Mercedes-Benz | M-Class = ML
+Mercedes-Benz | S-Class
 Audi | A4
 Audi | A6
 Audi | Q5
@@ -137,23 +188,36 @@ Lexus | RX
 Lexus | NX
 Lexus | GX
 Lexus | TX
+Lexus | UX
+Lexus | CT = CT 200h
 Acura | Integra
 Acura | TLX
 Acura | RDX
 Acura | MDX
+Acura | ILX
 Cadillac | Escalade
 Cadillac | XT5
 Cadillac | Lyriq
+Cadillac | CTS = CTS Coupe
+Cadillac | CT5
+Cadillac | DTS
 Lincoln | Navigator
 Lincoln | Aviator
 Lincoln | Nautilus
+Lincoln | MKS
 Buick | Enclave
 Buick | Envista
 Buick | Encore GX
 Infiniti | Q50
 Infiniti | QX60
+Infiniti | QX80
+Infiniti | QX50
 Volvo | XC60
 Volvo | XC90
+Volvo | XC40
+Volvo | S90
+Volvo | V60 = V60 Cross Country
+Volvo | V90 = V90 Cross Country
 Porsche | 911
 Porsche | Cayenne
 Porsche | Macan
@@ -162,18 +226,38 @@ Mitsubishi | Outlander
 Mitsubishi | Mirage
 Rivian | R1T
 Rivian | R1S
+Genesis | G80
+Jaguar | F-Pace
+Jaguar | XF
+Land Rover | Discovery Sport
+Land Rover | Discovery
+Land Rover | Range Rover Sport
+Land Rover | Range Rover Velar
+MINI | Cooper
+MINI | Countryman
+Fiat | 500
+Polestar | 2
+Scion | xB
+Suzuki | Grand Vitara
 
 # Work and construction vehicles, so they don't get forced into a car label
-dump truck
+dump truck = Volvo A400, Caterpillar Articulated Dump Truck, articulated dump truck
 concrete mixer truck
 semi truck
 box truck
 flatbed truck
 garbage truck
 tow truck
-school bus
+school bus = Blue Bird Vision
 city bus
 excavator
 wheel loader
 skid steer loader
 motorcycle
+trailer = utility trailer, flatbed trailer, box trailer, dump trailer, cargo trailer, enclosed cargo trailer, travel trailer, flatbed trailer with water tank, boat trailer, wakeboard boat
+delivery van = Rivian EDV, step van
+golf cart = Club Car Precedent, Yamaha Drive2, Kubota RTV, utility vehicle, UTV
+telehandler
+fire truck = Pierce Enforcer Fire Engine, Pierce Enforcer Pumper, fire engine
+bulldozer = Caterpillar D6, Caterpillar Track-Type Tractor, John Deere Dozer, dozer
+lawn mower = zero-turn mower, riding mower

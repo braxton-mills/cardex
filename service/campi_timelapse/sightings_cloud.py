@@ -25,7 +25,9 @@ PROMPT = """This crop comes from a fixed street camera. Identify the vehicle.
 An image model's top guesses (with its confidence shares): {guesses}.
 Return the vehicle's make and model (use the guesses' naming style when one fits), an approximate model-year
 range like "2019-2023" (empty if you can't tell), its main color, your confidence from 0 to 1, and
-in_candidates = true only if your make and model is one of the guesses."""
+in_candidates = true only if your make and model is one of the guesses. Name the model without trim or body style
+(no "SuperCrew", "Hatchback", "Coupe"). If it isn't a car, SUV, pickup or van, leave make empty and set model to the
+closest of: {generic}."""
 # Lowest first; the first one the model accepts is remembered for the rest of the run.
 THINKING = ({"thinking_level": "MINIMAL"}, {"thinking_level": "LOW"}, {"thinking_budget": 0}, None)
 TRANSIENT_CODES = {408, 429, 500, 502, 503, 504}
@@ -134,7 +136,8 @@ class CloudWorker(threading.Thread):
             img = cv2.resize(img, (round(w * s), round(h * s)), interpolation=cv2.INTER_AREA)
         jpg = cv2.imencode(".jpg", img, [cv2.IMWRITE_JPEG_QUALITY, 90])[1].tobytes()
         guesses = [(job["label"], job["confidence"])] + [(r["label"], r["p"]) for r in json.loads(job["runner_ups"])]
-        prompt = PROMPT.format(guesses="; ".join(f"{n} ({p:.0%})" for n, p in guesses[:3]))
+        prompt = PROMPT.format(guesses="; ".join(f"{n} ({p:.0%})" for n, p in guesses[:3]),
+                               generic=", ".join(self.labels.generic))
         try:
             key = self._key()
         except OSError as e:
@@ -167,11 +170,13 @@ class CloudWorker(threading.Thread):
             return parsed.model_dump()
 
     def apply(self, con, job, r: dict):
-        make, model = (r.get("make") or "").strip(), (r.get("model") or "").strip()
-        if not make or not model:
+        # The list's naming: aliases ("Mazda 3", "unknown dump truck") -> the label; a chassis brand on a work
+        # vehicle defers to SigLIP's generic class. The raw answer stays in cloud_queue.result.
+        resolved = self.labels.resolve(r.get("make"), r.get("model"), job["label"])
+        if resolved is None:
             db.finish_cloud_job(con, job["sighting_id"], r, error="empty answer", status="failed")
             return
-        label = model if model.lower().startswith(make.lower()) else f"{make} {model}"
+        label, make, model = resolved
         update = {"label": label, "make": make, "model": model, "year_range": r.get("year_range") or None,
                   "color": r.get("color") or None, "confidence": round(float(r.get("confidence") or 0), 4),
                   "source": "cloud"}

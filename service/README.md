@@ -139,8 +139,9 @@ Cloud second opinion (`[sightings.cloud]`, off by default): Gemini (`model`) is 
 top share is below `unsure_below`, the top two are within `cloud_margin`, or it's the first-ever row with that label.
 The row is written with SigLIP's answer first; the request waits in the `cloud_queue` table (survives restarts and
 outages, retries 30 s doubling to 1 h) and the row is updated when the answer arrives (`source = 'cloud'`, flag `G`;
-SigLIP's answer stays in `siglip_label` / `siglip_confidence`; media is not renamed). Cars the cloud names that
-aren't in the label list go to `discovered_labels`. At most `cloud_max_per_day` requests (counted in the DB, reset at
+SigLIP's answer stays in `siglip_label` / `siglip_confidence`; media is not renamed). Answers are mapped onto the
+label list's naming first (aliases, "unknown dump truck" -> `dump truck`; a work-truck chassis brand like "Mack
+Granite" keeps SigLIP's generic class); cars the cloud names that still aren't in the list go to `discovered_labels`. At most `cloud_max_per_day` requests (counted in the DB, reset at
 local midnight). The key is read from `api_key_file` (outside the repo) and never logged. Note: on the free tier
 Google may use the requests (your car crops) to improve its models.
 
@@ -170,6 +171,11 @@ campi sightings-record SECONDS       # save the raw stream (.mjpg with timestamp
 campi sightings-test --source FILE [--backend cuda|openvino] [--cloud]
                                      # pipeline on a recording or any video into a test DB; prints rows + timings
 campi sightings-bench [--parity]     # detection fps fp16/int8, SigLIP ms/crop, OpenVINO vs torch parity
+campi sightings-normalize [--apply]  # after editing the label list: Gemini rows, discovered labels and your
+                                     # corrections onto the list's naming (dry run by default; backs up the DBs)
+campi sightings-rescore --old-labels FILE [--days 7] [--cloud-budget 300] [--apply]
+                                     # re-score recent SigLIP-only rows on their crop (CUDA); a row changes only to a
+                                     # label FILE didn't have; unsure ones are queued for Gemini
 ```
 `campi status` shows the worker (disabled / running / paused: gaming / CRASH-LOOPING), its backend and device (or
 CPU FALLBACK), the classify queue, cloud calls today / cap, the last sighting and today's count.
@@ -188,7 +194,8 @@ How it behaves:
   been empty for 10 minutes. Clips are capped at 60 s.
 - Media is written before the row, so a row never points at a missing file. Housekeeping deletes clips older than
   `keep_clips_days` (and clears `clip_path`); crops, frames and rows are kept forever.
-- Labels: `sightings_labels.txt` (`Make | Model` or a generic type per line). `car_id.py` is the original
+- Labels: `sightings_labels.txt` (`Make | Model` or a generic type per line; `= a, b` adds other spellings that
+  Gemini's answers are mapped onto, never shown to SigLIP). `car_id.py` is the original
   standalone script, kept for reference.
 
 ## UI (optional)

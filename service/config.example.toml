@@ -98,6 +98,7 @@ ffprobe = "ffprobe"
 rife = "{project}\\tools\\rife-ncnn-vulkan\\rife-ncnn-vulkan.exe"
 rife_model = "rife-v4.6"     # folder next to the rife exe
 rife_gpu = "NVIDIA"         # Vulkan device: name substring (preferred; index order differs with no one logged on) or index
+blender = "C:\\Program Files\\Blender Foundation\\Blender 5.2\\blender.exe"   # campi site's 3D intro
 
 [sightings]
 # Optional vehicle "sightings": YOLO11m + ByteTrack on /stream.mjpg, SigLIP 2 make/model guess, one row per

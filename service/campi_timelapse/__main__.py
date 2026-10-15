@@ -282,6 +282,21 @@ def main(argv=None) -> int:
     fo.add_argument("--seconds", type=float, default=50.0, help="daylight footage length, before the freezes")
     fo.add_argument("--no-ai", action="store_true", help="no Gemini survey")
     fo.add_argument("--preview", type=float, metavar="SECONDS", help="only the first SECONDS, into work\\")
+    si = sub.add_parser("site", help="the water tower build as a video game: a 3D intro, then only the moments "
+                                     "something happened at the site, captioned (venv-sightings, Blender)")
+    si.add_argument("--box", help="x0,y0,x1,y1 in reference-frame pixels (default: the tower and its yard)")
+    si.add_argument("--start", help="ISO local time (default: the oldest frames)")
+    si.add_argument("--end", help="ISO local time (default: now)")
+    si.add_argument("--max-seconds", type=float, default=90.0, help="footage after the intro, at most")
+    si.add_argument("--no-ai", action="store_true", help="no Gemini captions (generic ones)")
+    si.add_argument("--no-intro", action="store_true", help="skip the 3D intro")
+    si.add_argument("--intro-only", action="store_true", help="only the 3D intro (renders it if needed)")
+    si.add_argument("--intro-still", type=float, metavar="SECONDS", help="render one 3D intro still, into work\\intro3d")
+    si.add_argument("--intro-draft", action="store_true",
+                    help="the whole intro fast (half size, few samples) with its HUD, to work\\site\\intro_draft.mp4")
+    si.add_argument("--sheet", metavar="DAY", help="debug: what the activity detector saw on DAY (YYYY-MM-DD)")
+    si.add_argument("--preview", type=float, metavar="SECONDS", help="only the first SECONDS, into work\\site")
+    si.add_argument("--no-upscale", action="store_true", help="plain cubic 2x instead of Real-ESRGAN (no GPU)")
     dv = sub.add_parser("devices", help="list paired devices; `devices revoke ID` unpairs one (venv-ui)")
     dv.add_argument("action", nargs="?", choices=["revoke"])
     dv.add_argument("device_id", nargs="?")
@@ -378,6 +393,22 @@ def main(argv=None) -> int:
                             _dt.fromisoformat(args.end).timestamp() if args.end else None, args.seconds,
                             ai=not args.no_ai, preview=args.preview,
                             subject_box=tuple(int(v) for v in args.subject_box.split(",")) if args.subject_box else None)
+        elif args.cmd == "site":
+            from datetime import date as _date, datetime as _dt
+            from . import site
+            box = tuple(int(v) for v in args.box.split(",")) if args.box else site.BOX
+            if args.sheet:
+                from .activity import sheet
+                res = {"sheet": str(sheet(cfg, box, _date.fromisoformat(args.sheet),
+                                          cfg.paths.work / "site" / f"activity_{args.sheet}.jpg"))}
+            elif args.intro_still is not None or args.intro_draft:
+                res = site.intro_check(cfg, box, args.intro_still, ai=not args.no_ai)
+            else:
+                res = site.run(cfg, _dt.fromisoformat(args.start).timestamp() if args.start else None,
+                               _dt.fromisoformat(args.end).timestamp() if args.end else None, box,
+                               args.max_seconds, ai=not args.no_ai, preview=args.preview,
+                               use_intro=not args.no_intro, intro_only=args.intro_only,
+                               upscale=not args.no_upscale)
         elif args.cmd == "housekeep":
             from . import housekeeping
             housekeeping.run(cfg)

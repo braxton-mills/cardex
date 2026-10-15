@@ -244,8 +244,9 @@ next/previous, `Space` play/pause, `S` star, `Enter` open, `Esc` close.
   aren't in the list (*discovered*) and labels only in your history (*retired*). The dial: X of Y list labels caught.
 - **Cards**: every car model as a Pokémon-style trading card with a live 3D model in the art window (see
   [Cards](#cards) below).
-- **Timelapse**: **Make a timelapse** (any range up to 7 days at a chosen speed or length, see
-  [Custom timelapses](#custom-timelapses)), your custom timelapses, the 10-minute clips grouped by hour, the daily
+- **Timelapse**: the `campi site` videos (their own **Site** section, shown once there is one), **Make a
+  timelapse** (any range up to 7 days at a chosen speed or length, see [Custom timelapses](#custom-timelapses)),
+  your custom timelapses, the 10-minute clips grouped by hour, the daily
   videos and the archive parts (all playable except the part still being written), each with **Show in folder**.
 - Every player has a speed button (0.25× to 8×, remembered); `[` and `]` step it.
 - **Live**: the camera through `/live.mjpg`, leveled like the renders. Connected only while this view is showing
@@ -312,6 +313,56 @@ base).
 - **Ending:** day 1 against the last day, split down the middle of the subject.
 - The registrations and Gemini's answers are cached in `state\annotate\`, so a re-render is quick. The result is a
   custom timelapse on the Timelapse tab.
+
+**The water tower build, game style**: `campi site` (`site.py`, `activity.py`, `intro.py`; venv-sightings plus
+Blender 5.2) makes about 2 minutes of video from the whole history.
+- **Intro (~45 s):** a cel-shaded 3D replay of the real build, rendered headless by `intro3d\tank_scene.py` in
+  Blender (`[tools] blender`). It plays in acts:
+  1. "THIS IS WHAT'S BEING BUILT": the finished tank as a cyan blueprint.
+  2. The site as the camera sees it. The yard, the green container, the spoil pile, the lamp post and the old water
+     tower are all placed where they are in the real view.
+  3. The replay, day by day. For each pour the detector saw, a mixer truck backs up to the boom pump, the boom
+     unfolds over the pedestal, the lift fills and the climbing form jumps up. A date ticker, pour and lift counters,
+     and short captions run over it.
+  4. "STILL TO COME": the rest of the job as a hologram.
+  5. An orbit of the finished tank with the spec cards.
+  - The replay comes from `intro.schedule()`. The pour times come from the detector. The lift count comes from each
+    midday height measurement: one lift is `site.LIFT_PX` (21 px) on the camera, the spacing of the lift lines.
+    Things the detector can't see come from Claude's day log (below), at most one a day, and from the hand-kept
+    `intro.EXTRAS`, which win on their days. Only `dig` (the excavator) and `crew` animate; the rest are captions.
+  - The facts are in `intro.SPECS`, and only known facts are listed (no height, no cost).
+  - The frames are cached in `work\intro3d\<hash of the script and schedule>\`. A new pour re-renders them (about
+    7 min); a HUD change doesn't.
+  - For quick looks, use `--intro-still 13` for one frame with its HUD, or `--intro-draft` for the whole intro at half
+    size, written to `work\site\intro_draft.mp4`.
+- **Live site feed (at most `--max-seconds`, 90 s):** only the stretches where something happened at the tower.
+  - `activity.py` maps every daylight frame onto `state\annotate\site_ref.jpg` and scores the tower box.
+  - Below the day's skyline it counts fine-detail change that survives a 1 px shift, ignoring trees in the wind. Above
+    the skyline it counts only thin dark lines, so the concrete pump's boom registers but clouds don't.
+  - Half a day's active segments make a chapter. Claude (`site_ai.py`, Claude Opus 5.5) captions all chapters in one
+    call from three frames each (start, busiest, end), the detector's notes and that day's log; Gemini is the fallback.
+    A caption stays up for max(4 s, 1.5 s + 0.35 s a word).
+  - **Day log:** Claude also looks at 6-8 frames spread over each day and notes what stands out beyond the pours
+    (the excavator working, a crew on top on a day without a pour, a delivery, a crane), plus a one-line summary that
+    the captions use. It is cached in `state\annotate\site\day_log.json`, so each past day is asked once (today again
+    as frames arrive). The key is `secrets\anthropic.key` in the data folder (else `ANTHROPIC_API_KEY`); without one,
+    the day log is skipped and Gemini captions. Each call logs its tokens and rough cost; a full first pass is well
+    under $1.
+  - The HUD counts the concrete pours seen (segments with the boom) and charts the pedestal's height, measured each
+    midday with the focus ruler.
+  - Every frame shown is held still: it is aligned to its chapter's median view on the ground below the skyline.
+    ECC runs twice, first rotation and shift at half size, then affine at full size. This removes wind shake, the
+    rolling-shutter shear, and the up-to-10 px errors of the 10-minute SIFT keyframes, leaving about 0.1 px.
+  - The box is cropped once at camera resolution and upscaled 2x by Real-ESRGAN (`upscale.py`, CUDA, about 0.15 s a
+    frame on the 5070). The weights download once into `tools\upscale\`. Use `--no-upscale` for a plain cubic resize.
+- **Ending:** the first day against the latest, then what comes next.
+- **Options:**
+  - `--sheet 2026-10-12`: a contact sheet of what the detector counted that day (red: change, yellow: boom). Use it to
+    tune the thresholds at the top of `activity.py`.
+  - `--intro-still 13`: one 3D frame with its HUD; `--intro-draft`: the whole intro, fast.
+  - `--intro-only`, `--no-intro`, `--no-ai`, `--no-upscale`, and `--preview S`.
+- **Caching:** per-day scores are cached in `state\annotate\site\`. Today's are redone while frames are still
+  arriving.
 
 ### Cards
 Each label is a trading card: make in the stage pill, model as the name, **SEEN ×N** where the HP goes, a type

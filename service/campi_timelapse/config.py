@@ -160,6 +160,9 @@ def load_config(path: Path | None = None) -> SimpleNamespace:
     cfg.tools.ffmpeg = _tool(cfg.tools.ffmpeg, "ffmpeg")
     cfg.tools.ffprobe = _tool(cfg.tools.ffprobe, "ffprobe")
     cfg.tools.rife = _expand(cfg.tools.rife)
+    # Blender (campi site's 3D intro): optional; checked when the intro renders
+    cfg.tools.blender = _expand(getattr(cfg.tools, "blender", "") or
+                                r"C:\Program Files\Blender Foundation\Blender 5.2\blender.exe")
     return cfg
 
 

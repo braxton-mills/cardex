@@ -53,7 +53,7 @@ if ($Sightings) {
     uv pip install --python $spy torch torchvision --index-url https://download.pytorch.org/whl/cu128
     uv pip install --python $spy ultralytics lap open_clip_torch 'transformers[sentencepiece]' opencv-python-headless
     # OpenVINO backend (Intel UHD 770: detection + SigLIP vision; NNCF for INT8) and the optional Gemini client
-    uv pip install --python $spy openvino nncf google-genai
+    uv pip install --python $spy openvino nncf google-genai anthropic
     # ultralytics depends on opencv-python, which clashes with the headless build (same cv2 module)
     uv pip uninstall --python $spy opencv-python
     uv pip install --python $spy --reinstall opencv-python-headless

@@ -5,7 +5,7 @@
     campi stop            stop everything; stays stopped until `campi start`
     campi restart
     campi run             run in this window with live logs (Ctrl+C stops); needs `campi stop` first
-    campi logs [name] [-f]  name: supervisor|capture|render|daily|housekeep|gaps|gpu|sightings|meshes|models|focus|annotate (default: summary)
+    campi logs [name] [-f]  name: supervisor|capture|render|daily|housekeep|gaps|gpu|sightings|meshes|models|site|focus|annotate (default: summary)
     campi render-now      render the last 10 minutes right now
     campi test            render the last 1 minute
     campi daily [date]    render a daily video (default: yesterday)
@@ -24,6 +24,7 @@
     campi meshes [--label L] [--force] [--limit N]   3D card scans from crops with TripoSR (install.ps1 -Meshes)
     campi focus SUBJECT --box x0,y0,x1,y1   crime-lab timelapse of one part of the scene (daylight, stabilized)
     campi annotate VIDEO [--no-ai] [--preview S]   overlay saying what happened (custom id or video name)
+    campi site [--intro-draft] [--no-intro] [--preview S]   the water tower build as a video game (Blender 3D intro)
     campi models [--label L] [--force] [--limit N] [--search-only]   Sketchfab card models (install.ps1 -Models)
 #>
 param([Parameter(Position = 0)][string]$Command = 'status',
@@ -122,7 +123,7 @@ switch ($Command) {
         & $exe -m campi_timelapse $Command @Rest
         exit $LASTEXITCODE
     }
-    { $_ -in 'sightings-record', 'sightings-test', 'sightings-bench', 'annotate', 'focus' } {
+    { $_ -in 'sightings-record', 'sightings-test', 'sightings-bench', 'annotate', 'focus', 'site' } {
         if (-not (Test-Path $PySightings)) { Write-Host 'sightings env not installed: run install.ps1 -Sightings'; exit 1 }
         & $PySightings -m campi_timelapse $Command @Rest
     }

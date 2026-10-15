@@ -35,6 +35,37 @@ import Testing
         }
     }
 
+    @Test func sightingPromptDescribesThisCar() throws {
+        var s = try Fixtures.decode(Sighting.self, "sighting_cloud.json")   // white Rivian R1S, 11:30, years 2016-2019
+        let p = CardexPrompt.prompt(for: s, item: nil)
+        #expect(p.contains("Vehicle: Rivian R1S") && p.contains("Make: Rivian") && p.contains("Model: R1S"))
+        #expect(p.contains("Color: white") && p.contains("Work its color into the name"))
+        #expect(p.contains("in the morning"))
+        #expect(!p.contains("2016") && !p.contains("parked"))
+        s.color = nil
+        s.stationary = true
+        s.startedAt = PCDate(rfc3339: "2026-10-01T23:10:00.000-05:00")!
+        let q = CardexPrompt.prompt(for: s, item: nil)
+        #expect(!q.contains("Color:") && !q.contains("Work its color") && q.contains("parked"))
+        #expect(q.contains("in the night"))
+    }
+
+    @Test func sightingFallbackAndKey() throws {
+        var s = try Fixtures.decode(Sighting.self, "sighting_cloud.json")
+        s.color = "dark blue"
+        #expect(CardexPrompt.fallback(for: s, item: nil).displayName == "Dark Blue Rivian R1S")
+        s.color = nil
+        let f = CardexPrompt.fallback(for: s, item: nil)
+        #expect(f.displayName == "Rivian R1S" && f.type == "Rivian" && !f.generated && f.bodyStyle == .suv)
+        let key = CardexPrompt.sightingKey(s)
+        #expect(key.hasPrefix("sighting:\(s.id)"))
+        s.label = "Tesla Model Y"
+        #expect(CardexPrompt.sightingKey(s) != key)
+        let relabeled = CardexPrompt.sightingKey(s)
+        s.color = "red"
+        #expect(CardexPrompt.sightingKey(s) != relabeled)
+    }
+
     @Test func sanitizeClampsAndTrims() {
         let raw = CardexText(
             displayName: "  \"Toyota GR86\" ", type: "JDM",
@@ -85,6 +116,18 @@ import Testing
         #expect(CarBodyStyle.guess(label: "Tesla Model 3") == .sedan)
         // whole words only: "fit" isn't in "Fitzgerald"
         #expect(CarBodyStyle.guess(label: "Fitzgerald Special") == .sedan)
+        #expect(CarBodyStyle.match(label: "Fitzgerald Special") == nil)
+        #expect(CarBodyStyle.match(label: "Nissan Maxima") == .sedan)
+    }
+
+    @Test func labelBeatsTheGeneratedBodyStyle() {
+        // the on-device model called a Maxima an SUV: the label wins
+        #expect(CarShape.bodyStyle(label: "Nissan Maxima", model: "Maxima", generated: .suv) == .sedan)
+        #expect(CarShape.for(label: "Nissan Maxima", model: "Maxima", style: .suv).roof != .hatch)
+        #expect(CarShape.bodyStyle(label: "Toyota RAV4", generated: .sedan) == .suv)
+        // a label that names nothing keeps the model's pick
+        #expect(CarShape.bodyStyle(label: "Fitzgerald Special", generated: .wagon) == .wagon)
+        #expect(CarShape.bodyStyle(label: "Fitzgerald Special", generated: nil) == .sedan)
     }
 
     @Test func fallbackGuessesBodyStyle() {

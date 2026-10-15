@@ -1,9 +1,10 @@
 import CampiKit
 import SwiftUI
 
-/// Opens a label's trading card in the inspector.
+/// Opens a label's trading card in the inspector, or with `sighting`, that sighting's own card.
 struct CardexCardRoute: Hashable {
     let item: CollectionItem
+    var sighting: Sighting? = nil
 }
 
 /// A caught car as a Pokémon-style trading card: generated name and ratings, real catch stats, the 3D car in the
@@ -12,6 +13,8 @@ struct CardexCardRoute: Hashable {
 struct TradingCardView: View {
     @Environment(AppModel.self) private var app
     let item: CollectionItem
+    /// This sighting's own card: its paint and generated text, on the label's finish.
+    var sighting: Sighting? = nil
     /// Collector number: the label's position in the collection, and the collection's size.
     var number: Int = 0
     var total: Int = 0
@@ -24,6 +27,10 @@ struct TradingCardView: View {
     var forcedPattern: HoloPattern?
     var forcedTheme: SceneTheme?
     var forcedFinishOverride: CardFinish?
+
+    /// The PC's scan, once loaded; `scanFailed` falls back to the built shape.
+    @State private var scanned: ScannedCar?
+    @State private var scanFailed = false
 
     static let size = CGSize(width: 300, height: 419)
 
@@ -42,15 +49,33 @@ struct TradingCardView: View {
             // the printed card is decoration for VoiceOver: one summary instead of dozens of tiny labels
             .accessibilityRepresentation { Text(accessibilityText) }
             .accessibilityIdentifier("cardex.trading")
-            .task(id: item.label) {
-                await app.cardex.load(item)
-                await app.cardex.loadPaint(item, app: app)
+            .task(id: sighting.map(CardexPrompt.sightingKey) ?? item.label) {
+                if let sighting {
+                    await app.cardex.load(sighting, item: item)
+                } else {
+                    await app.cardex.load(item)
+                    await app.cardex.loadPaint(item, app: app)
+                }
             }
+            .task(id: ScanRequest(url: item.mesh?.url.cacheKey, paint: scanPaint)) { await loadScan() }
     }
 
     // MARK: - Data
 
-    private var card: CardexStore.Card? { app.cardex.card(for: item.label) }
+    private var card: CardexStore.Card? {
+        if let sighting { app.cardex.card(for: sighting) } else { app.cardex.card(for: item.label) }
+    }
+    private var writing: Bool {
+        if let sighting { app.cardex.isGenerating(sighting) } else { app.cardex.generating.contains(item.label) }
+    }
+    private var paint: PaintColor {
+        if let sighting { app.cardex.paint(for: sighting) } else { app.cardex.paint(for: item.label) }
+    }
+    /// What the foil and scene are picked from: each sighting's card gets its own.
+    private var seed: String { sighting?.id ?? item.label }
+    private var carLabel: String { sighting?.label ?? item.label }
+    private var make: String? { sighting?.make ?? item.make }
+    private var model: String? { sighting?.model ?? item.model }
     private var finish: CardFinish {
         if let forcedFinishOverride { return forcedFinishOverride }
         #if DEBUG
@@ -68,19 +93,20 @@ struct TradingCardView: View {
     }()
     #endif
     private var style: CarBodyStyle {
-        card?.text.bodyStyle ?? CarBodyStyle.guess(label: item.label, make: item.make, model: item.model)
+        CarShape.bodyStyle(label: carLabel, model: model, generated: card?.text.bodyStyle)
     }
     private var energy: Energy { Energy(style) }
     private var shape: CarShape {
-        CarShape.for(label: item.label, make: item.make, model: item.model, style: card?.text.bodyStyle)
+        CarShape.for(label: carLabel, make: make, model: model, style: card?.text.bodyStyle)
     }
     private var name: String { card?.text.displayName ?? item.label }
-    private var pattern: HoloPattern { forcedPattern ?? HoloPattern.for(label: item.label, finish: finish) }
-    private var theme: SceneTheme { forcedTheme ?? SceneTheme.for(label: item.label, style: style, finish: finish) }
+    private var pattern: HoloPattern { forcedPattern ?? HoloPattern.for(label: seed, finish: finish) }
+    private var theme: SceneTheme { forcedTheme ?? SceneTheme.for(label: seed, style: style, finish: finish) }
 
     private var accessibilityText: String {
         var parts = ["\(name) trading card", finish.title, item.tier.title, "seen \(item.count) times",
                      "\(theme.title) art"]
+        if let color = sighting?.color { parts.append("\(color) paint") }
         if let ratings = card?.text.ratings, !ratings.isEmpty {
             parts.append(ratings.map { "\($0.name) \($0.value) of 10" }.joined(separator: ", "))
         }
@@ -232,18 +258,53 @@ struct TradingCardView: View {
     }
 
     @ViewBuilder private var carImage: some View {
-        let paint = app.cardex.paint(for: item.label)
-        if live {
-            CarModelView(shape: shape, paint: paint, tilt: tilt, spins: spins)
+        if live, let art {
+            CarModelView(art: art, tilt: tilt, spins: spins)
         } else {
-            CarSnapshotImage(shape: shape, paint: paint)
+            CarSnapshotImage(art: art)
         }
     }
 
+    // MARK: - Scan
+
+    private struct ScanRequest: Hashable {
+        var url: String?
+        var paint: PaintColor?
+    }
+
+    /// The scan while it loads is nil (a placeholder rather than flashing the built car first).
+    private var art: CarArt? {
+        if let scanned { return .scan(scanned) }
+        if item.mesh != nil && !scanFailed { return nil }
+        return .shape(shape, paint)
+    }
+
+    /// A sighting card repaints the scan in its own color, unless the scan's photo is already that color.
+    /// Label cards show the scan's photo colors.
+    private var scanPaint: PaintColor? {
+        guard let sighting, let paint = PaintColor.from(sighting.color) else { return nil }
+        return paint == PaintColor.from(item.mesh?.color) ? nil : paint
+    }
+
+    private func loadScan() async {
+        guard let mesh = item.mesh else { scanned = nil; return }
+        scanFailed = false
+        if scanned?.key != mesh.url.cacheKey || scanned?.paint != scanPaint { scanned = nil }
+        guard let client = app.client, let scan = try? await CarScanLoader.shared.scan(mesh, client: client) else {
+            scanFailed = true
+            return
+        }
+        let made = await ScannedCar.make(key: mesh.url.cacheKey, scan: scan, paint: scanPaint)
+        if !Task.isCancelled { scanned = made }
+    }
+
     private var infoStrip: some View {
-        let parts = [item.make, item.model].compactMap { $0 } + (item.firstSeenAt.map {
-            ["First seen \($0.date.formatted(Date.FormatStyle(timeZone: $0.timeZone).month(.abbreviated).day().year()))"]
-        } ?? [])
+        let day = { (d: PCDate) in d.date.formatted(Date.FormatStyle(timeZone: d.timeZone).month(.abbreviated).day().year()) }
+        let parts = if let sighting {
+            [make, model, sighting.color?.capitalized].compactMap { $0 } + ["Seen \(day(sighting.startedAt))"]
+        } else {
+            [make, model].compactMap { $0 } + (item.firstSeenAt.map { ["First seen \(day($0))"] } ?? [])
+        }
         return Text(parts.isEmpty ? item.label : parts.joined(separator: " · "))
             .font(.system(size: 8, weight: .semibold).italic())
             .lineLimit(1)
@@ -260,7 +321,7 @@ struct TradingCardView: View {
             ? [("Sightings", "×\(item.count)", 1), ("Rarity", item.tier.title, 2)]
             : ratings.map { ($0.name, "\($0.value * 10)", max(1, Int((Double($0.value) / 3.4).rounded(.up)))) }
         return VStack(spacing: 0) {
-            if app.cardex.generating.contains(item.label) && ratings.isEmpty {
+            if writing && ratings.isEmpty {
                 Text("Writing card…").font(.system(size: 11, weight: .medium).italic())
                     .frame(maxWidth: .infinity, alignment: .leading).padding(.vertical, 6)
             }
@@ -351,23 +412,23 @@ struct FoilLayer: View {
     }
 }
 
-/// The car's still render, from the snapshot cache.
+/// The car's still render, from the snapshot cache; a placeholder while `art` is nil (its scan is loading).
 struct CarSnapshotImage: View {
-    let shape: CarShape
-    let paint: PaintColor
+    let art: CarArt?
     @State private var image: UIImage?
 
     var body: some View {
         Group {
-            if let image = image ?? CarSnapshots.shared.cached(shape, paint: paint) {
+            if let image = image ?? art.flatMap(CarSnapshots.shared.cached) {
                 Image(uiImage: image).resizable().scaledToFit()
             } else {
                 Image(systemName: "car.side.fill").font(.system(size: 60)).foregroundStyle(.white.opacity(0.4))
             }
         }
-        .task(id: CarSnapshots.Key(shape: shape, paint: paint)) {
+        .task(id: art) {
             image = nil   // don't keep showing the previous car while this one renders
-            image = await CarSnapshots.shared.image(shape, paint: paint)
+            guard let art else { return }
+            image = await CarSnapshots.shared.image(art)
         }
     }
 }

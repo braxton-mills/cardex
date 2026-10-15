@@ -186,12 +186,71 @@ def ensure_media() -> dict[str, Path]:
         _ff(ff, ["-f", "lavfi", "-i", "testsrc2=size=1280x960:rate=10", "-t", "3", "-q:v", "5",
                  str(MEDIA / "live_%03d.jpg")])
     out["live"] = sorted(MEDIA.glob("live_0*.jpg"))
+    p = MEDIA / "scan.glb"
+    p.write_bytes(scan_glb())   # cheap: rewritten every launch so it follows this file
+    out[p.name] = p
     for name, src in (("poster_clip.jpg", "clip.mp4"), ("poster_daily.jpg", "daily.mp4")):
         p = MEDIA / name
         if not p.exists():
             _ff(ff, ["-ss", "5", "-i", str(MEDIA / src), "-frames:v", "1", "-vf", "scale=640:-2", str(p)])
         out[name] = p
     return out
+
+
+def scan_glb() -> bytes:
+    """A stand-in for the PC's TripoSR scans (api-contract §5.6): a white box car laid out like trimesh's GLB export
+    (one mesh; POSITION, NORMAL, COLOR_0 as normalised sRGB bytes; uint32 indices), length 1 along +x, y up."""
+    import struct
+    white, glass, tire, lamp = (232, 232, 228, 255), (30, 36, 46, 255), (18, 18, 18, 255), (250, 246, 220, 255)
+    boxes = [((-0.5, 0.07, -0.2), (0.5, 0.2, 0.2), white), ((-0.27, 0.2, -0.17), (0.2, 0.3, 0.17), glass),
+             ((-0.25, 0.3, -0.16), (0.16, 0.315, 0.16), white), ((0.495, 0.13, -0.17), (0.505, 0.17, -0.09), lamp),
+             ((0.495, 0.13, 0.09), (0.505, 0.17, 0.17), lamp)]
+    boxes += [((x - 0.06, 0, z - 0.02), (x + 0.06, 0.12, z + 0.02), tire) for x in (-0.32, 0.32) for z in (-0.19, 0.19)]
+    pos, nrm, col, idx = [], [], [], []
+    for (x0, y0, z0), (x1, y1, z1), c in boxes:
+        for axis in range(3):
+            for side in (0, 1):
+                n = [0.0, 0.0, 0.0]
+                n[axis] = 1.0 if side else -1.0
+                u, v = [(1, 2), (2, 0), (0, 1)][axis]
+                lo, hi = (x0, y0, z0), (x1, y1, z1)
+                base = len(pos)
+                for a, b in ((0, 0), (1, 0), (1, 1), (0, 1)):
+                    q = [0.0, 0.0, 0.0]
+                    q[axis] = (hi if side else lo)[axis]
+                    q[u] = (lo, hi)[a][u]
+                    q[v] = (lo, hi)[b][v]
+                    pos.append(q)
+                    nrm.append(n)
+                    col.append(c)
+                quad = (0, 1, 2, 0, 2, 3) if side else (0, 2, 1, 0, 3, 2)
+                idx += [base + i for i in quad]
+    vcount = len(pos)
+    bin_ = (b"".join(struct.pack("<3f", *p_) for p_ in pos) + b"".join(struct.pack("<3f", *n_) for n_ in nrm)
+            + bytes(b for c in col for b in c) + struct.pack(f"<{len(idx)}I", *idx))
+    o_n, o_c = vcount * 12, vcount * 24
+    o_i = o_c + vcount * 4
+    lo = [min(p_[i] for p_ in pos) for i in range(3)]
+    hi = [max(p_[i] for p_ in pos) for i in range(3)]
+    gltf = {"asset": {"version": "2.0", "generator": "campi mock"}, "scene": 0, "scenes": [{"nodes": [0]}],
+            "nodes": [{"mesh": 0}],
+            "meshes": [{"primitives": [{"attributes": {"POSITION": 0, "NORMAL": 1, "COLOR_0": 2}, "indices": 3,
+                                        "mode": 4}]}],
+            "accessors": [
+                {"bufferView": 0, "componentType": 5126, "count": vcount, "type": "VEC3", "min": lo, "max": hi},
+                {"bufferView": 1, "componentType": 5126, "count": vcount, "type": "VEC3"},
+                {"bufferView": 2, "componentType": 5121, "normalized": True, "count": vcount, "type": "VEC4"},
+                {"bufferView": 3, "componentType": 5125, "count": len(idx), "type": "SCALAR"}],
+            "bufferViews": [{"buffer": 0, "byteOffset": 0, "byteLength": o_n},
+                            {"buffer": 0, "byteOffset": o_n, "byteLength": o_c - o_n},
+                            {"buffer": 0, "byteOffset": o_c, "byteLength": o_i - o_c},
+                            {"buffer": 0, "byteOffset": o_i, "byteLength": len(idx) * 4}],
+            "buffers": [{"byteLength": len(bin_)}]}
+    js = json.dumps(gltf, separators=(",", ":")).encode()
+    js += b" " * (-len(js) % 4)
+    bin_ += b"\0" * (-len(bin_) % 4)
+    body = struct.pack("<I4s", len(js), b"JSON") + js + struct.pack("<I4s", len(bin_), b"BIN\0") + bin_
+    return struct.pack("<4sII", b"glTF", 2, 12 + len(body)) + body
 
 
 def _ff(ff, args):
@@ -574,7 +633,10 @@ class Views:
                     "last_seen_at": self.c.iso(rows[-1]["started"]) if rows else None,
                     "tier": tier(len(rows)),
                     "cover": {"sighting_id": best["id"], "crop": self.media("sightings", best["crop"], dev)}
-                    if best else None}
+                    if best else None,
+                    # like a PC with [cards] meshes on: labels seen 3+ times have been scanned
+                    "mesh": {"url": self.media("cards", self.mesh_file(label, best), dev), "sighting_id": best["id"],
+                             "color": best["color"]} if len(rows) >= 3 else None}
 
         for li in st.labels:
             items.append(item(li["label"], li["make"], li["model"], li["generic"], "labels_file"))
@@ -587,6 +649,10 @@ class Views:
         items += [item(lab, None, None, False, "other") for lab in sorted(by) if lab not in seen]
         return {"total": len(items), "caught": sum(1 for i in items if i["count"] > 0), "tiers": TIERS,
                 "items": items}
+
+    @staticmethod
+    def mesh_file(label: str, best: dict) -> str:
+        return f"{slug(label)}-{best['id'][:8]}.glb"   # card_meshes' naming
 
     def highlights_all(self, dev: str) -> list[dict]:
         st, c = self.s, self.c
@@ -1118,9 +1184,13 @@ class Handler(BaseHTTPRequestHandler):
             elif kind == "daily" and re.fullmatch(r"\d{4}-\d{2}-\d{2}", ident) and \
                     date.fromisoformat(ident) in st.dailies():
                 f = st.media["poster_daily.jpg"]
+        elif root == "cards":
+            if any(i["mesh"] and i["mesh"]["url"].split("?")[0].endswith("/" + quote(name))
+                   for i in self.views.collection("mock")["items"]):
+                f = st.media["scan.glb"]
         if f is None:
             raise ApiError(404, "not_found", f"no media {rel}")
-        ctype = "video/mp4" if f.suffix == ".mp4" else "image/jpeg"
+        ctype = {".mp4": "video/mp4", ".glb": "model/gltf-binary"}.get(f.suffix, "image/jpeg")
         cache = "private, max-age=86400" if root == "sightings" and ctype == "image/jpeg" else "private, max-age=300"
         return f, ctype, cache
 
@@ -1338,7 +1408,8 @@ def write_fixtures():
     for name, obj in out.items():
         (FIXTURES / name).write_text(json.dumps(obj, indent=2, ensure_ascii=False) + "\n", encoding="utf-8")
         bad += [f"{name}: {e}" for e in schema.validate(obj, schema.fixtures[name])]
-    print(f"wrote {len(out)} fixtures to {FIXTURES}")
+    (FIXTURES / "scan.glb").write_bytes(scan_glb())   # a collection item's mesh, for the app's GLB reader
+    print(f"wrote {len(out)} fixtures and scan.glb to {FIXTURES}")
     if bad:
         print("\n".join(bad))
         sys.exit(1)

@@ -261,12 +261,14 @@ struct TimelapseView: View {
 
     private func play(_ clip: Clip) {
         guard let url = app.client?.url(for: clip.media.video) else { return }
-        video = VideoTarget(url: url, title: "\(clip.windowStart.timeText)–\(clip.windowEnd.timeText)")
+        video = VideoTarget(url: url, title: "\(clip.windowStart.timeText)–\(clip.windowEnd.timeText)",
+                            file: SavableFile(path: clip.media.video, fileName: clip.fileName))
     }
 
     private func play(_ d: Daily) {
         guard let url = app.client?.url(for: d.media.video) else { return }
-        video = VideoTarget(url: url, title: "Daily video, \(d.day.text(timeZone: d.modifiedAt.timeZone))")
+        video = VideoTarget(url: url, title: "Daily video, \(d.day.text(timeZone: d.modifiedAt.timeZone))",
+                            file: SavableFile(path: d.media.video, fileName: d.fileName))
     }
 }
 

@@ -28,6 +28,7 @@ struct SettingsView: View {
                     Button(cacheCleared ? "Image cache cleared" : "Clear image cache") {
                         Task {
                             await ImageLoader.shared.clear()
+                            await CarScanLoader.shared.clear()
                             cacheCleared = true
                         }
                     }

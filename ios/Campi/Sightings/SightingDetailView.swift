@@ -11,7 +11,7 @@ struct SightingDetailView: View {
     @State private var video: VideoTarget?
     @State private var message: String?
     @State private var seeking = false
-    /// The collection item for the effective label, for its Cardex card.
+    /// The collection item for the effective label: the finish of this sighting's card.
     @State private var cardItem: CollectionItem?
 
     private var s: Sighting { app.sightings.resolve(initial) }
@@ -27,7 +27,7 @@ struct SightingDetailView: View {
                 if s.hidden { hiddenBanner }
                 actionButtons
                 verdict
-                if let cardItem { CardexCardView(item: cardItem) }
+                if let cardItem { SightingCardView(sighting: s, item: cardItem) }
                 if !s.runnerUps.isEmpty { runnerUps }
                 facts
                 media
@@ -71,7 +71,7 @@ struct SightingDetailView: View {
                     }
                     if let cardItem {
                         Button("Regenerate Card", systemImage: "arrow.clockwise") {
-                            Task { await app.cardex.regenerate(cardItem) }
+                            Task { await app.cardex.regenerate(s, item: cardItem) }
                         }
                     }
                     Divider()

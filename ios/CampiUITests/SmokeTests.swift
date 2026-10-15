@@ -269,6 +269,25 @@ final class SmokeTests: XCTestCase {
         XCTAssertTrue(done.waitForExistence(timeout: 10))
         sleep(2)
         attach(app, "18-clip-player")
+
+        // Save to Photos while watching
+        app.buttons["player.save"].tap()
+        XCTAssertTrue(app.buttons["Save to Photos"].waitForExistence(timeout: 5))
+        app.buttons["Save to Photos"].tap()
+        XCTAssertTrue(app.staticTexts["Saved to Photos"].waitForExistence(timeout: 30), "save from the player didn't finish")
+        attach(app, "18b-saved-from-player")
+        _ = app.staticTexts["Saved to Photos"].waitForNonExistence(timeout: 6)
+
+        // Share while watching (the player presents its own sheet; the root one can't show over the cover)
+        app.buttons["player.save"].tap()
+        XCTAssertTrue(app.buttons["Share…"].waitForExistence(timeout: 5))
+        app.buttons["Share…"].tap()
+        XCTAssertTrue(waitForAny([app.otherElements["ActivityListView"], app.buttons["Copy"], app.cells["Copy"]], timeout: 20),
+                      "share sheet didn't open over the player")
+        sleep(1)
+        attach(app, "18c-share-from-player")
+        if app.buttons["Close"].exists { app.buttons["Close"].tap() } else { app.swipeDown(velocity: .fast) }
+        XCTAssertTrue(done.waitForExistence(timeout: 5))
         done.tap()
 
         // Save to Photos from the context menu
@@ -298,6 +317,44 @@ final class SmokeTests: XCTestCase {
 
     /// Long-presses for the context menu and returns `item`, retrying the press once (it can miss while
     /// another animation is finishing).
+    // MARK: Insights
+
+    /// Today → Insights: busiest day, heatmap (tap a cell), direction, colors and makes; then All time.
+    @MainActor
+    func testInsights() async throws {
+        let app = try await launchPaired()
+        openInsights(app)
+        XCTAssertTrue(app.otherElements["insights.busiest"].waitForExistence(timeout: 5) || app.staticTexts["Busiest day ever"].exists)
+        sleep(1)
+        attach(app, "50-insights")
+        let heatmap = app.otherElements["insights.heatmap"]
+        heatmap.coordinate(withNormalizedOffset: CGVector(dx: 0.6, dy: 0.5)).tap()
+        XCTAssertTrue(app.staticTexts.containing(NSPredicate(format: "label CONTAINS 'on average'")).firstMatch.waitForExistence(timeout: 5))
+        attach(app, "51-insights-heatmap-selected")
+        app.swipeUp()
+        sleep(1)
+        attach(app, "52-insights-direction-colors")
+        app.swipeUp()
+        sleep(1)
+        attach(app, "53-insights-makes")
+        app.swipeDown()
+        app.swipeDown()
+        app.segmentedControls["insights.range"].buttons["All"].tap()
+        sleep(3)
+        XCTAssertTrue(app.otherElements["insights.heatmap"].waitForExistence(timeout: 30))
+        attach(app, "54-insights-all")
+    }
+
+    @MainActor
+    private func openInsights(_ app: XCUIApplication) {
+        let tile = app.buttons["today.insights"]
+        XCTAssertTrue(app.buttons["today.status"].waitForExistence(timeout: 10))
+        for _ in 0..<4 where !(tile.exists && tile.isHittable) { app.swipeUp() }
+        tile.tap()
+        XCTAssertTrue(app.navigationBars["Insights"].waitForExistence(timeout: 5))
+        XCTAssertTrue(app.otherElements["insights.heatmap"].waitForExistence(timeout: 30), "insights didn't load")
+    }
+
     // MARK: Accessibility (M6)
 
     /// Runs Xcode's accessibility audit on every main screen; logs each issue, then fails if any are left.
@@ -333,6 +390,9 @@ final class SmokeTests: XCTestCase {
         XCTAssertTrue(app.images["live.image"].waitForExistence(timeout: 15))
         try audit("Live")
         app.buttons["live.close"].tap()
+        openInsights(app)
+        try audit("Insights")
+        app.navigationBars["Insights"].buttons.firstMatch.tap()
         app.buttons["Settings"].tap()
         XCTAssertTrue(app.navigationBars["Settings"].waitForExistence(timeout: 5))
         try audit("Settings")
@@ -551,20 +611,30 @@ final class SmokeTests: XCTestCase {
                       || app.staticTexts.containing(NSPredicate(format: "label CONTAINS 'Apple Intelligence'")).firstMatch.exists)
         attach(app, "27-cardex-collection-item")
 
-        // The same card on one of that label's sightings.
+        // One of that label's sightings has its own trading card (its paint, its text).
         let sighting = app.buttons.matching(identifier: "sightings.card").firstMatch
         XCTAssertTrue(sighting.waitForExistence(timeout: 10))
         sighting.tap()
         XCTAssertTrue(app.buttons["detail.timelapse"].waitForExistence(timeout: 10))
         let detailCard = app.descendants(matching: .any)["cardex.card"]
         XCTAssertTrue(detailCard.waitForExistence(timeout: 15), "no Cardex card on the sighting detail")
-        app.swipeUp()
+        let sightingCard = app.descendants(matching: .any)["cardex.sightingCard"]
+        XCTAssertTrue(sightingCard.waitForExistence(timeout: 5), "no sighting trading card on the detail")
         attach(app, "28-cardex-detail")
 
         // Regenerate from the ⋯ menu keeps a card on screen.
         app.buttons["More"].tap()
         app.buttons["Regenerate Card"].tap()
         XCTAssertTrue(detailCard.waitForExistence(timeout: 5))
+
+        // Tapping it holds it in the inspector, which links to the label's own card.
+        let writing = app.staticTexts["Writing card…"]
+        let done = XCTNSPredicateExpectation(predicate: NSPredicate(format: "exists == false"), object: writing)
+        XCTAssertEqual(XCTWaiter.wait(for: [done], timeout: 90), .completed, "sighting card never finished")
+        sightingCard.tap()
+        XCTAssertTrue(app.descendants(matching: .any)["cardex.trading"].waitForExistence(timeout: 10))
+        XCTAssertTrue(app.descendants(matching: .any)["cardex.viewLabelCard"].waitForExistence(timeout: 5))
+        attach(app, "28b-cardex-sighting-inspector")
     }
 
     /// The Cardex tab in Cards (binder) or Grid mode; the mode is remembered across launches.

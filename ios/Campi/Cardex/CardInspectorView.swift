@@ -2,10 +2,12 @@ import CampiKit
 import SwiftUI
 
 /// One trading card, held: drag it to tilt it, and the foil and glare follow; let go and it settles flat.
+/// With `sighting`, that sighting's own card.
 struct CardInspectorView: View {
     @Environment(AppModel.self) private var app
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
     let item: CollectionItem
+    var sighting: Sighting? = nil
 
     @State private var tilt: CGPoint = Self.restingTilt
     @State private var held = false
@@ -23,6 +25,9 @@ struct CardInspectorView: View {
     }()
 
     private var finish: CardFinish { CardFinish(for: item) ?? .plain }
+    private var card: CardexStore.Card? {
+        if let sighting { app.cardex.card(for: sighting) } else { app.cardex.card(for: item.label) }
+    }
     private var maxTilt: Double { reduceMotion ? 6 : 18 }
 
     var body: some View {
@@ -30,7 +35,7 @@ struct CardInspectorView: View {
         let number = (collection?.items.firstIndex { $0.label == item.label } ?? -1) + 1
         ScrollView {
             VStack(spacing: 22) {
-                TradingCardView(item: item, number: number, total: collection?.total ?? 0, tilt: tilt, live: true,
+                TradingCardView(item: item, sighting: sighting, number: number, total: collection?.total ?? 0, tilt: tilt, live: true,
                                 spins: !reduceMotion)
                     .frame(maxWidth: 380)
                     .rotation3DEffect(.degrees(tilt.x * maxTilt), axis: (x: 0, y: 1, z: 0), perspective: 0.6)
@@ -58,13 +63,19 @@ struct CardInspectorView: View {
         }
         .environment(\.colorScheme, .dark)
         .toolbarColorScheme(.dark, for: .navigationBar)
-        .navigationTitle(app.cardex.card(for: item.label)?.text.displayName ?? item.label)
+        .navigationTitle(card?.text.displayName ?? item.label)
         .navigationBarTitleDisplayMode(.inline)
         .toolbar {
             ToolbarItem(placement: .topBarTrailing) {
                 Menu {
                     Button("Regenerate Card", systemImage: "arrow.clockwise") {
-                        Task { await app.cardex.regenerate(item) }
+                        Task {
+                            if let sighting {
+                                await app.cardex.regenerate(sighting, item: item)
+                            } else {
+                                await app.cardex.regenerate(item)
+                            }
+                        }
                     }
                 } label: {
                     Image(systemName: "ellipsis.circle")
@@ -94,19 +105,36 @@ struct CardInspectorView: View {
         VStack(alignment: .leading, spacing: 12) {
             HStack(spacing: 8) {
                 TierBadge(tier: item.tier)
-                Pill(text: HoloPattern.for(label: item.label, finish: finish).title(for: finish), symbol: "sparkles",
+                Pill(text: HoloPattern.for(label: sighting?.id ?? item.label, finish: finish).title(for: finish),
+                     symbol: "sparkles",
                      color: finish >= .holo ? .yellow : .secondary)
                 if item.origin == .discovered { Pill(text: "Discovered", symbol: "sparkle", color: .indigo) }
             }
-            Text("Seen \(item.count) time\(item.count == 1 ? "" : "s")").font(.headline)
-            if let first = item.firstSeenAt {
-                Text("First \(first.dateTimeText)").font(.subheadline).foregroundStyle(.secondary)
+            if let sighting {
+                Text("This \(sighting.color.map { "\($0) " } ?? "")\(sighting.displayLabel)").font(.headline)
+                Text("Seen \(sighting.startedAt.dateTimeText)").font(.subheadline).foregroundStyle(.secondary)
+                Text("\(item.label): seen \(item.count) time\(item.count == 1 ? "" : "s")")
+                    .font(.subheadline).foregroundStyle(.secondary)
+            } else {
+                Text("Seen \(item.count) time\(item.count == 1 ? "" : "s")").font(.headline)
+                if let first = item.firstSeenAt {
+                    Text("First \(first.dateTimeText)").font(.subheadline).foregroundStyle(.secondary)
+                }
+                if let last = item.lastSeenAt, item.count > 1 {
+                    Text("Last \(last.dateTimeText)").font(.subheadline).foregroundStyle(.secondary)
+                }
             }
-            if let last = item.lastSeenAt, item.count > 1 {
-                Text("Last \(last.dateTimeText)").font(.subheadline).foregroundStyle(.secondary)
-            }
-            if let note = app.cardex.card(for: item.label)?.note {
+            if let note = card?.note {
                 Label(note, systemImage: "apple.intelligence").font(.caption).foregroundStyle(.secondary)
+            }
+            if sighting != nil {
+                NavigationLink(value: CardexCardRoute(item: item)) {
+                    Label("View \(item.label) Card", systemImage: "rectangle.portrait.on.rectangle.portrait.angled")
+                        .frame(maxWidth: .infinity)
+                }
+                .buttonStyle(.bordered)
+                .controlSize(.large)
+                .accessibilityIdentifier("cardex.viewLabelCard")
             }
             NavigationLink(value: item) {
                 Label("See Sightings", systemImage: "car.side")

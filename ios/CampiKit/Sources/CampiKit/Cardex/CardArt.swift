@@ -46,15 +46,21 @@ public enum CarBodyStyle: String, Codable, Hashable, Sendable, CaseIterable {
                 "cherokee", "rogue", "tucson", "telluride", "cx-5", "cx-50", "x3", "x5", "urus", "r1s", "highlander",
                 "pilot", "escape", "santa fe", "sorento", "pathfinder", "murano", "traverse", "q5", "q7", "gx", "rx", "nx", "atlas", "tiguan", "kona", "seltos", "sportage", "crosstrek",
                 "ascent", "4xe", "bronco sport", "blazer", "trax", "durango", "palisade", "polestar 3"]),
+        (.sedan, ["sedan", "camry", "accord", "altima", "maxima", "sentra", "versa", "corolla", "civic", "avalon",
+                  "malibu", "impala", "sonata", "elantra", "k5", "optima", "forte", "jetta", "passat", "legacy",
+                  "mazda3", "mazda6", "fusion", "taurus", "charger", "300", "model 3", "model s", "es", "is",
+                  "a4", "a6", "c-class", "e-class", "3 series", "5 series", "tlx", "integra", "g70"]),
     ]
 
     /// A body style from the label alone, for cards without a generated one. Defaults to sedan.
     public static func guess(label: String, make: String? = nil, model: String? = nil) -> CarBodyStyle {
+        match(label: label, model: model) ?? .sedan
+    }
+
+    /// The body style the label's words name, or `nil` when they don't name one.
+    public static func match(label: String, model: String? = nil) -> CarBodyStyle? {
         let text = words(label, model)
-        for (style, words) in keywords where words.contains(where: { text.contains(" \($0) ") }) {
-            return style
-        }
-        return .sedan
+        return keywords.first { _, words in words.contains { text.contains(" \($0) ") } }?.0
     }
 }
 

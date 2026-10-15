@@ -438,6 +438,7 @@ media: {video: url?}}`
 | `first_seen_at`, `last_seen_at` | datetime? | over counted sightings |
 | `tier` | enum `uncaught` \| `rare` \| `uncommon` \| `common` | §6.2 |
 | `cover` | `{sighting_id: string, crop: url}?` | the counted sighting with the highest `confidence` (ties: newest) |
+| `mesh` | `{url: url, sighting_id: string, color: string?}?` | a 3D scan of the car from one sighting's crop (`[cards] meshes_enabled`); `null` until one is made. Binary glTF: one triangle mesh with `POSITION`, `NORMAL` and `COLOR_0` (the photo's sRGB bytes), the car's length 1 along +x (its front), y up, ground at y = 0. `color`: that sighting's color name, to repaint the scan in another's |
 
 ### 5.7 `Highlight`
 | Key | Type | Meaning |

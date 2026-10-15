@@ -33,6 +33,14 @@ public struct CollectionItem: Codable, Hashable, Sendable, Identifiable {
         public var crop: MediaPath
     }
 
+    /// The PC's 3D scan of the car (api-contract §5.6): a GLB made from one sighting's crop.
+    public struct Mesh: Codable, Hashable, Sendable {
+        public var url: MediaPath
+        public var sightingId: String
+        /// That sighting's color name: what the scan's paint is, for repainting it in another sighting's color.
+        public var color: String?
+    }
+
     public var label: String
     public var make: String?
     public var model: String?
@@ -43,6 +51,8 @@ public struct CollectionItem: Codable, Hashable, Sendable, Identifiable {
     public var lastSeenAt: PCDate?
     public var tier: Tier
     public var cover: Cover?
+    /// `nil` until the PC has scanned this car (or with scans off).
+    public var mesh: Mesh?
 
     public var id: String { label }
     public var isCaught: Bool { count > 0 }
